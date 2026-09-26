@@ -7,8 +7,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
-from tauceti_worker.transcript import TOOL_INPUT_LIMIT, TOOL_RESULT_LIMIT
+import epsiloneridani_worker as tc
+from epsiloneridani_worker.transcript import TOOL_INPUT_LIMIT, TOOL_RESULT_LIMIT
 
 fails = 0
 
@@ -98,7 +98,7 @@ check("large result reports exact omitted bytes", f"[... omitted {omitted} bytes
 
 patch_command = """apply_patch <<'PATCH'
 *** Begin Patch
-*** Update File: TauCeti/A.lean
+*** Update File: EpsilonEridani/A.lean
 @@
 -old private diff
 +new private diff
@@ -116,7 +116,7 @@ out = event(
         },
     },
 )
-check("Codex apply_patch body is suppressed", "TauCeti/A.lean" in out and "private diff" not in out)
+check("Codex apply_patch body is suppressed", "EpsilonEridani/A.lean" in out and "private diff" not in out)
 
 out = event(
     codex,
@@ -126,14 +126,14 @@ out = event(
             "id": "f1",
             "type": "file_change",
             "changes": [
-                {"path": "TauCeti/A.lean", "kind": "update"},
-                {"path": "TauCeti/B.lean", "kind": "add"},
+                {"path": "EpsilonEridani/A.lean", "kind": "update"},
+                {"path": "EpsilonEridani/B.lean", "kind": "add"},
             ],
             "status": "completed",
         },
     },
 )
-check("Codex file changes list actions and paths", "- update TauCeti/A.lean" in out and "- add TauCeti/B.lean" in out)
+check("Codex file changes list actions and paths", "- update EpsilonEridani/A.lean" in out and "- add EpsilonEridani/B.lean" in out)
 check("Codex file changes contain no diff", "diff --git" not in out and "@@" not in out)
 
 out = event(
@@ -214,7 +214,7 @@ out = event(
                     "id": "tool-1",
                     "name": "Edit",
                     "input": {
-                        "file_path": "TauCeti/A.lean",
+                        "file_path": "EpsilonEridani/A.lean",
                         "old_string": "SECRET OLD BODY",
                         "new_string": "SECRET NEW BODY",
                     },
@@ -225,7 +225,7 @@ out = event(
 )
 check("Claude narration is retained", "[assistant]\nI will inspect the failing file." in out)
 check("Claude raw thinking is omitted", "hidden chain of thought" not in out)
-check("Claude edit lists its path", "[tool Edit]" in out and "TauCeti/A.lean" in out)
+check("Claude edit lists its path", "[tool Edit]" in out and "EpsilonEridani/A.lean" in out)
 check("Claude edit bodies are suppressed", "SECRET OLD BODY" not in out and "SECRET NEW BODY" not in out)
 check("Claude edit reports body sizes", '"old_string_bytes": 15' in out and '"new_string_bytes": 15' in out)
 

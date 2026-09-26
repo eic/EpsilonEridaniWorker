@@ -1,4 +1,4 @@
-"""tauceti_worker.round — round lifecycle: the per-worker lock, signal/cleanup handling, the
+"""epsiloneridani_worker.round — round lifecycle: the per-worker lock, signal/cleanup handling, the
 branch-claim heartbeat, and the loop→child round spawn with process-group teardown."""
 
 from __future__ import annotations
@@ -305,7 +305,7 @@ def run_round_subprocess(argv_tail: list[str], timeout: int = ROUND_TIMEOUT) -> 
         # Unlike kill_round_group (which signals while the leader PID is still live), p.wait() has already
         # reaped the leader here, so the group is held open only by stragglers. The lone wrong-kill window
         # — the freed leader PID being reused AND the reuser making itself a group leader before this line
-        # — is microseconds wide and needs a deliberate setsid; we accept it. (One-shot `tauceti work`
+        # — is microseconds wide and needs a deliberate setsid; we accept it. (One-shot `epsiloneridani work`
         # runs the round in-process, not through here, so it is not swept; only the unbounded --loop leak
         # is operationally damaging, so that scope gap is acceptable.)
         reap_round_group(pgid)

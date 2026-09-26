@@ -1,4 +1,4 @@
-"""tauceti_worker.loop — the driver loop: pace against quota, run one round as a child under a hard
+"""epsiloneridani_worker.loop — the driver loop: pace against quota, run one round as a child under a hard
 timeout, then settle (short pause if productive, escalating back-off otherwise)."""
 
 from __future__ import annotations
@@ -362,7 +362,7 @@ def resolve_work_model(
 
     `fresh` forces the usage read rather than accepting a cached one. A cached reading is only evidence
     about the moment it was taken (see Quota._claude_pass), so where nothing has just refreshed it — a
-    one-shot `tauceti work` — this is the difference between deciding on current telemetry and refusing
+    one-shot `epsiloneridani work` — this is the difference between deciding on current telemetry and refusing
     on an hour-old verdict. A `_round` child leaves it off: the loop driver refreshed seconds ago, and
     re-fetching would only ask the same question twice.
 

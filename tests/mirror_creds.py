@@ -16,7 +16,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 if sys.platform == "darwin":
     print("[SKIP] mirror_creds is a Linux-only behavior (macOS uses the Keychain)")
@@ -50,8 +50,8 @@ def setup(tmp):
     src_codex, iso_codex = real / ".codex", iso / ".codex"
     for d in (src_claude, iso_claude, src_codex, iso_codex):
         d.mkdir(parents=True)
-    (iso_claude / ".tauceti-creds-source").write_text(str(src_claude))
-    (iso_codex / ".tauceti-creds-source").write_text(str(src_codex))
+    (iso_claude / ".epsiloneridani-creds-source").write_text(str(src_claude))
+    (iso_codex / ".epsiloneridani-creds-source").write_text(str(src_codex))
     os.environ["CLAUDE_CONFIG_DIR"] = str(iso_claude)  # mirror_creds reads claude_dir(cfg.home) = this
     cfg = types.SimpleNamespace(home=iso)
     return (

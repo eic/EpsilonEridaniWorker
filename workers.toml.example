@@ -1,4 +1,4 @@
-# Semantic desired state for `tauceti workers`.
+# Semantic desired state for `epsiloneridani workers`.
 version = 1
 
 [[workers]]

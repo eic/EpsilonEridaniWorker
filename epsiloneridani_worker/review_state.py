@@ -1,4 +1,4 @@
-"""tauceti_worker.review_state — read the PR scoreboard comment (the multi-agent source of truth)
+"""epsiloneridani_worker.review_state — read the PR scoreboard comment (the multi-agent source of truth)
 behind a short-TTL cache, with the predicates the cascade gates on."""
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ from .github import GitHub
 # Provenance is tracked so mutating passes can refuse to act on stale data.
 # ============================================================================
 
-META_RE = re.compile(r"<!--tauceti-meta:v1 (.*?)-->", re.S)
+META_RE = re.compile(r"<!--epsiloneridani-meta:v1 (.*?)-->", re.S)
 
 
 @dataclass
@@ -155,7 +155,7 @@ class ReviewState:
         return inflight_review_providers(self._issue_comments(pr, force=force), head, int(time.time()))
 
     def gh_meta(self, pr: int, *, force: bool = False) -> Meta:
-        """Newest scoreboard's <!--tauceti-meta:v1 {...}--> JSON, identified by the <!--tauceti-scoreboard-->
+        """Newest scoreboard's <!--epsiloneridani-meta:v1 {...}--> JSON, identified by the <!--epsiloneridani-scoreboard-->
         marker, with TTL cache.
 
         We DON'T gate on the comment author's repo association. `author_association` is viewer-dependent:
@@ -195,10 +195,10 @@ class ReviewState:
         data = None
         if comments:
             # Newest-first, but skip a marker comment whose meta is missing/garbage: a newer empty or
-            # malformed <!--tauceti-scoreboard--> marker must not mask an older comment that does carry a
+            # malformed <!--epsiloneridani-scoreboard--> marker must not mask an older comment that does carry a
             # valid scoreboard (without the author gate, anyone can post such a masking marker).
             marked = sorted(
-                (c for c in comments if "<!--tauceti-scoreboard-->" in (c.get("body") or "")),
+                (c for c in comments if "<!--epsiloneridani-scoreboard-->" in (c.get("body") or "")),
                 key=lambda c: c.get("updated_at", ""),
                 reverse=True,
             )
@@ -284,9 +284,9 @@ class ReviewState:
 
     def newest_contest_reply(self, pr: int, *, force: bool = False):
         """The newest author CONTEST reply on this PR's rubric threads, or None. A contest reply has
-        its `in_reply_to_id` pointing at a thread root carrying a `<!--tauceti-rubric:NAME-->`
+        its `in_reply_to_id` pointing at a thread root carrying a `<!--epsiloneridani-rubric:NAME-->`
         marker. Our own comments are dropped by MARKER, never by author login: a contest answer
-        carries `tauceti-reply:` and a root carries `tauceti-rubric:`, so both are skipped, while a
+        carries `epsiloneridani-reply:` and a root carries `epsiloneridani-rubric:`, so both are skipped, while a
         human contest (even one sharing the worker's login) is never wrongly dropped. "Newest" is by
         the monotonic comment `id` (not the second-resolution timestamp, which can't separate two
         replies in one second). Its creation time is returned for review-affinity aging. Returns
@@ -307,7 +307,7 @@ class ReviewState:
         roots = {}
         for c in rcs:
             if c.get("in_reply_to_id") is None:
-                mk = re.search(r"tauceti-rubric:([a-z][a-z-]*?)\s*-->", c.get("body") or "")
+                mk = re.search(r"epsiloneridani-rubric:([a-z][a-z-]*?)\s*-->", c.get("body") or "")
                 if mk:
                     roots[c["id"]] = mk.group(1)
         best = None
@@ -316,7 +316,7 @@ class ReviewState:
             if not rubric:
                 continue
             body = c.get("body") or ""
-            if "tauceti-reply:" in body or "tauceti-rubric:" in body:
+            if "epsiloneridani-reply:" in body or "epsiloneridani-rubric:" in body:
                 continue
             cid = c.get("id") or 0
             if best is None or cid > best["id"]:

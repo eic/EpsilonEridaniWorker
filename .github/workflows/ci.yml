@@ -59,17 +59,17 @@ jobs:
       - name: Build the wheel
         run: uv build
       # uv build proves the artifact builds; this proves the force-include mapping (prompts/ and
-      # scripts/ into the tauceti_worker package) works once installed, and that the console script
-      # runs. Run the import check from /tmp with -P so the source-tree tauceti_worker/ on the
+      # scripts/ into the epsiloneridani_worker package) works once installed, and that the console script
+      # runs. Run the import check from /tmp with -P so the source-tree epsiloneridani_worker/ on the
       # checkout root can't shadow the installed package (whose prompts/scripts sit beside it).
       - name: Install smoke test
         run: |
           uv venv /tmp/smoke
           uv pip install --python /tmp/smoke/bin/python dist/*.whl
-          /tmp/smoke/bin/tauceti --help
+          /tmp/smoke/bin/epsiloneridani --help
           cd /tmp && /tmp/smoke/bin/python -P - <<'PY'
           import pathlib
-          import tauceti_worker.__main__ as m
+          import epsiloneridani_worker.__main__ as m
           base = pathlib.Path(m.__file__).parent
           assert (base / "prompts").is_dir(), "prompts/ missing from the installed wheel"
           assert (base / "scripts").is_dir(), "scripts/ missing from the installed wheel"
@@ -90,8 +90,8 @@ jobs:
           context: .
           load: true
           tags: |
-            tauceti-worker:ci
-            tauceti-worker:local
+            epsiloneridani-worker:ci
+            epsiloneridani-worker:local
           pull: true
           no-cache: ${{ github.event_name == 'schedule' }}
           cache-from: type=gha
@@ -100,21 +100,21 @@ jobs:
         run: |
           docker compose run --rm --no-deps \
             -e HOME=/tmp/isolated-home \
-            tauceti bash -euo pipefail -c '
+            epsiloneridani bash -euo pipefail -c '
             mkdir -p "$HOME"
-            for tool in gh git uvx jq lake codex claude tauceti-oauth-refresh; do
+            for tool in gh git uvx jq lake codex claude epsiloneridani-oauth-refresh; do
               command -v "$tool" >/dev/null
             done
             lake --version
-            ./tauceti --help >/dev/null
+            ./epsiloneridani --help >/dev/null
             claude auth login --help >/dev/null
             codex login --help 2>&1 | grep -F -- --device-auth >/dev/null
-            doctor_output="$(./tauceti doctor || true)"
+            doctor_output="$(./epsiloneridani doctor || true)"
             printf "%s\n" "$doctor_output"
             printf "%s\n" "$doctor_output" | grep -F "[ok     ] lake"
             git init -q /tmp/git-smoke
             git -C /tmp/git-smoke commit --allow-empty -m smoke >/dev/null
-            test "$(git -C /tmp/git-smoke log -1 --format=%ae)" = "tauceti-worker@users.noreply.github.com"
+            test "$(git -C /tmp/git-smoke log -1 --format=%ae)" = "epsiloneridani-worker@users.noreply.github.com"
             set +e
             claude_output="$(timeout 15 claude -p "Reply with ok" --model opus --dangerously-skip-permissions 2>&1)"
             set -e
@@ -122,42 +122,42 @@ jobs:
           '
       - name: Smoke-test configurable worker options
         run: |
-          TAUCETI_WORKER_ARGS=--help docker compose run --rm --no-deps tauceti 2>&1 |
-            grep -F "usage: tauceti work"
+          TAUCETI_WORKER_ARGS=--help docker compose run --rm --no-deps epsiloneridani 2>&1 |
+            grep -F "usage: epsiloneridani work"
           test ! -e .env
           trap 'rm -f .env' EXIT
           printf '%s\n' 'TAUCETI_WORKER_ARGS=--help' >.env
           docker compose config --format json | python3 -c \
-            'import json, sys; assert json.load(sys.stdin)["services"]["tauceti"]["environment"]["TAUCETI_WORKER_ARGS"] == "--help"'
+            'import json, sys; assert json.load(sys.stdin)["services"]["epsiloneridani"]["environment"]["TAUCETI_WORKER_ARGS"] == "--help"'
       # Exercise the actual tini -> uv -> Python process tree used by Compose. The
       # unit test invokes Python directly and cannot prove that SIGTERM crosses uv.
       - name: Graceful stop reaches the worker loop
         run: |
-          docker compose up -d tauceti
+          docker compose up -d epsiloneridani
           for attempt in $(seq 1 30); do
-            docker compose logs --no-color tauceti | grep -F "loop start:" && break
+            docker compose logs --no-color epsiloneridani | grep -F "loop start:" && break
             test "$attempt" -lt 30
             sleep 1
           done
-          docker compose stop -t 60 tauceti
-          worker_log="$(docker compose logs --no-color tauceti)"
+          docker compose stop -t 60 epsiloneridani
+          worker_log="$(docker compose logs --no-color epsiloneridani)"
           printf "%s\n" "$worker_log"
           printf "%s\n" "$worker_log" | grep -F "loop terminated — stopping"
-          container_id="$(docker compose ps -aq tauceti)"
+          container_id="$(docker compose ps -aq epsiloneridani)"
           test "$(docker inspect --format '{{.State.ExitCode}}' "$container_id")" = 143
       - name: Smoke-test both credential refresher services
         run: |
           for provider in claude codex; do
             log="$(mktemp)"
-            docker run --rm --entrypoint /usr/local/bin/tauceti-oauth-refresh \
+            docker run --rm --entrypoint /usr/local/bin/epsiloneridani-oauth-refresh \
               -e TAUCETI_REFRESH_ONCE=1 \
-              tauceti-worker:ci "$provider" >"$log" 2>&1
+              epsiloneridani-worker:ci "$provider" >"$log" 2>&1
             grep -F "$provider-refresh: waiting for" "$log"
           done
       - name: Probe the live OAuth contracts
         if: github.event_name == 'schedule'
         run: |
-          docker run --rm -i --entrypoint python3 tauceti-worker:ci <<'PY'
+          docker run --rm -i --entrypoint python3 epsiloneridani-worker:ci <<'PY'
           import requests
 
           probes = [

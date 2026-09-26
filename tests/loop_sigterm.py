@@ -25,8 +25,8 @@ def child(started: Path, cleaned: Path) -> int:
 
 
 def driver(started: Path, cleaned: Path) -> int:
-    import tauceti_worker.loop as loop
-    import tauceti_worker.round as round_lifecycle
+    import epsiloneridani_worker.loop as loop
+    import epsiloneridani_worker.round as round_lifecycle
 
     loop.choose_model = lambda *_args, **_kwargs: ("codex", {})
     loop.github_budget = lambda: {}

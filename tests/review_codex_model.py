@@ -13,7 +13,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-from tauceti_worker import agents  # noqa: E402
+from epsiloneridani_worker import agents  # noqa: E402
 
 fails = 0
 

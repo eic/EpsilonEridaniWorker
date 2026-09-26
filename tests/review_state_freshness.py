@@ -24,7 +24,7 @@ from types import SimpleNamespace
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 fails = 0
 
@@ -38,12 +38,12 @@ def check(name, got, want):
 
 def board(head="abc123"):
     """A scoreboard comment shaped exactly like the engine's: the marker, then the meta blob."""
-    return {"body": "<!--tauceti-scoreboard--><!--tauceti-meta:v1 " + json.dumps({"head_sha": head}) + "-->"}
+    return {"body": "<!--epsiloneridani-scoreboard--><!--epsiloneridani-meta:v1 " + json.dumps({"head_sha": head}) + "-->"}
 
 
 def marker(head, provider, expires_at):
     return {
-        "body": "<!--tauceti-review-in-progress "
+        "body": "<!--epsiloneridani-review-in-progress "
         + json.dumps({"head": head, "providers": [provider], "expires_at": expires_at})
         + "-->"
     }
@@ -51,7 +51,7 @@ def marker(head, provider, expires_at):
 
 def contest(cid=7, root=3):
     return [
-        {"id": root, "in_reply_to_id": None, "body": "<!--tauceti-rubric:reuse-->"},
+        {"id": root, "in_reply_to_id": None, "body": "<!--epsiloneridani-rubric:reuse-->"},
         {"id": cid, "in_reply_to_id": root, "body": "this finding is wrong", "created_at": "2026-09-17T00:00:00Z"},
     ]
 

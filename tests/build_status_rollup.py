@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 SAME = tc.TAUCETI_OWNER  # head in the base repo
 FORK = "some-fork-owner"  # head in a fork

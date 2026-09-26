@@ -11,7 +11,7 @@ from types import SimpleNamespace
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 SOL = "gpt-6-sol"
 LUNA = "gpt-6-luna"

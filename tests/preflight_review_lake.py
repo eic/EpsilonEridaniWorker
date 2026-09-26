@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """preflight() gates a HOST authoring round on a local `lake` toolchain — but review is not an
 authoring stage: it runs the fetched-on-demand review engine and never compiles. Since the sandbox
-default flipped to host, `tauceti work --only review` runs on the host by default, so a stray `lake`
+default flipped to host, `epsiloneridani work --only review` runs on the host by default, so a stray `lake`
 requirement would falsely block every review-only machine that has no Lean toolchain. This test pins
 that review-host preflight passes without `lake`, while an authoring stage still requires it.
 
@@ -13,7 +13,7 @@ from types import SimpleNamespace
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 fails = 0
 

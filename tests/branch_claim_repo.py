@@ -18,10 +18,10 @@ from types import SimpleNamespace
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
-from tauceti_worker import github as gh_mod  # noqa: E402
-from tauceti_worker import round as round_mod  # noqa: E402
+from epsiloneridani_worker import github as gh_mod  # noqa: E402
+from epsiloneridani_worker import round as round_mod  # noqa: E402
 
-CLAIMS = "TauCetiProject/tauceti-claims"
+CLAIMS = "eic/epsiloneridani-claims"
 
 
 class FakeContext:
@@ -104,13 +104,13 @@ def check(name, fn):
 
 def shared_namespace_lifecycle():
     with Harness([0]) as h:
-        assert h.claims.begin_branch_work(143, "abc", "feature", "alice", "TauCeti")
+        assert h.claims.begin_branch_work(143, "abc", "feature", "alice", "EpsilonEridani")
         assert h.acquired_from == [CLAIMS]
         assert h.heartbeats == [("branch/143", CLAIMS)]
         assert "CLAIM_REPO" not in os.environ
         assert os.environ["TAUCETI_CLAIM_REPO"] == CLAIMS
         # The arbiter still pushes to the head repository; only the claim moved.
-        assert os.environ["TAUCETI_PUSH_REMOTE"] == "https://github.com/alice/TauCeti"
+        assert os.environ["TAUCETI_PUSH_REMOTE"] == "https://github.com/alice/EpsilonEridani"
         h.claims.release()
         assert h.released_from == [CLAIMS]
         assert "TAUCETI_CLAIM_KEY" not in os.environ
@@ -118,20 +118,20 @@ def shared_namespace_lifecycle():
 
 
 def fork_namespace_lifecycle():
-    with Harness([0], resolved="alice/TauCeti") as h:
+    with Harness([0], resolved="alice/EpsilonEridani") as h:
         # An operator with no shared access claims in their own fork, for any PR, including one whose
         # head lives somewhere they could never push.
-        assert h.claims.begin_branch_work(91, "abc", "feature", "bob", "TauCeti")
-        assert h.acquired_from == ["alice/TauCeti"]
-        assert h.heartbeats == [("branch/91", "alice/TauCeti")]
-        assert os.environ["TAUCETI_PUSH_REMOTE"] == "https://github.com/bob/TauCeti"
+        assert h.claims.begin_branch_work(91, "abc", "feature", "bob", "EpsilonEridani")
+        assert h.acquired_from == ["alice/EpsilonEridani"]
+        assert h.heartbeats == [("branch/91", "alice/EpsilonEridani")]
+        assert os.environ["TAUCETI_PUSH_REMOTE"] == "https://github.com/bob/EpsilonEridani"
         h.claims.release()
-        assert h.released_from == ["alice/TauCeti"]
+        assert h.released_from == ["alice/EpsilonEridani"]
 
 
 def head_repository_is_never_the_claim_repository():
     with Harness([0]) as h:
-        assert h.claims.begin_branch_work(7, "abc", "feature", "TauCetiProject", "TauCeti")
+        assert h.claims.begin_branch_work(7, "abc", "feature", "eic", "EpsilonEridani")
         # Canonical is never chosen, not even when the PR head is on it: nobody outside the org can
         # push there, and a claim repo you cannot push to errors on every acquire.
         assert h.acquired_from == [CLAIMS]
@@ -139,7 +139,7 @@ def head_repository_is_never_the_claim_repository():
 
 def explicit_override():
     with Harness([0], override="coordination/claims") as h:
-        assert h.claims.begin_branch_work(143, "abc", "feature", "alice", "TauCeti")
+        assert h.claims.begin_branch_work(143, "abc", "feature", "alice", "EpsilonEridani")
         assert h.acquired_from == ["coordination/claims"]
         assert h.heartbeats == [("branch/143", "coordination/claims")]
         assert os.environ["TAUCETI_CLAIM_REPO"] == "coordination/claims"
@@ -150,20 +150,20 @@ def explicit_override():
 
 def skipped_candidate_does_not_leak():
     with Harness([1, 0]) as h:
-        assert not h.claims.begin_branch_work(1, "a", "one", "alice", "TauCeti")
+        assert not h.claims.begin_branch_work(1, "a", "one", "alice", "EpsilonEridani")
         assert "TAUCETI_CLAIM_KEY" not in os.environ
         assert "TAUCETI_CLAIM_REPO" not in os.environ
-        assert h.claims.begin_branch_work(2, "b", "two", "bob", "TauCeti")
+        assert h.claims.begin_branch_work(2, "b", "two", "bob", "EpsilonEridani")
         assert h.acquired_from == [CLAIMS, CLAIMS]
         assert h.heartbeats == [("branch/2", CLAIMS)]
-        assert os.environ["TAUCETI_PUSH_REMOTE"] == "https://github.com/bob/TauCeti"
+        assert os.environ["TAUCETI_PUSH_REMOTE"] == "https://github.com/bob/EpsilonEridani"
         h.claims.release()
         assert h.released_from == [CLAIMS]
 
 
 def acquire_error_fails_open():
     with Harness([2]) as h:
-        assert h.claims.begin_branch_work(143, "abc", "feature", "alice", "TauCeti")
+        assert h.claims.begin_branch_work(143, "abc", "feature", "alice", "EpsilonEridani")
         assert h.acquired_from == [CLAIMS]
         assert h.heartbeats == []
         assert h.claims.held is None
@@ -221,7 +221,7 @@ def safe_push_scopes_claim_repo():
             "TAUCETI_CLAIM_SH": str(claim),
             "TAUCETI_PUSH_REF": "feature",
             "TAUCETI_PUSH_EXPECT": "abc",
-            "TAUCETI_PUSH_REMOTE": "https://github.com/alice/TauCeti",
+            "TAUCETI_PUSH_REMOTE": "https://github.com/alice/EpsilonEridani",
         }
         result = subprocess.run([REPO / "scripts" / "git-safe-push"], env=env, capture_output=True, text=True)
         assert result.returncode == 0, result.stderr

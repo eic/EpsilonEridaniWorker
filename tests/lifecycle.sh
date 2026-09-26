@@ -10,7 +10,7 @@ pass=0; fail=0
 ok()  { echo "  [PASS] $1"; pass=$((pass+1)); }
 no()  { echo "  [FAIL] $1"; fail=$((fail+1)); }
 
-run() { "$PY" ./tauceti "$@"; }   # plain python3 (lifecycle hooks don't need rich)
+run() { "$PY" ./epsiloneridani "$@"; }   # plain python3 (lifecycle hooks don't need rich)
 # `setsid` is util-linux and absent on macOS. NEWSESS is a portable inline prefix that puts the round in
 # its own session (own process group) via Python's os.setsid() before exec, matching how the loop driver
 # spawns rounds (subprocess start_new_session=True). It MUST be expanded inline, never wrapped in a shell
@@ -36,7 +36,7 @@ TAUCETI_TEST_SLEEP=0 run _round >/tmp/lc4.log 2>&1; rc=$?
 echo "== 3. timeout teardown: a wedged round's process group is killed =="
 # Start a round in its own session that holds the lock and sleeps long, then kill its whole group
 # (this is what the loop driver's ROUND_TIMEOUT teardown does via os.killpg).
-TAUCETI_TEST_SLEEP=60 "${NEWSESS[@]}" "$PY" ./tauceti _round >/tmp/lc5.log 2>&1 &
+TAUCETI_TEST_SLEEP=60 "${NEWSESS[@]}" "$PY" ./epsiloneridani _round >/tmp/lc5.log 2>&1 &
 child=$!; sleep 1
 pgid=$(ps -o pgid= -p "$child" | tr -d ' ')
 self=$(ps -o pgid= -p $$ | tr -d ' ')
@@ -51,10 +51,10 @@ fi
 
 echo "== 4. signal exit codes: SIGTERM→143, SIGINT→130 =="
 # Direct PID kill (no separate group needed): RoundContext maps SIGTERM→143 / SIGINT→130 via cleanup.
-TAUCETI_TEST_SLEEP=30 "$PY" ./tauceti _round >/tmp/lc6.log 2>&1 &
+TAUCETI_TEST_SLEEP=30 "$PY" ./epsiloneridani _round >/tmp/lc6.log 2>&1 &
 c=$!; sleep 1; kill -TERM "$c"; wait "$c"; rc=$?
 (( rc == 143 )) && ok "SIGTERM → 143" || no "SIGTERM → $rc (expected 143)"
-TAUCETI_TEST_SLEEP=30 "$PY" ./tauceti _round >/tmp/lc7.log 2>&1 &
+TAUCETI_TEST_SLEEP=30 "$PY" ./epsiloneridani _round >/tmp/lc7.log 2>&1 &
 c=$!; sleep 1; kill -INT "$c"; wait "$c"; rc=$?
 (( rc == 130 )) && ok "SIGINT → 130" || no "SIGINT → $rc (expected 130)"
 

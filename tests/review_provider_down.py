@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """A reviewer-provider outage backs the loop off; it is not charged to whichever PR was next.
 
-TauCetiReview#117 gave the engine a distinct exit status for "I stopped because the provider is
+EpsilonEridaniReview#117 gave the engine a distinct exit status for "I stopped because the provider is
 unusable, and I posted nothing": a revoked credential, or an exhausted subscription window. Before
 that the engine exited 0 having posted a scoreboard of `error` rows, so do_review took the success
 path. With a real non-zero status it would otherwise fall into the ordinary failure branch and
@@ -11,7 +11,7 @@ outage lasting one quota window could strand several unrelated PRs. Review worke
 `--ignore-quota` precisely so they do not pace, which is what makes that a live risk rather than a
 theoretical one.
 
-This is the same carve-out the TauCetiData publish failure and the host-binary preflight already
+This is the same carve-out the EpsilonEridaniData publish failure and the host-binary preflight already
 make, in the same words: machine-wide, so warn loudly and raise NoProgress rather than bump a
 per-PR counter.
 
@@ -33,9 +33,9 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
-from tauceti_worker.constants import MAX_REVIEW_ERRORS, REVIEW_PROVIDER_DOWN_EXIT
-from tauceti_worker.review_diagnostics import classify_failure, read_review_failure
+import epsiloneridani_worker as tc
+from epsiloneridani_worker.constants import MAX_REVIEW_ERRORS, REVIEW_PROVIDER_DOWN_EXIT
+from epsiloneridani_worker.review_diagnostics import classify_failure, read_review_failure
 
 fails = 0
 

@@ -1,9 +1,9 @@
-"""tauceti — the Tau Ceti worker.
+"""epsiloneridani — the Tau Ceti worker.
 
-Bare `tauceti` opens a dashboard + launcher; `tauceti work [--loop]` does the work
-(one round, or the driver loop); `tauceti status` prints the read-only survey.
+Bare `epsiloneridani` opens a dashboard + launcher; `epsiloneridani work [--loop]` does the work
+(one round, or the driver loop); `epsiloneridani status` prints the read-only survey.
 
-The worker acts on TauCetiProject/TauCeti as the authenticated `gh` account, and
+The worker acts on eic/EpsilonEridani as the authenticated `gh` account, and
 treats that account's own PRs as the ones it tends. Each round does exactly ONE unit
 of work, chosen in priority order: rebase → bump → lint-repair → progress → fix-ci → fix → review →
 roadmap.
@@ -11,7 +11,7 @@ The `bump` step adapts a red bump-mathlib PR (the review bot opens those; the wo
 never authors a bump). Merging, abandoning, and de-duplicating PRs is the repo's CI,
 not the worker.
 
-(This module is the CLI entry point; `argparse` shows this docstring as `tauceti --help`.)"""
+(This module is the CLI entry point; `argparse` shows this docstring as `epsiloneridani --help`.)"""
 
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ from .agents import (
     isolate_home,
     resolve_authoring_profile,
     run_in_bubble,
-    tauceti_cache_unreachable_reason,
+    epsiloneridani_cache_unreachable_reason,
 )
 from .config import (
     Config,
@@ -87,11 +87,11 @@ WORK_EPILOG = """\
 the cascade (priority order; a round does the first that applies):
   rebase    bring our open PRs up to date with their base branch
   bump      adapt a red bump-mathlib PR (the worker never authors one)
-  lint-repair  fix what TauCeti's daily full lint found on main, on its red lint-repair PR
+  lint-repair  fix what EpsilonEridani's daily full lint found on main, on its red lint-repair PR
   progress  write a roadmap's STATUS.md / PROGRESS.md report (globally paced at 8h)
   fix-ci    fix red CI on one of our PRs
   fix       address review feedback on one of our PRs
-  review    review an open PR (runs the tauceti-review engine)
+  review    review an open PR (runs the epsiloneridani-review engine)
   roadmap   open a new PR for a roadmap item
 
   With no --only a round walks the whole cascade; --only pins it to a subset,
@@ -100,22 +100,22 @@ the cascade (priority order; a round does the first that applies):
   have done, so progress and roadmap (which name no existing PR) drop out.
 
 examples:
-  tauceti work                          one round: auto agent, on the host
-  tauceti work --loop                   the driver: keep picking the best job
-  tauceti work --loop --only review     a focused reviewer
-  tauceti work --loop --skip roadmap    the whole cascade except authoring new PRs
-  tauceti work --pr 412                 whatever the cascade wants to do to PR #412
-  tauceti work --pr 412,415 --only review,fix   only those two PRs, only those two units
-  tauceti work --only roadmap --roadmap-only ReductiveGroups
-  tauceti work --loop --roadmap-skip OneParameterSemigroups   leave that area to other workers
-  tauceti work --only review --agent claude --bubble
+  epsiloneridani work                          one round: auto agent, on the host
+  epsiloneridani work --loop                   the driver: keep picking the best job
+  epsiloneridani work --loop --only review     a focused reviewer
+  epsiloneridani work --loop --skip roadmap    the whole cascade except authoring new PRs
+  epsiloneridani work --pr 412                 whatever the cascade wants to do to PR #412
+  epsiloneridani work --pr 412,415 --only review,fix   only those two PRs, only those two units
+  epsiloneridani work --only roadmap --roadmap-only ReductiveGroups
+  epsiloneridani work --loop --roadmap-skip OneParameterSemigroups   leave that area to other workers
+  epsiloneridani work --only review --agent claude --bubble
                                         review with Opus inside the Bubble sandbox
-  tauceti work --dry-run                show what it WOULD do; act on nothing
+  epsiloneridani work --dry-run                show what it WOULD do; act on nothing
 
 multiple workers (share a host and coordinate through GitHub; a distinct id namespaces each):
-  tauceti work --loop                   auto-assigns worker1, worker2, ... per terminal
-  tauceti work --loop --worker-id alice --only review
-  tauceti work --loop --worker-id bob   --only roadmap
+  epsiloneridani work --loop                   auto-assigns worker1, worker2, ... per terminal
+  epsiloneridani work --loop --worker-id alice --only review
+  epsiloneridani work --loop --worker-id bob   --only roadmap
 
 environment (flags win; full reference linked below):
   TAUCETI_AGENT          default for --agent
@@ -133,10 +133,10 @@ environment (flags win; full reference linked below):
   CLAUDE_CONFIG_DIR      Claude config/credential source (Bubble uses a private macOS handoff)
                          (account switching, where the creds live in a file)
   CODEX_HOME             Codex config/credential source; point it at a private directory to give
-                         TauCeti its own Codex account without disturbing your interactive one
+                         EpsilonEridani its own Codex account without disturbing your interactive one
 
 full reference:
-  https://github.com/TauCetiProject/TauCetiWorker/blob/main/docs/reference.md
+  https://github.com/eic/EpsilonEridaniWorker/blob/main/docs/reference.md
 """
 
 
@@ -193,7 +193,7 @@ def add_work_flags(p: argparse.ArgumentParser) -> None:
         default=os.environ.get("TAUCETI_ACCOUNT"),
         metavar="EMAIL_OR_ID",
         help="require the agent's credential to be this account (email, or the workspace UUID "
-        "`tauceti doctor` prints), and refuse to run otherwise. TauCeti never switches accounts; "
+        "`epsiloneridani doctor` prints), and refuse to run otherwise. EpsilonEridani never switches accounts; "
         "this only checks, and the error says how to switch. Codex only, so it needs an explicit "
         "--agent codex (or $TAUCETI_AGENT=codex). Defaults to $TAUCETI_ACCOUNT",
     )
@@ -239,8 +239,8 @@ def add_work_flags(p: argparse.ArgumentParser) -> None:
         default=None,
         metavar="AREA",
         help="for roadmap rounds, the single roadmap area to steer toward: a subdirectory of "
-        "the TauCetiRoadmap repo. List them by opening the dashboard (bare `tauceti`) and "
-        "expanding the roadmap row, or browse github.com/TauCetiProject/TauCetiRoadmap. "
+        "the EpsilonEridaniRoadmap repo. List them by opening the dashboard (bare `epsiloneridani`) and "
+        "expanding the roadmap row, or browse github.com/eic/EpsilonEridaniRoadmap. "
         "Empty string = all areas; omit entirely (and leave $TAUCETI_ROADMAP_ONLY "
         "unset) to pick a fresh random area each round. Overrides "
         "$TAUCETI_ROADMAP_ONLY for this run",
@@ -510,12 +510,12 @@ def resolve_source(args, only: list[str]) -> str | None:
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="tauceti",
+        prog="epsiloneridani",
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="Run 'tauceti work -h' for work units and examples, or 'tauceti workers -h'\n"
+        epilog="Run 'epsiloneridani work -h' for work units and examples, or 'epsiloneridani workers -h'\n"
         "for persistent workers. Guide and reference:\n"
-        "  https://github.com/TauCetiProject/TauCetiWorker",
+        "  https://github.com/eic/EpsilonEridaniWorker",
     )
     sub = p.add_subparsers(dest="cmd")
 
@@ -626,7 +626,7 @@ def main(argv: list[str] | None = None) -> int:
         # --account names a CODEX account, so the round must be committed to Codex before it starts.
         # Under `auto` the pacer may legitimately land on Claude, and there is no honest answer then:
         # silently ignoring the flag would spend on an account the operator did not authorise, and
-        # failing at that point would look like TauCeti reneging on `auto`. Refuse up front instead.
+        # failing at that point would look like EpsilonEridani reneging on `auto`. Refuse up front instead.
         if getattr(args, "account", None) and agent != "codex":
             raise Die(
                 f"--account is a Codex account check, so it needs an explicit --agent codex; got "
@@ -634,7 +634,7 @@ def main(argv: list[str] | None = None) -> int:
                 + (
                     "`auto` may pick Claude, which has no account to check against."
                     if agent == "auto"
-                    else "TauCeti cannot check a Claude account: unlike Codex, Claude Code keeps no "
+                    else "EpsilonEridani cannot check a Claude account: unlike Codex, Claude Code keeps no "
                     "account identity in the credential this worker mirrors."
                 )
             )
@@ -827,7 +827,7 @@ def cmd_work(args, *, only: list[str], agent: str, one_round: bool, prs: tuple[i
                     pass
             os.kill(os.getpid(), signal.SIGTERM)
 
-        threading.Thread(target=stop_with_parent, name="tauceti-parent-watch", daemon=True).start()
+        threading.Thread(target=stop_with_parent, name="epsiloneridani-parent-watch", daemon=True).start()
     if explicit:
         wid = sanitize_wid(explicit)
         # A top-level loop driver also reserves its slot, so an auto-assigned peer in another terminal
@@ -888,7 +888,7 @@ def cmd_work(args, *, only: list[str], agent: str, one_round: bool, prs: tuple[i
             return 0
 
         # A `_round` child is spawned by a loop driver that forced a usage read moments ago, so it may
-        # use that. A one-shot `tauceti work` has nothing recent behind it and must look for itself,
+        # use that. A one-shot `epsiloneridani work` has nothing recent behind it and must look for itself,
         # rather than refuse the round on a cached verdict that may be an hour old.
         work_model, pending_init = resolve_work_model(
             cfg, agent, dry=dry, ignore_quota=ignore_quota, quota_cmd=quota_cmd, fresh=not one_round
@@ -930,14 +930,14 @@ def cmd_work(args, *, only: list[str], agent: str, one_round: bool, prs: tuple[i
 
 def cmd_egress_probe(args) -> int:
     """Open a review-posture bubble (same flags as review_in_bubble) and assert the network boundary:
-    the TauCeti-scoped proxy is reachable but arbitrary egress is denied. This is the property that makes
+    the EpsilonEridani-scoped proxy is reachable but arbitrary egress is denied. This is the property that makes
     a tool-using reviewer safe — re-run it whenever the bubble image / security policy changes, and once
     review gains tool use. Prints PROXY_OK + EGRESS_BLOCKED on success; tests/egress.sh asserts both."""
     cfg = Config.resolve(getattr(args, "worker_id", None))
     # set +e so a non-zero curl (the blocked case) doesn't abort the script before we print the verdict.
     probe = (
         "sh -lc 'set +e; "
-        "if gh auth token >/dev/null 2>&1 && gh api /repos/TauCetiProject/TauCeti >/dev/null 2>&1; "
+        "if gh auth token >/dev/null 2>&1 && gh api /repos/eic/EpsilonEridani >/dev/null 2>&1; "
         "then echo PROXY_OK; else echo PROXY_FAIL; fi; "
         "if curl -sS --max-time 10 -o /dev/null https://example.com 2>/dev/null; "
         "then echo EGRESS_LEAK; else echo EGRESS_BLOCKED; fi'"
@@ -963,7 +963,7 @@ def cmd_doctor(args) -> int:
     rows: list[tuple[str, bool, str]] = []
     rows.append(("gh", _have("gh"), "required"))
     rows.append(("git", _have("git"), "required"))
-    rows.append(("uv/uvx", _have("uvx"), "required (runs tauceti and fetches the review engine)"))
+    rows.append(("uv/uvx", _have("uvx"), "required (runs epsiloneridani and fetches the review engine)"))
     rows.append(("jq", _have("jq"), "claim.sh needs it"))
     gh_auth = subprocess.run(["gh", "auth", "status"], capture_output=True).returncode == 0
     rows.append(("gh auth", gh_auth, "the worker acts as this account; its PRs are the ones it tends"))
@@ -984,7 +984,7 @@ def cmd_doctor(args) -> int:
     rows.append(("lake", _have("lake"), "host authoring (the default) builds with it"))
     rows.append(("pi", _have("pi"), "for --agent deepseek/minimax"))
     rows.append(("kiro-cli", _have("kiro-cli"), "for --agent kiro"))
-    rows.append(("tmux", _have("tmux"), "optional `tauceti workers tmux` log workspace"))
+    rows.append(("tmux", _have("tmux"), "optional `epsiloneridani workers tmux` log workspace"))
     codex_creds = codex_dir(cfg.home) / "auth.json"
     rows.append(("codex creds", _safe_exists(codex_creds), str(codex_creds)))
     # Which Codex account those credentials spend under. `codex login status` will not tell you (it
@@ -1016,7 +1016,7 @@ def cmd_doctor(args) -> int:
         )
     )
     bad = 0
-    print(f"tauceti doctor — worker '{cfg.wid}'")
+    print(f"epsiloneridani doctor — worker '{cfg.wid}'")
     for name, ok, note in rows:
         mark = "ok " if ok else "MISSING"
         if not ok and name in ("gh", "git", "uv/uvx", "gh auth"):
@@ -1054,7 +1054,7 @@ def preflight(cfg: Config, opts: RoundOpts) -> None:
             "    - install Incus (https://linuxcontainers.org/incus/), then re-run; or\n"
             "    - drop --bubble to run on this host directly (the default; the agent then\n"
             "      has your full gh credentials and network, so use it only on trusted/disposable machines).\n"
-            "  `tauceti doctor` reports this too."
+            "  `epsiloneridani doctor` reports this too."
         )
     if uses_bubble and not opts.dry_run and bubble_cmd_is_disposable():
         raise Die(
@@ -1084,26 +1084,26 @@ def preflight(cfg: Config, opts: RoundOpts) -> None:
             "(needs kim-em/bubble#320). Install or update Bubble from kim-em/bubble, then re-run "
             "(override the executable with $TAUCETI_BUBBLE)."
         )
-    # Work-agent bubble rounds warm both Mathlib's cache and TauCeti's public Lake artifact cache before
+    # Work-agent bubble rounds warm both Mathlib's cache and EpsilonEridani's public Lake artifact cache before
     # launching the model. Require Bubble's host-global download proxy rather than exposing the cache's
     # public R2 domain directly to the container.
     if uses_fork and not opts.dry_run and not bubble_supports_lake_cache_service():
         raise Die(
-            "preflight: this bubble is too old for TauCeti's Lake artifact cache — it has no "
+            "preflight: this bubble is too old for EpsilonEridani's Lake artifact cache — it has no "
             "`--lake-cache-service`. Install or update Bubble from kim-em/bubble, then re-run "
             "(override the executable with $TAUCETI_BUBBLE)."
         )
     # Having the capability is not the same as the cache being readable through it. Check the endpoint
-    # itself, because the round's own fallback is to build TauCeti from source and carry on: a dead
+    # itself, because the round's own fallback is to build EpsilonEridani from source and carry on: a dead
     # cache costs an hour per round and never fails anything, so nothing else would ever report it.
     if uses_fork and not opts.dry_run:
-        unreachable = tauceti_cache_unreachable_reason()
+        unreachable = epsiloneridani_cache_unreachable_reason()
         if unreachable:
             raise Die(
-                f"preflight: TauCeti's public Lake artifact cache is not readable: {unreachable}. "
+                f"preflight: EpsilonEridani's public Lake artifact cache is not readable: {unreachable}. "
                 "Every work round would rebuild the library from source instead. Check the bucket's "
                 "public access and that TAUCETI_CACHE_DOMAIN still matches the LAKE_CACHE_*_PUBLIC "
-                "repository variables on TauCetiProject/TauCeti, then re-run."
+                "repository variables on eic/EpsilonEridani, then re-run."
             )
     # The CLI may advertise --allow-push while an older live daemon keeps rejecting fork pushes (403).
     # Require a reachable endpoint that advertises the capability, and refresh it safely when needed.
@@ -1113,7 +1113,7 @@ def preflight(cfg: Config, opts: RoundOpts) -> None:
 
 
 def cli_main() -> int:
-    """Console-script entry point (also used by ./tauceti). Maps the worker's exceptions to exit codes."""
+    """Console-script entry point (also used by ./epsiloneridani). Maps the worker's exceptions to exit codes."""
     # A service has no login shell to provide NIX_SSL_CERT_FILE, and uv's standalone CPython may not
     # know the host's CA-bundle path. Repair the process environment before quota telemetry and child
     # launches; this also gives other TLS-using subprocesses the same host trust store.
@@ -1131,7 +1131,7 @@ def cli_main() -> int:
         report_failure(str(e), code=EX_NOPROGRESS)
         return EX_NOPROGRESS
     except WorkersError as e:
-        print(f"tauceti workers: {e}", file=sys.stderr)
+        print(f"epsiloneridani workers: {e}", file=sys.stderr)
         return 2
     except KeyboardInterrupt:
         return 130

@@ -11,7 +11,7 @@ provider's usage endpoint. It honors `$CLAUDE_CONFIG_DIR`, so switching between
 a personal and a work Claude account is paced correctly.
 
 Reading quota never spends anything, with the one exception described under
-"window bootstrap" below. `tauceti status`, the dashboard, and an auto selection
+"window bootstrap" below. `epsiloneridani status`, the dashboard, and an auto selection
 that lands on Codex make no model request at all.
 
 ## Keeping the Claude token alive: `--auto-refresh`
@@ -22,12 +22,12 @@ is fine at a keyboard and fatal unattended: `work --loop` will sit at
 `claude usage HTTP 401 (access token expired or rejected; log in again)` until
 someone intervenes.
 
-`tauceti work --loop --auto-refresh` (or `$TAUCETI_AUTO_REFRESH=1`) lets the
+`epsiloneridani work --loop --auto-refresh` (or `$TAUCETI_AUTO_REFRESH=1`) lets the
 worker renew the token itself once it is within 90 minutes of expiry.
 
 **Only turn it on when nothing else uses that credential file.** Claude and Codex
 issue single-use refresh tokens: exchanging one retires it and returns a
-replacement. TauCeti serializes its own processes on the host, but it cannot
+replacement. EpsilonEridani serializes its own processes on the host, but it cannot
 serialize an interactive `claude` sharing `~/.claude/.credentials.json`, a second
 refresher, or a copy of the credential on another machine — a rotation here logs
 any of those out. The shape this is meant for is a worker running as its own
@@ -42,7 +42,7 @@ Docker deployment's dedicated refresher stays the single writer there. Rotations
 are rate-limited by markers beside the credential, shared across every worker on
 the host. Only the paths about to run something renew — the loop pacing towards a
 round, a round resolving the model it will launch, and the launch stage. Reading
-commands stay reads: `tauceti status` and the dashboard report an expired token
+commands stay reads: `epsiloneridani status` and the dashboard report an expired token
 rather than rotating it behind you.
 
 ## macOS and the login Keychain
@@ -86,7 +86,7 @@ as no constraint.
 
 There is one gap where the endpoint reports a window with no usage and no reset
 clock: right after that window rolls. Only a Claude request can open the new
-window, so `tauceti` makes one small `claude -p` turn to do it, drops the cached
+window, so `epsiloneridani` makes one small `claude -p` turn to do it, drops the cached
 usage, and re-reads. The fresh telemetry, not the request, then decides whether a
 round runs.
 

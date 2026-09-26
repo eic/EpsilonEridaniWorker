@@ -1,4 +1,4 @@
-"""tauceti_worker.build_caches — pooling the Lean build caches across workers.
+"""epsiloneridani_worker.build_caches — pooling the Lean build caches across workers.
 
 Mathlib's `.ltar` cache and the elan toolchain directory hold artifacts every worker fetches
 identically, but the per-worker `$HOME` that isolate_home() creates for CREDENTIALS made both

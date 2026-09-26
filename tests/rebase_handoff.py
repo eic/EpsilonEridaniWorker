@@ -9,14 +9,14 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from tauceti_worker.github import GitHub
+from epsiloneridani_worker.github import GitHub
 
-survey_mod = importlib.import_module("tauceti_worker.survey")
+survey_mod = importlib.import_module("epsiloneridani_worker.survey")
 HEAD = "a" * 40
 
 
-def request(head=HEAD, author="tauceti-review-bot[bot]"):
-    return {"author": author, "body": f"Merge-queue recovery for head `{head[:7]}`.\n\n<!--tauceti-rebase:v1 {head}-->"}
+def request(head=HEAD, author="epsiloneridani-review-bot[bot]"):
+    return {"author": author, "body": f"Merge-queue recovery for head `{head[:7]}`.\n\n<!--epsiloneridani-rebase:v1 {head}-->"}
 
 
 def test_trusted_paginated_comments():
@@ -27,10 +27,10 @@ def test_trusted_paginated_comments():
             ([request(author="peer"), request()], True),
             ([request(author="peer")], False),
             ([request("b" * 40)], False),
-            ([{**request(), "body": request()["body"].replace("tauceti-rebase", "tauceti-merge-stalled")}], False),
+            ([{**request(), "body": request()["body"].replace("epsiloneridani-rebase", "epsiloneridani-merge-stalled")}], False),
             ([{**request(), "body": "Quoted text\n" + request()["body"]}], False),
-            ([{"author": "tauceti-review-bot[bot]", "body": None}], False),
-            ([{"author": "tauceti-review-bot[bot]", "body": []}], False),
+            ([{"author": "epsiloneridani-review-bot[bot]", "body": None}], False),
+            ([{"author": "epsiloneridani-review-bot[bot]", "body": []}], False),
             ([None, [], request()], True),
         ]:
             response.stdout = "\n".join(json.dumps(row) for row in rows)
@@ -52,7 +52,7 @@ def pr(number, *, author="me", labels=("needs-rebase",), head=HEAD, conflicting=
         "headRefOid": head,
         "headRefName": "feature",
         "headRepositoryOwner": {"login": author},
-        "headRepository": {"name": "TauCeti"},
+        "headRepository": {"name": "EpsilonEridani"},
         "author": {"login": author},
         "statusCheckRollup": [],
         "mergeable": "CONFLICTING" if conflicting else "MERGEABLE",

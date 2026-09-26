@@ -7,10 +7,10 @@
 # Local Docker Compose options (may contain operator-specific configuration).
 /.env
 
-# Legacy local Screen assignments; `tauceti workers import workers.conf` migrates these.
+# Legacy local Screen assignments; `epsiloneridani workers import workers.conf` migrates these.
 /workers.conf
 
-# Python bytecode (tauceti is a single-file script; tests import it).
+# Python bytecode (epsiloneridani is a single-file script; tests import it).
 __pycache__/
 *.pyc
 

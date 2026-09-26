@@ -18,7 +18,7 @@ This harness pins the four properties that keep that true:
      passes — a leaked `__BIN__/git-safe-push` is the very failure being fixed.
   4. The bump and CI-repair prompts run the expired-shim gate and tell the worker how to migrate.
   5. `fill_prompt` raises on an unfilled placeholder in a bundled prompt, and stays quiet for a
-     prompt served from elsewhere (TauCetiProgress owns the progress prompt's placeholder set).
+     prompt served from elsewhere (EpsilonEridaniProgress owns the progress prompt's placeholder set).
 
 Exit 0 = all assertions hold; 1 = a mismatch.
 """
@@ -31,7 +31,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 fill_prompt = tc.agents.fill_prompt
 wrapper_bin = tc.agents.wrapper_bin
@@ -53,7 +53,7 @@ CALL_SITES = {
         AGENT="Claude Code",
         FORK="alice",
         WORKERID="worker5",
-        ROADMAP_DIR="/opt/roadmap/TauCetiRoadmap",
+        ROADMAP_DIR="/opt/roadmap/EpsilonEridaniRoadmap",
         REVIEW_DIR="/opt/review",
         RUBRICS="/opt/rubrics/rubrics.md",
         SOURCE_GUIDANCE="",
@@ -116,7 +116,7 @@ def main():
         check(f"{name}: uses strict shim expiry mode", prompt.count("--fail-on-available") == 2)
         check(f"{name}: validates the base registry ratchet", prompt.count("--base-manifest") == 2)
         check(f"{name}: refreshes the base ref", prompt.count("git fetch -q origin main") == 2)
-        check(f"{name}: migrates the AI-owned registry", "TauCeti/mathlib-shims.json" in prompt)
+        check(f"{name}: migrates the AI-owned registry", "EpsilonEridani/mathlib-shims.json" in prompt)
         check(f"{name}: forbids weakening exact targets", "never make the check green" in prompt)
     check(
         "fix-ci.md: source PRs probe only changed obligations",
@@ -126,7 +126,7 @@ def main():
         prompt = (PROMPTS / name).read_text()
         check(
             f"{name}: shim baseline is the PR merge base",
-            prompt.count('git show "$base_ref":TauCeti/mathlib-shims.json') == 2,
+            prompt.count('git show "$base_ref":EpsilonEridani/mathlib-shims.json') == 2,
         )
         check(
             f"{name}: shim ratchet reads merge-base sources",

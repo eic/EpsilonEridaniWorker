@@ -1,9 +1,9 @@
-You are addressing AI code review on pull request #__PR__ of TauCetiProject/TauCeti, an AIs-welcome Lean 4 library downstream of Mathlib. You are in a checkout of the repo, already on the PR's branch. Work autonomously to completion.
+You are addressing AI code review on pull request #__PR__ of eic/EpsilonEridani, an AIs-welcome Lean 4 library downstream of Mathlib. You are in a checkout of the repo, already on the PR's branch. Work autonomously to completion.
 
 ## Read the review
 - The review is posted as a sticky scoreboard comment plus one thread per flagged rubric. Read them:
-  - `gh pr view __PR__ --repo TauCetiProject/TauCeti --json comments`
-  - `gh api "/repos/TauCetiProject/TauCeti/pulls/__PR__/comments?per_page=100"` (the per-rubric review threads; each root carries a `<!--tauceti-rubric:NAME-->` marker, and the finding text + suggested fix).
+  - `gh pr view __PR__ --repo eic/EpsilonEridani --json comments`
+  - `gh api "/repos/eic/EpsilonEridani/pulls/__PR__/comments?per_page=100"` (the per-rubric review threads; each root carries a `<!--epsiloneridani-rubric:NAME-->` marker, and the finding text + suggested fix).
 - The blocking rubrics are the ones marked ⛔ (block) or 🟡 (changes requested) on the scoreboard. The other rubrics are already ✅ approved — note which ones.
 
 ## Do not regress what is already green
@@ -16,13 +16,13 @@ The scoreboard shows several rubrics already approved (✅). A re-review re-runs
 For each finding, judge whether it is actually correct:
 - **If it is correct**, fix the code. Verify the fix empirically (does it build? does the claimed Mathlib lemma actually exist — `grep`/`#check`? does the suggested `@[simp]` lemma have a variable head, which the linter forbids?). Reviewers are sometimes confidently wrong; do not blindly comply.
 - **If it is wrong**, do NOT comply. Reply on that rubric's thread explaining why, with evidence (a synth-check, a Mathlib citation, a build error). Post the reply to the thread root:
-  `gh api -X POST "/repos/TauCetiProject/TauCeti/pulls/__PR__/comments/<ROOT_ID>/replies" -f body="..."`
+  `gh api -X POST "/repos/eic/EpsilonEridani/pulls/__PR__/comments/<ROOT_ID>/replies" -f body="..."`
   (A re-review reads these replies, so a well-evidenced contest can clear a wrong finding.)
 
 ## Rules of the repo (hard constraints)
-- Code goes under `TauCeti/`. Do NOT edit the root `TauCeti.lean`: it is intentionally empty, and the lakefile's glob (`TauCeti.*`) builds every module under `TauCeti/`, so there is no need to touch it (if a reviewer claims your API is not reachable from the root, the glob already covers it). Do NOT touch `Scripts/`, `.github/`, the lakefile (`lakefile.toml`/`lakefile.lean`), or the Lake pins (`lake-manifest.json`/`lean-toolchain`) — the lakefile is human-owned, and forward Mathlib/toolchain bumps are a separate dedicated flow; keep this PR to `TauCeti/`.
-- Everything under `namespace TauCeti`.
-- **Never write to the roadmaps.** Do not open a PR or an issue in `TauCetiProject/TauCetiRoadmap`; creating or changing a roadmap needs human attention. If a finding means the PR's target is not on any roadmap, say so in your report and stop.
+- Code goes under `EpsilonEridani/`. Do NOT edit the root `EpsilonEridani.lean`: it is intentionally empty, and the lakefile's glob (`EpsilonEridani.*`) builds every module under `EpsilonEridani/`, so there is no need to touch it (if a reviewer claims your API is not reachable from the root, the glob already covers it). Do NOT touch `Scripts/`, `.github/`, the lakefile (`lakefile.toml`/`lakefile.lean`), or the Lake pins (`lake-manifest.json`/`lean-toolchain`) — the lakefile is human-owned, and forward Mathlib/toolchain bumps are a separate dedicated flow; keep this PR to `EpsilonEridani/`.
+- Everything under `namespace EpsilonEridani`.
+- **Never write to the roadmaps.** Do not open a PR or an issue in `eic/EpsilonEridaniRoadmap`; creating or changing a roadmap needs human attention. If a finding means the PR's target is not on any roadmap, say so in your report and stop.
 - Must stay green AND axiom-clean: no `sorry`, no `native_decide`, no new axioms (allowlist: `propext`, `Classical.choice`, `Quot.sound`), no `maxHeartbeats` overrides, and **never silence a linter** (e.g. with `set_option ... false`) to force a change through — that is itself a reason to push back on the finding.
 
 ## Verify before pushing (all three MUST pass)

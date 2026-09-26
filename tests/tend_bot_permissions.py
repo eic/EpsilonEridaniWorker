@@ -7,7 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-survey_mod = importlib.import_module("tauceti_worker.survey")
+survey_mod = importlib.import_module("epsiloneridani_worker.survey")
 
 
 def pr(number, author, *, bot=False, owner="contributor", head="feature", failed=False, conflicting=False):
@@ -16,7 +16,7 @@ def pr(number, author, *, bot=False, owner="contributor", head="feature", failed
         "headRefOid": f"head-{number}",
         "headRefName": head,
         "headRepositoryOwner": {"login": owner},
-        "headRepository": {"name": "TauCeti"},
+        "headRepository": {"name": "EpsilonEridani"},
         "statusCheckRollup": ([{"context": "build", "state": "FAILURE"}] if failed else []),
         "author": {"login": author, "is_bot": bot},
         "mergeable": "CONFLICTING" if conflicting else "MERGEABLE",

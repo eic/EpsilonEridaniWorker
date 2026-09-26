@@ -31,7 +31,7 @@ from types import SimpleNamespace
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 fails = 0
 
@@ -254,8 +254,8 @@ def pr_info(number, *, draft=False, green_since=None):
         number=number,
         head_oid=f"head{number}",
         head_ref=f"r{number}",
-        head_owner="TauCetiProject",
-        head_repo="TauCeti",
+        head_owner="eic",
+        head_repo="EpsilonEridani",
         is_draft=draft,
         mergeable="MERGEABLE",
         author="kim-em",

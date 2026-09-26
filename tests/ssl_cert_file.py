@@ -13,9 +13,9 @@ from unittest import mock
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
-import tauceti_worker.paths as worker_paths
+import epsiloneridani_worker.paths as worker_paths
 
-with tempfile.TemporaryDirectory(prefix="tauceti-certs-") as raw_tmp:
+with tempfile.TemporaryDirectory(prefix="epsiloneridani-certs-") as raw_tmp:
     tmp = Path(raw_tmp)
     nix_bundle = tmp / "nix.pem"
     python_bundle = tmp / "python.pem"

@@ -1,7 +1,7 @@
-# `tauceti work` reference
+# `epsiloneridani work` reference
 
-`tauceti work` does one round and exits; `--loop` runs the driver. The same flag
-list is in `tauceti work -h`. For persistent workers, see
+`epsiloneridani work` does one round and exits; `--loop` runs the driver. The same flag
+list is in `epsiloneridani work -h`. For persistent workers, see
 [the workers documentation](workers.md).
 
 ## Flags
@@ -15,7 +15,7 @@ list is in `tauceti work -h`. For persistent workers, see
 | `--agent AGENT` | `auto` (default), `codex`, `claude`, `kiro`, `deepseek`, or `minimax`. Kiro and OpenRouter providers are explicit-only and unpaced. |
 | `--author-model MODEL` | Exact authoring model for an explicit provider (CLI > provider environment > committed default). |
 | `--author-effort EFFORT` | Authoring reasoning effort for an explicit Codex, Claude, or Kiro provider. |
-| `--account EMAIL_OR_ID` | Require the Codex credential to be this account (email, or the workspace UUID `tauceti doctor` prints) and refuse to run otherwise. Checks only; never switches. Needs an explicit `--agent codex`. |
+| `--account EMAIL_OR_ID` | Require the Codex credential to be this account (email, or the workspace UUID `epsiloneridani doctor` prints) and refuse to run otherwise. Checks only; never switches. Needs an explicit `--agent codex`. |
 | `--bubble` | Run code and review agents inside the Bubble sandbox instead of directly on the host. The outer survey and coordination, plus all progress-report rounds, remain on the host. |
 | `--host` | Deprecated no-op: the host is now the default. It only warns; pass `--bubble` for the sandbox. |
 | `--stream` | Stream the agent's log to the terminal instead of a file under `logs/`. |
@@ -45,18 +45,18 @@ in every scope until its area label resolves.
 
 Two workers must not spend two subscriptions writing the same report or fixing
 the same PR. They avoid it by taking a lease before they start: a custom git ref
-`refs/tauceti-claims/<key>` in some repository both of them can push to, acquired
+`refs/epsiloneridani-claims/<key>` in some repository both of them can push to, acquired
 with an atomic compare-and-swap (see `scripts/claim.sh`). Which repository that
 is decides how far de-duplication reaches, and the worker picks it like this:
 
 1. `$CLAIM_REPO`, verbatim, if you set it.
-2. `TauCetiProject/tauceti-claims`, the shared namespace, if your account can
+2. `eic/epsiloneridani-claims`, the shared namespace, if your account can
    push there. Then you de-duplicate against every other operator.
 3. Otherwise your own fork, which you can always push to. Then you de-duplicate
    across your own workers, and only those.
 
 Push access to the shared namespace is granted automatically once you have had a
-pull request merged into TauCeti, and the worker accepts the invitation itself
+pull request merged into EpsilonEridani, and the worker accepts the invitation itself
 (that repository, and no other). Until then your fleet coordinates in your fork,
 so nothing waits on anybody. The shared repository holds nothing but leases: no
 code, no Actions, and no relationship to write access on the canonical repo,
@@ -116,7 +116,7 @@ or effort may not apply to whichever provider quota selection picks.
 
 Kiro is explicit-only. The committed authoring default is `gpt-5.6-sol` at high
 effort; `--author-model claude-opus-5` selects Kiro's current exact Opus ID.
-Before either a host or Bubble launch, TauCeti runs
+Before either a host or Bubble launch, EpsilonEridani runs
 `kiro-cli chat --list-models --format json` and requires the requested exact ID
 to be present. That command sends no prompt. A missing entitlement pauses the
 round instead of invoking Kiro Auto or silently downgrading.
@@ -127,7 +127,7 @@ same exact Sol ID. Use `KIRO_API_KEY` for headless authentication or
 
 ## Credit usage
 
-`tauceti usage [--provider kiro|openrouter] [--json]` is a prompt-free,
+`epsiloneridani usage [--provider kiro|openrouter] [--json]` is a prompt-free,
 read-only telemetry command. `--provider` is repeatable and defaults to both.
 `--kiro-burn-rate CREDITS` and `--openrouter-burn-rate USD` add estimated rounds
 remaining to the report; they do not pace or select a provider. The equivalent
@@ -144,7 +144,7 @@ values. OpenRouter's inference key reports key usage/limits; an optional
 belong to a particular account, and exits the round before spending anything if
 it does not. It checks; it never switches. This is Codex-only because its
 credential carries the account identity, where `codex login status` prints only
-"Logged in using ChatGPT". `tauceti doctor` shows which account the current
+"Logged in using ChatGPT". `epsiloneridani doctor` shows which account the current
 credential is for.
 
 To change accounts outright, `codex logout && codex login`. Two things to know:
@@ -152,12 +152,12 @@ the browser flow has no account picker, so it completes as whichever ChatGPT
 account your browser is already signed into, and `codex logout` revokes the old
 session rather than merely forgetting it locally.
 
-To run TauCeti on one account while your interactive `codex` keeps another, give
+To run EpsilonEridani on one account while your interactive `codex` keeps another, give
 it a private credential directory instead of logging out:
 
 ```bash
-CODEX_HOME=~/.codex-tauceti codex login
-CODEX_HOME=~/.codex-tauceti tauceti work --agent codex --account you@example.com
+CODEX_HOME=~/.codex-epsiloneridani codex login
+CODEX_HOME=~/.codex-epsiloneridani epsiloneridani work --agent codex --account you@example.com
 ```
 
 ## Environment variables
@@ -168,7 +168,7 @@ Flags win over these. Most are tuning knobs with sane defaults.
 | --- | --- | --- |
 | `TAUCETI_AGENT` | `auto` | Default for `--agent`. |
 | `TAUCETI_ACCOUNT` | _(unset)_ | Default for `--account`. |
-| `CODEX_HOME` | `~/.codex` | Codex config/credential source. Point it at a private directory to give TauCeti its own Codex account without disturbing the one your interactive `codex` uses. |
+| `CODEX_HOME` | `~/.codex` | Codex config/credential source. Point it at a private directory to give EpsilonEridani its own Codex account without disturbing the one your interactive `codex` uses. |
 | `TAUCETI_WORKER_ID` | _(unset)_ | Pin the id; when unset, `work` takes the lowest free `workerN`. |
 | `TAUCETI_FORK` | auto-created | Point at an existing fork instead of the one the worker creates. |
 | `TAUCETI_ROADMAP_ONLY` | _(unset)_ | The single roadmap area for `--roadmap-only`. Unset = a fresh random area each round (falls back to all areas if the list can't be fetched); `""` = all areas. |
@@ -186,7 +186,7 @@ Flags win over these. Most are tuning knobs with sane defaults.
 | `TAUCETI_MATHLIB_POOL` | `$XDG_CACHE_HOME/mathlib`, else login user's `~/.cache/mathlib` | The pool those hardlinks go to and come from. |
 | `LAKE_CACHE_DIR` | `<worker state>/.cache/lake` | Lake's own build-output cache. Per-worker: unlike a toolchain install it is written throughout a build. |
 | `LAKE_ARTIFACT_CACHE` | `1` | Keep local build outputs in Lake's artifact store so later rounds can reuse them. |
-| `LAKE_RESTORE_ARTIFACTS` | `1` | Copy artifact-store hits into the build directory for TauCeti's post-build audits. |
+| `LAKE_RESTORE_ARTIFACTS` | `1` | Copy artifact-store hits into the build directory for EpsilonEridani's post-build audits. |
 | `TAUCETI_CLAUDE_CMD` | `claude` | The `claude` executable for host rounds; split as a shell word list, the usual flags appended. |
 | `TAUCETI_INHERIT_CLAUDE_CONFIG` | _(unset)_ | `1` gives an isolated worker your own `CLAUDE.md`, `settings.json`, and skills instead of its own. Off by default: a round should not depend on whose config dir it ran from, and personal instructions can contradict the task prompt. |
 | `TAUCETI_AUTHORING_CODEX_MODEL` / `TAUCETI_AUTHORING_CODEX_EFFORT` | `gpt-6-sol` (Luna fallback) / `high` | Codex authoring profile. An explicit model disables automatic fallback; unrelated host configuration remains available. |
@@ -197,14 +197,14 @@ Flags win over these. Most are tuning knobs with sane defaults.
 | `TAUCETI_CODEX_MODEL` | _(deprecated)_ | Legacy fallback for the Codex authoring model only. Prefer `TAUCETI_AUTHORING_CODEX_MODEL`. |
 | `DEEPSEEK_MODEL` / `MINIMAX_MODEL` | `deepseek/deepseek-v4-pro` / `minimax/minimax-m3` | OpenRouter model ids for those agents. |
 | `OPENROUTER_API_KEY` | — | Required for `--agent deepseek\|minimax`; staged read-only into the bubble. |
-| `OPENROUTER_MANAGEMENT_KEY` | — | Optional management key for account-wide `tauceti usage` credit totals; never passed to an agent. |
-| `KIRO_API_KEY` | browser login | Optional headless Kiro credential. TauCeti isolates the browser store when set so the key wins deterministically. |
+| `OPENROUTER_MANAGEMENT_KEY` | — | Optional management key for account-wide `epsiloneridani usage` credit totals; never passed to an agent. |
+| `KIRO_API_KEY` | browser login | Optional headless Kiro credential. EpsilonEridani isolates the browser store when set so the key wins deterministically. |
 | `TAUCETI_KIRO_HOME` / `TAUCETI_KIRO_DATA_DIR` | per-worker when isolated | Internal redirects for Kiro settings and its platform-native browser-auth SQLite store. |
-| `TAUCETI_KIRO_BURN_RATE` / `TAUCETI_OPENROUTER_BURN_RATE` | _(unset)_ | Observability-only default burn rates for `tauceti usage`; never used by the loop pacer. |
+| `TAUCETI_KIRO_BURN_RATE` / `TAUCETI_OPENROUTER_BURN_RATE` | _(unset)_ | Observability-only default burn rates for `epsiloneridani usage`; never used by the loop pacer. |
 | `PI_RUN` | `~/.claude/skills/pi/scripts/run.sh` | The `pi` runner for OpenRouter agents on the host. |
 | `TAUCETI_BUBBLE` | `bubble` (else `uvx` for dry-run probes only) | Override the Bubble executable. |
 | `TAUCETI_BUBBLE_HOME` | per-worker cache dir | Override the private bubble home. |
-| `TAUCETI_REVIEW_ENGINE_DIR` | — | Use a local `tauceti-review` checkout instead of fetching the engine. |
+| `TAUCETI_REVIEW_ENGINE_DIR` | — | Use a local `epsiloneridani-review` checkout instead of fetching the engine. |
 | `TAUCETI_POLL` | `300` | Seconds between quota checks while the loop waits. |
 | `TAUCETI_ROUND_TIMEOUT` | `5400` | Hard cap per round (seconds). |
 | `TAUCETI_INTERROUND` | `20` | Minimum gap after a productive round (seconds). |
@@ -213,7 +213,7 @@ Flags win over these. Most are tuning knobs with sane defaults.
 | `TAUCETI_GH_MIN_BUDGET` | `200` | GitHub requests (REST core and GraphQL) the loop requires before launching a round; below it on either bucket, the loop waits for the hourly reset. |
 | `TAUCETI_GH_INROUND_WAIT` | `900` | Cap on how long a single `gh` call waits in place for a secondary rate limit to clear (seconds). Primary limits return immediately so the loop can wait for them before another round. |
 | `TAUCETI_META_TTL` | `120` | How long a cached scoreboard stays fresh (seconds). |
-| `CLAIM_REPO` | automatic | The repository holding this worker's cooperative claim leases. Without an override it is the shared namespace `TauCetiProject/tauceti-claims` once your account can push there, and your own fork until then. See [the claim namespace](#the-claim-namespace). |
+| `CLAIM_REPO` | automatic | The repository holding this worker's cooperative claim leases. Without an override it is the shared namespace `eic/epsiloneridani-claims` once your account can push there, and your own fork until then. See [the claim namespace](#the-claim-namespace). |
 | `CLAIM_TTL` / `CLAIM_HEARTBEAT` | `1500` / `300` | Branch-claim lease TTL and heartbeat interval (seconds). |
 
 Worker configuration paths (`TAUCETI_WORKERS_CONFIG`, `TAUCETI_CONFIG_HOME`,

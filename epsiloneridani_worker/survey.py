@@ -1,4 +1,4 @@
-"""tauceti_worker.survey — classify every open PR per work-kind into the read-only Survey that the
+"""epsiloneridani_worker.survey — classify every open PR per work-kind into the read-only Survey that the
 picker, `status`, and the TUI all consume."""
 
 from __future__ import annotations
@@ -81,7 +81,7 @@ class Counters:
 
 BUILD_FAIL = {"FAILURE", "ERROR", "TIMED_OUT", "CANCELLED", "STARTUP_FAILURE", "ACTION_REQUIRED"}
 
-TARGET_MARKER_RE = re.compile(r"<!--tauceti-target:v1 (\{[^}]*\})-->")
+TARGET_MARKER_RE = re.compile(r"<!--epsiloneridani-target:v1 (\{[^}]*\})-->")
 
 TARGET_ID_RE = re.compile(r'"id"\s*:\s*"([^"]+)"')
 
@@ -135,7 +135,7 @@ class PRInfo:
         # check-run reflects a JOB's outcome, which can go red on a transient INFRA / status-report
         # hiccup while the authoritative `build` status is green — the false-red that once routed a
         # green PR to fix-ci and wedged it. (The sandboxed-build job used to be named `build`, so its
-        # check-run collided with this status context; TauCeti#1156 renamed it to `sandboxed-build`, so
+        # check-run collided with this status context; EpsilonEridani#1156 renamed it to `sandboxed-build`, so
         # no check-run named `build` exists at all now.) A PR with no `build` status yet is pending —
         # neither success nor failed — and simply waits for the trusted build to post.
         build_states = [c.get("state") for c in rollup if c.get("context") == "build"]
@@ -475,21 +475,21 @@ def fix_disposition(
 
 
 def progress_argv(state: Path, *args: str) -> list[str]:
-    """The TauCetiProgress CLI, cached separately for each immutable source revision.
+    """The EpsilonEridaniProgress CLI, cached separately for each immutable source revision.
 
     uv's shared ``uvx`` tool environment is keyed by the unchanged package name/version rather than
     reliably by the Git revision passed through ``--from``. Reusing it after a pin bump can therefore
     execute an older checkout. A per-ref cache preserves normal reuse within a release while making
     the revision part of the cache identity.
     """
-    cache = state / "cache" / "uvx" / "tauceti-progress" / PROGRESS_REF
+    cache = state / "cache" / "uvx" / "epsiloneridani-progress" / PROGRESS_REF
     return [
         "uvx",
         "--cache-dir",
         str(cache),
         "--from",
         f"git+https://github.com/{PROGRESS}@{PROGRESS_REF}",
-        "tauceti-progress",
+        "epsiloneridani-progress",
         *args,
     ]
 
@@ -779,7 +779,7 @@ def survey(cfg: Config, gh: GitHub, rs: ReviewState, counters: Counters, *, deep
             sv.red_ci.actionable.append(c)
 
     # 5) bump: a bump-mathlib PR (opened by the review bot) whose build is RED — mathlib moved
-    #    out from under the last-known-good bump and TauCeti/ needs adapting. We adapt it; we never
+    #    out from under the last-known-good bump and EpsilonEridani/ needs adapting. We adapt it; we never
     #    author a bump (the bot owns opening them, CI owns merging the green ones). This is the
     #    bump-specific CI-fixer: fix-ci defers a red bump PR here (rebase still owns its conflicts and
     #    fix still owns its review findings).
@@ -795,9 +795,9 @@ def survey(cfg: Config, gh: GitHub, rs: ReviewState, counters: Counters, *, deep
         else:
             sv.bump.actionable.append(c)
 
-    # 5b) lint-repair: the repair PR TauCeti's daily full lint opens (branch lint-repair/..., authored
+    # 5b) lint-repair: the repair PR EpsilonEridani's daily full lint opens (branch lint-repair/..., authored
     #    by the review bot) whose build is RED — main carries environment-lint violations that PR
-    #    builds, which lint only changed modules, could not see, and TauCeti/ needs fixing. Like bump:
+    #    builds, which lint only changed modules, could not see, and EpsilonEridani/ needs fixing. Like bump:
     #    we repair it and never author one (the daily lint owns opening them, CI owns merging).
     for p in tended:
         if not (p.head_ref.startswith(LINT_REPAIR_HEAD_PREFIX) and p.build_failed):
@@ -815,7 +815,7 @@ def survey(cfg: Config, gh: GitHub, rs: ReviewState, counters: Counters, *, deep
         else:
             sv.lint_repair.actionable.append(c)
 
-    # 6) progress: a per-roadmap STATUS.md / PROGRESS.md report is due in TauCetiRoadmap. Unlike every
+    # 6) progress: a per-roadmap STATUS.md / PROGRESS.md report is due in EpsilonEridaniRoadmap. Unlike every
     #    other kind this is not about a PR of ours, so it carries a single pr=0 candidate whose reason
     #    is the cadence verdict. Deep only: the check costs an API call, and the shallow survey exists
     #    to be cheap. progress_due never raises.

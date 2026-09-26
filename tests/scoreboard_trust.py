@@ -6,7 +6,7 @@ themselves but as CONTRIBUTOR (or NONE) to an outside contributor. The old trust
 ({OWNER, MEMBER, COLLABORATOR}) therefore silently discarded legitimate scoreboards for every
 unprivileged contributor — Bryan's PR #470 had a real kim-em scoreboard with four blocking rubrics that
 his worker treated as "no scoreboard at this head", so `fix` never ran. gh_meta now identifies the
-scoreboard by the <!--tauceti-scoreboard--> marker alone and parses the newest one's meta. This mirrors
+scoreboard by the <!--epsiloneridani-scoreboard--> marker alone and parses the newest one's meta. This mirrors
 the live merge gate's deliberate no-access-bar policy: the scoreboard supplies review state, while
 trusted CI independently supplies build, scope, and bump-guard status.
 
@@ -23,7 +23,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 fails = 0
 
@@ -35,10 +35,10 @@ def check(name, cond):
 
 
 def sb(head, updated, assoc="CONTRIBUTOR"):
-    """A scoreboard comment: the marker + a tauceti-meta block, authored with `assoc` association."""
+    """A scoreboard comment: the marker + a epsiloneridani-meta block, authored with `assoc` association."""
     meta = json.dumps({"head_sha": head, "states": {"reuse": "blocking_request"}})
     return {
-        "body": f"<!--tauceti-scoreboard-->\nscores here\n<!--tauceti-meta:v1 {meta}-->",
+        "body": f"<!--epsiloneridani-scoreboard-->\nscores here\n<!--epsiloneridani-meta:v1 {meta}-->",
         "updated_at": updated,
         "author_association": assoc,
     }
@@ -47,19 +47,19 @@ def sb(head, updated, assoc="CONTRIBUTOR"):
 def plain(updated, assoc="MEMBER"):
     """A non-scoreboard comment (no marker) — must be ignored even from a 'trusted' author."""
     meta = json.dumps({"head_sha": "FORGED"})
-    return {"body": f"just chatting <!--tauceti-meta:v1 {meta}-->", "updated_at": updated, "author_association": assoc}
+    return {"body": f"just chatting <!--epsiloneridani-meta:v1 {meta}-->", "updated_at": updated, "author_association": assoc}
 
 
 def empty_marker(updated, garbage=False):
     """A scoreboard MARKER with no valid meta — a newer one of these must not mask an older real board."""
-    tail = "<!--tauceti-meta:v1 {not json}-->" if garbage else ""
-    return {"body": f"<!--tauceti-scoreboard--> {tail}", "updated_at": updated, "author_association": "MEMBER"}
+    tail = "<!--epsiloneridani-meta:v1 {not json}-->" if garbage else ""
+    return {"body": f"<!--epsiloneridani-scoreboard--> {tail}", "updated_at": updated, "author_association": "MEMBER"}
 
 
 def nondict_marker(updated, literal="[]"):
     """A scoreboard marker whose meta is valid JSON but NOT an object (list/string/number/null) — not a
     usable scoreboard, and must never be cached (callers call meta.data.get(...))."""
-    return {"body": f"<!--tauceti-scoreboard--> <!--tauceti-meta:v1 {literal}-->", "updated_at": updated}
+    return {"body": f"<!--epsiloneridani-scoreboard--> <!--epsiloneridani-meta:v1 {literal}-->", "updated_at": updated}
 
 
 def make_rs(comments):

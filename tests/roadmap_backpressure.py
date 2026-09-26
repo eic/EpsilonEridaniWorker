@@ -8,9 +8,9 @@ import types
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
-survey_module = importlib.import_module("tauceti_worker.survey")
+survey_module = importlib.import_module("epsiloneridani_worker.survey")
 
 
 def pr(number, *labels, body="", head_ref=""):
@@ -65,10 +65,10 @@ def main():
         tc.roadmap_open_count(prs, "Topology", ["Topology"]),
         3,
     )
-    marker = '<!--tauceti-target:v1 {"focus":"Topology","id":"target"}-->'
+    marker = '<!--epsiloneridani-target:v1 {"focus":"Topology","id":"target"}-->'
     check("target marker covers asynchronous label lag", tc.roadmap_open_count([pr(8, body=marker)], "Topology", []), 1)
     check("target marker remains scoped", tc.roadmap_open_count([pr(8, body=marker)], "PDE", []), 0)
-    any_marker = '<!--tauceti-target:v1 {"focus":"any","id":"target"}-->'
+    any_marker = '<!--epsiloneridani-target:v1 {"focus":"any","id":"target"}-->'
     check(
         "all-areas marker defers to its derived area label",
         tc.roadmap_open_count([pr(12, "roadmap/Topology", body=any_marker)], "Topology", []),
@@ -79,7 +79,7 @@ def main():
         tc.roadmap_open_count([pr(13, "roadmap/PDE", body=marker)], "Topology", []),
         0,
     )
-    id_only_marker = '<!--tauceti-target:v1 {"id":"target"}-->'
+    id_only_marker = '<!--epsiloneridani-target:v1 {"id":"target"}-->'
     check(
         "focus-less marker on a roadmap branch stays fail-closed",
         tc.roadmap_open_count([pr(14, body=id_only_marker, head_ref="roadmap/target")], "Topology", []),

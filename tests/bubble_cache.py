@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bubble work rounds warm Mathlib's cache and TauCeti's Lake cache before launching the agent.
+"""Bubble work rounds warm Mathlib's cache and EpsilonEridani's Lake cache before launching the agent.
 
 The review/probe path supplies its own command and must remain untouched: it does not compile and should
 not gain project-cache egress. Exit 0 = the bootstrap/config/argv contract agrees; 1 = a mismatch.
@@ -17,7 +17,7 @@ from types import SimpleNamespace
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 fails = 0
 
@@ -31,11 +31,11 @@ def check(name, ok):
 inner = "env OPENAI_API_KEY= agent --do-work"
 bootstrap = tc.bubble_work_cmd(inner)
 mathlib_i = bootstrap.index("lake exe cache get")
-tauceti_i = bootstrap.index("lake cache get")
+epsiloneridani_i = bootstrap.index("lake cache get")
 build_i = bootstrap.index("lake build")
 agent_i = bootstrap.index("exec " + inner)
-check("cache/build/agent order", mathlib_i < tauceti_i < build_i < agent_i)
-check("TauCeti cache uses the canonical repository", f"--repo {tc.TAUCETI}" in bootstrap)
+check("cache/build/agent order", mathlib_i < epsiloneridani_i < build_i < agent_i)
+check("EpsilonEridani cache uses the canonical repository", f"--repo {tc.TAUCETI}" in bootstrap)
 check("Bubble, not the bootstrap, supplies Lake config", "LAKE_CONFIG" not in bootstrap)
 check("Bubble, not the bootstrap, supplies Lake restore settings", "LAKE_RESTORE_ARTIFACTS" not in bootstrap)
 
@@ -69,7 +69,7 @@ lake.write_text(
 lake.chmod(0o755)
 
 
-def run_bootstrap(*, mathlib=0, tauceti=0, build=0, tauceti_msg=""):
+def run_bootstrap(*, mathlib=0, epsiloneridani=0, build=0, epsiloneridani_msg=""):
     marker.unlink(missing_ok=True)
     calls.unlink(missing_ok=True)
     env = {
@@ -77,8 +77,8 @@ def run_bootstrap(*, mathlib=0, tauceti=0, build=0, tauceti_msg=""):
         "PATH": f"{shimdir}:{os.environ.get('PATH', '')}",
         "LAKE_CALLS": str(calls),
         "MATHLIB_RC": str(mathlib),
-        "TAUCETI_RC": str(tauceti),
-        "TAUCETI_MSG": tauceti_msg,
+        "TAUCETI_RC": str(epsiloneridani),
+        "TAUCETI_MSG": epsiloneridani_msg,
         "BUILD_RC": str(build),
         "MARKER": str(marker),
     }
@@ -91,33 +91,33 @@ result, lake_calls = run_bootstrap(mathlib=1)
 check("Mathlib cache failure blocks the agent", result.returncode != 0 and not marker.exists())
 check("Mathlib cache gets one retry", lake_calls == ["exe cache get", "exe cache get"])
 
-result, _ = run_bootstrap(tauceti=1)
-check("TauCeti cache miss still launches the agent", result.returncode == 0 and marker.exists())
+result, _ = run_bootstrap(epsiloneridani=1)
+check("EpsilonEridani cache miss still launches the agent", result.returncode == 0 and marker.exists())
 
 result, _ = run_bootstrap(build=1)
 check("red preliminary build still launches the repair agent", result.returncode == 0 and marker.exists())
 check("red preliminary build emits a warning", "agent starts from a red tree" in result.stderr)
 
-# The two reasons a TauCeti fetch comes back empty must not read alike. "No outputs for this revision"
+# The two reasons a EpsilonEridani fetch comes back empty must not read alike. "No outputs for this revision"
 # is the ordinary case on a commit main has not built yet. Anything else means the cache did not answer,
 # which is broken infrastructure; it used to print the same line and rebuild the library from source
 # every round for as long as the endpoint stayed down.
-result, lake_calls = run_bootstrap(tauceti=1, tauceti_msg="error: no outputs found for revision abc123")
+result, lake_calls = run_bootstrap(epsiloneridani=1, epsiloneridani_msg="error: no outputs found for revision abc123")
 check("a cold revision still launches the agent", result.returncode == 0 and marker.exists())
 check("a cold revision is reported as cold", "holds no outputs for this revision" in result.stderr)
 check("a cold revision is not reported as an endpoint failure", "did not answer" not in result.stderr)
 check(
-    "a cold revision is not retried", lake_calls.count("cache get --service tauceti-public --repo " + tc.TAUCETI) == 1
+    "a cold revision is not retried", lake_calls.count("cache get --service epsiloneridani-public --repo " + tc.TAUCETI) == 1
 )
 
-result, lake_calls = run_bootstrap(tauceti=1, tauceti_msg="curl: (22) The requested URL returned 401")
+result, lake_calls = run_bootstrap(epsiloneridani=1, epsiloneridani_msg="curl: (22) The requested URL returned 401")
 check("an unreachable cache still launches the agent", result.returncode == 0 and marker.exists())
 check("an unreachable cache is reported as a failure", "did not answer" in result.stderr)
 check("an unreachable cache is not reported as cold", "holds no outputs" not in result.stderr)
 check("an unreachable cache echoes the fetch log", "cache: curl: (22)" in result.stderr)
 check(
     "an unreachable cache is retried once",
-    lake_calls.count("cache get --service tauceti-public --repo " + tc.TAUCETI) == 2,
+    lake_calls.count("cache get --service epsiloneridani-public --repo " + tc.TAUCETI) == 2,
 )
 
 shutil.rmtree(shimdir, ignore_errors=True)
@@ -125,7 +125,7 @@ shutil.rmtree(shimdir, ignore_errors=True)
 
 # The cache is reached over the custom domain, not the bucket's `pub-<id>.r2.dev` development URL.
 # That URL was disabled and answered 401 for every path, so `lake cache get` failed on every round.
-check("cache uses the custom domain", tc.TAUCETI_CACHE_DOMAIN == "cache.taucetiproject.org")
+check("cache uses the custom domain", tc.TAUCETI_CACHE_DOMAIN == "cache.epsiloneridaniproject.org")
 check("cache does not use the r2.dev development URL", "r2.dev" not in tc.TAUCETI_CACHE_ARTIFACT_URL)
 
 
@@ -136,16 +136,16 @@ import urllib.error
 
 
 def _probe_with(exc):
-    tc.agents.tauceti_cache_unreachable_reason.cache_clear()
+    tc.agents.epsiloneridani_cache_unreachable_reason.cache_clear()
     import urllib.request as ur
 
     real = ur.urlopen
     ur.urlopen = lambda *a, **k: (_ for _ in ()).throw(exc)
     try:
-        return tc.agents.tauceti_cache_unreachable_reason()
+        return tc.agents.epsiloneridani_cache_unreachable_reason()
     finally:
         ur.urlopen = real
-        tc.agents.tauceti_cache_unreachable_reason.cache_clear()
+        tc.agents.epsiloneridani_cache_unreachable_reason.cache_clear()
 
 
 def _http_error(code):
@@ -214,7 +214,7 @@ try:
         f"--lake-cache-service {tc.TAUCETI_CACHE_SERVICE} "
         f"{tc.TAUCETI_CACHE_ARTIFACT_URL} {tc.TAUCETI_CACHE_REVISION_URL}"
     )
-    check("work round grants the TauCeti download cache", cache_grant in work_argv)
+    check("work round grants the EpsilonEridani download cache", cache_grant in work_argv)
     check("work round does not expose the upstream domain directly", "--allow-domain" not in work_argv)
     check("work round runs both cache commands", "lake exe cache get" in work_argv and "lake cache get" in work_argv)
     check("work round stages no competing Lake config", not (cfg.state / "bubble-round" / "lake-cache.toml").exists())

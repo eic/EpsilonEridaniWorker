@@ -1,16 +1,16 @@
-"""tauceti_worker — the Tau Ceti worker.
+"""epsiloneridani_worker — the Tau Ceti worker.
 
-Bare `tauceti` opens a dashboard + launcher; `tauceti work [--loop]` does the work (one round, or
-the driver loop); `tauceti status` prints the read-only survey.
+Bare `epsiloneridani` opens a dashboard + launcher; `epsiloneridani work [--loop]` does the work (one round, or
+the driver loop); `epsiloneridani status` prints the read-only survey.
 
-The worker acts on TauCetiProject/TauCeti as the authenticated `gh` account, and treats that
+The worker acts on eic/EpsilonEridani as the authenticated `gh` account, and treats that
 account's own PRs as the ones it tends. Each round does exactly ONE unit of work, chosen in
 priority order: rebase -> bump -> lint-repair -> progress -> fix-ci -> fix -> review -> roadmap.
 
 This package was split from a single-file script for navigability. The split is behaviour-
-preserving. For both the test harness (which reaches `tauceti_worker.<NAME>`) and the historical
+preserving. For both the test harness (which reaches `epsiloneridani_worker.<NAME>`) and the historical
 single-module API, every submodule's top-level name is flattened into the package namespace below;
-the submodules themselves stay importable (e.g. `tauceti_worker.github`) so a test can monkeypatch
+the submodules themselves stay importable (e.g. `epsiloneridani_worker.github`) so a test can monkeypatch
 a function on the module that actually looks it up.
 """
 
@@ -45,9 +45,9 @@ from . import (
 )
 
 # Flatten each submodule's public + private top-level names into the package namespace, in
-# dependency order, so the entire former single-module surface is reachable as tauceti_worker.<NAME>.
+# dependency order, so the entire former single-module surface is reachable as epsiloneridani_worker.<NAME>.
 # `oauth` is deliberately absent: it is a self-contained credential-rotation module whose names
-# (Provider, provider, expires_at) would collide with the pacer's. Reach it as tauceti_worker.oauth.
+# (Provider, provider, expires_at) would collide with the pacer's. Reach it as epsiloneridani_worker.oauth.
 _MODULES = (
     paths,
     constants,

@@ -1,5 +1,5 @@
-"""tauceti_worker.tui — the survey renderer (Rich, for `status`) and the Textual dashboard + launcher
-that bare `tauceti` opens."""
+"""epsiloneridani_worker.tui — the survey renderer (Rich, for `status`) and the Textual dashboard + launcher
+that bare `epsiloneridani` opens."""
 
 from __future__ import annotations
 
@@ -112,7 +112,7 @@ def render_survey(
     """Render the survey table. `selected` (a kind name) is highlighted as the arrow-key cursor;
     `expanded` (a set of kind names) get their candidate PRs listed beneath them, one per row, with
     the PR title — and an expanded `roadmap` lists the `areas` instead. Pass None for all
-    (e.g. from `tauceti status`) for the plain table."""
+    (e.g. from `epsiloneridani status`) for the plain table."""
     from rich.markup import escape  # PR titles / areas / errors are external text — escape before markup
     from rich.panel import Panel
     from rich.table import Table
@@ -121,7 +121,7 @@ def render_survey(
         console.print(
             Panel(
                 "[bold red]GitHub fetch failed[/] — survey unavailable.\n" + escape("\n".join(sv.errors)),
-                title="tauceti",
+                title="epsiloneridani",
             )
         )
         return
@@ -132,7 +132,7 @@ def render_survey(
     header = f"[bold]{TAUCETI}[/]   worker: {sv.worker_id}   open: {sv.status_label_line()}"
     if quota_snap is not None:
         header += "\nquota: " + quota_line(quota_snap)
-    console.print(Panel(header, title="tauceti"))
+    console.print(Panel(header, title="epsiloneridani"))
 
     t = Table(show_header=True, header_style="bold")
     # The "#" is the key you press in the TUI to run one round of that kind (matches KIND_KEYS).
@@ -164,7 +164,7 @@ def launch_cmd(
     roadmap_only: str | None = None,
     roadmap_skip: str | None = None,
 ) -> list[str]:
-    """Build the exact `tauceti work` command a TUI action runs/spawns (also shown via 'copy command').
+    """Build the exact `epsiloneridani work` command a TUI action runs/spawns (also shown via 'copy command').
     `roadmap_only`/`roadmap_skip` (the raw env values for the current roadmap dials) are embedded as
     --roadmap-only/--roadmap-skip so the copied/logged command reproduces what [o]/[x] set instead of
     silently reverting to the shell default. They are passed through verbatim (an explicit empty string
@@ -237,7 +237,7 @@ def _dashboard_app(cfg, loader=None):
     # Restore the operator's last-used dials. An explicit TAUCETI_ROADMAP_ONLY/SKIP in the environment
     # (exported, or passed by a parent) always wins over the saved one; otherwise apply the saved value
     # to the env now so BOTH the survey display and any round launched from here inherit it. This is the
-    # ONLY place a saved value is read — it is dashboard-scoped: a bare `tauceti work` never loads prefs
+    # ONLY place a saved value is read — it is dashboard-scoped: a bare `epsiloneridani work` never loads prefs
     # (cmd_work resolves these from the env + the live area list only), so the saved pref cannot leak
     # into a CLI run; rounds launched from here carry it via explicit --roadmap-only/--roadmap-skip flags.
     prefs = load_dashboard_prefs(cfg)
@@ -306,7 +306,7 @@ def _dashboard_app(cfg, loader=None):
             self.dismiss(None)
 
     class CommandScreen(ModalScreen):
-        """Show the exact `tauceti work` commands the current dials would run; the one-round form is
+        """Show the exact `epsiloneridani work` commands the current dials would run; the one-round form is
         also placed on the clipboard so it can be pasted into another shell."""
 
         BINDINGS = [
@@ -375,7 +375,7 @@ def _dashboard_app(cfg, loader=None):
             Binding("q", "quit", "quit"),
         ] + [Binding(k, f"run_kind('{k}')", f"#{k}", show=False) for k in KIND_KEYS]
 
-        TITLE = "tauceti"
+        TITLE = "epsiloneridani"
 
         def __init__(self):
             super().__init__()
@@ -480,7 +480,7 @@ def _dashboard_app(cfg, loader=None):
                 msg = (
                     Text("loading…") if self.loading else Text("GitHub fetch failed — " + (self.err or ""), style="red")
                 )
-                self.query_one("#hdr", Static).update(Panel(msg, title="tauceti"))
+                self.query_one("#hdr", Static).update(Panel(msg, title="epsiloneridani"))
                 return
             head = Text()
             head.append(TAUCETI, style="bold")
@@ -490,7 +490,7 @@ def _dashboard_app(cfg, loader=None):
                 head.append_text(Text.from_markup(quota_line(self.quota)))
             if sv.github_failed:
                 head.append("\nGitHub fetch failed — survey unavailable", style="red")
-            self.query_one("#hdr", Static).update(Panel(head, title="tauceti"))
+            self.query_one("#hdr", Static).update(Panel(head, title="epsiloneridani"))
 
         def _render_table(self) -> None:
             t = self.query_one("#tbl", DataTable)
@@ -579,7 +579,7 @@ def _dashboard_app(cfg, loader=None):
             head.append(
                 f"\nmanager: {'running' if self.worker_manager_online else 'offline'}   config: {self.workers_config}"
             )
-            self.query_one("#hdr", Static).update(Panel(head, title="tauceti — workers"))
+            self.query_one("#hdr", Static).update(Panel(head, title="epsiloneridani — workers"))
 
         def _render_worker_table(self) -> None:
             table = self.query_one("#workers-tbl", DataTable)
@@ -864,7 +864,7 @@ def cmd_tui(args) -> int:
         sv = survey(cfg, gh, ReviewState(cfg, gh), Counters(cfg), deep=True)
         _, q = Quota(cfg).choose(None)
         render_survey(sv, console, q)
-        console.print("[dim](not a TTY — snapshot only; use `tauceti status [--json]` in scripts)[/]")
+        console.print("[dim](not a TTY — snapshot only; use `epsiloneridani status [--json]` in scripts)[/]")
         return 0
 
     app = _dashboard_app(cfg)

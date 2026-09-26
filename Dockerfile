@@ -5,7 +5,7 @@ FROM node:22-bookworm
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG TAUCETI_LEAN_TOOLCHAIN=leanprover/lean4:v4.32.0
 
-# Runtime tools for tauceti and its agents, plus a native toolchain for Lean builds. Debian
+# Runtime tools for epsiloneridani and its agents, plus a native toolchain for Lean builds. Debian
 # package revisions deliberately track Bookworm's security repository instead of being frozen.
 # hadolint ignore=DL3008
 RUN apt-get update \
@@ -72,23 +72,23 @@ ENV PATH="/root/.elan/bin:/root/.local/bin:${PATH}" \
 
 # Keep the toolchain layers reusable while making every image contain the exact checked-out
 # worker revision under test (including pull-request changes).
-WORKDIR /opt/tauceti
-COPY tauceti pyproject.toml ./
+WORKDIR /opt/epsiloneridani
+COPY epsiloneridani pyproject.toml ./
 COPY prompts ./prompts
 COPY scripts ./scripts
-COPY tauceti_worker ./tauceti_worker
+COPY epsiloneridani_worker ./epsiloneridani_worker
 
-# The refresher is a symlink, not a copy: it imports the rotation core from tauceti_worker, and
-# resolving its own path back to /opt/tauceti is how it finds the package in an image that runs the
+# The refresher is a symlink, not a copy: it imports the rotation core from epsiloneridani_worker, and
+# resolving its own path back to /opt/epsiloneridani is how it finds the package in an image that runs the
 # worker from a checkout rather than an installed wheel.
-RUN ln -s /opt/tauceti/scripts/oauth_refresh_loop.py /usr/local/bin/tauceti-oauth-refresh \
-    && install -m 0755 scripts/docker-entrypoint /usr/local/bin/tauceti-entrypoint \
-    && chmod 0755 tauceti scripts/oauth_refresh_loop.py scripts/claim.sh scripts/gh-safe-pr-create scripts/git-safe-push \
-    && ./tauceti --help >/dev/null \
-    && git config --system user.name "TauCeti Worker" \
-    && git config --system user.email "tauceti-worker@users.noreply.github.com" \
+RUN ln -s /opt/epsiloneridani/scripts/oauth_refresh_loop.py /usr/local/bin/epsiloneridani-oauth-refresh \
+    && install -m 0755 scripts/docker-entrypoint /usr/local/bin/epsiloneridani-entrypoint \
+    && chmod 0755 epsiloneridani scripts/oauth_refresh_loop.py scripts/claim.sh scripts/gh-safe-pr-create scripts/git-safe-push \
+    && ./epsiloneridani --help >/dev/null \
+    && git config --system user.name "EpsilonEridani Worker" \
+    && git config --system user.email "epsiloneridani-worker@users.noreply.github.com" \
     && git config --system credential.https://github.com.helper "" \
     && git config --system --add credential.https://github.com.helper "!gh auth git-credential"
 
-ENTRYPOINT ["/usr/local/bin/tauceti-entrypoint"]
-CMD ["./tauceti", "work", "--loop"]
+ENTRYPOINT ["/usr/local/bin/epsiloneridani-entrypoint"]
+CMD ["./epsiloneridani", "work", "--loop"]

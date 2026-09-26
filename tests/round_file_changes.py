@@ -29,7 +29,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 fails = 0
 lines: list[str] = []
@@ -79,19 +79,19 @@ def main():
 
         # 1) committed work, the normal success path: the agent commits and pushes, so the tree is
         # clean and the evidence is only in the range.
-        (repo / "TauCeti").mkdir()
-        (repo / "TauCeti" / "New.lean").write_text("theorem t : True := trivial\n")
+        (repo / "EpsilonEridani").mkdir()
+        (repo / "EpsilonEridani" / "New.lean").write_text("theorem t : True := trivial\n")
         git(repo, "add", "-A")
         git(repo, "commit", "-qm", "feat: add")
         out = run(repo, head)
         check("committed files are reported", "files committed this round" in out)
-        check("...naming the file", "TauCeti/New.lean" in out)
+        check("...naming the file", "EpsilonEridani/New.lean" in out)
         check("...and nothing is claimed uncommitted", "left uncommitted" not in out)
 
         # 2) an untracked new file left behind: invisible to `git diff`, which is exactly why
         # status --porcelain is the right question.
         head2 = git(repo, "rev-parse", "HEAD").stdout.strip()
-        (repo / "TauCeti" / "Abandoned.lean").write_text("sorry\n")
+        (repo / "EpsilonEridani" / "Abandoned.lean").write_text("sorry\n")
         out = run(repo, head2)
         check("an untracked leftover is reported", "left uncommitted" in out and "Abandoned.lean" in out)
         check("...and no commit is claimed", "files committed" not in out)
@@ -99,7 +99,7 @@ def main():
         # 3) both halves at once.
         git(repo, "add", "-A")
         git(repo, "commit", "-qm", "feat: more")
-        (repo / "TauCeti" / "Dirty.lean").write_text("x\n")
+        (repo / "EpsilonEridani" / "Dirty.lean").write_text("x\n")
         out = run(repo, head2)
         check(
             "committed and dirty are both reported",
@@ -111,11 +111,11 @@ def main():
         git(repo, "commit", "-qm", "wip")
         head3 = git(repo, "rev-parse", "HEAD").stdout.strip()
         for i in range(60):
-            (repo / "TauCeti" / f"F{i}.lean").write_text("x\n")
+            (repo / "EpsilonEridani" / f"F{i}.lean").write_text("x\n")
         git(repo, "add", "-A")
         git(repo, "commit", "-qm", "many")
         out = run(repo, head3)
-        body = [ln for ln in out.splitlines() if ln.strip().startswith("TauCeti/")]
+        body = [ln for ln in out.splitlines() if ln.strip().startswith("EpsilonEridani/")]
         check("the file list is bounded", len(body) <= tc.work_units._MAX_CHANGED_FILES)
         check("...and says how many it elided", "more" in out)
 
@@ -134,7 +134,7 @@ def main():
             check(f"no pre-head does not raise (raised {e!r})", False)
 
     # The hook is wired only where an agent edits the host checkout.
-    src = (REPO / "tauceti_worker" / "work_units.py").read_text()
+    src = (REPO / "epsiloneridani_worker" / "work_units.py").read_text()
     check("review is not in scope", "review" not in tc.work_units.FILE_CHANGE_STAGES)
     check("progress is not in scope", "progress" not in tc.work_units.FILE_CHANGE_STAGES)
     check(

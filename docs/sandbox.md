@@ -1,6 +1,6 @@
 # Inside the sandbox
 
-`tauceti work --bubble` runs code and review agents inside a
+`epsiloneridani work --bubble` runs code and review agents inside a
 [Bubble](https://github.com/kim-em/bubble) container instead of on the host.
 Progress-report rounds always run on the host. This page describes what the
 container boundary enforces; the README covers when to use it.
@@ -13,27 +13,27 @@ the agent's git and gh commands run inside the container. Code-writing rounds
 also run their cache downloads and advisory `lake build` there.
 
 - GitHub traffic goes through Bubble's auth proxy. It permits access to
-  `TauCetiProject/TauCeti` and, for authoring and fixes, git push access to the
+  `eic/EpsilonEridani` and, for authoring and fixes, git push access to the
   configured fork. Other repository access is rejected by the proxy. Your `gh`
   token never enters the container.
 - Only the one credential the agent needs is seeded. The other models'
   credentials, and all of your host config (`CLAUDE.md`, skills), stay out.
-- Review runs the `tauceti-review` engine inside the container too, offline. The
+- Review runs the `epsiloneridani-review` engine inside the container too, offline. The
   engine, the roadmap, and the review store are mounted in, and it runs on the
   image's `python3` with no PyPI or cross-repo fetch. The only traffic crossing
-  the proxy is the TauCeti clone, the PR API, and the scoreboard post.
+  the proxy is the EpsilonEridani clone, the PR API, and the scoreboard post.
 
 That isolation matters most for review, where the agent reads untrusted PRs.
 
 ## Lake caches
 
 Before the work agent starts, the worker fetches Mathlib's prebuilt outputs with
-`lake exe cache get`, fetches TauCeti's own main-built outputs with
+`lake exe cache get`, fetches EpsilonEridani's own main-built outputs with
 `lake cache get`, and runs an advisory `lake build`. A red tree still reaches the
 repair agent.
 
 Bubble routes both download-only caches through its host-global proxy, so
-TauCeti's public R2 host is never reachable from inside the container. The exact
+EpsilonEridani's public R2 host is never reachable from inside the container. The exact
 revision and content-addressed GET routes are shared across rounds; containers
 cannot select another origin or upload, and their writable Lake views are
 discarded when the container is popped.
@@ -44,7 +44,7 @@ Bubble needs a working [Incus](https://linuxcontainers.org/incus/) runtime.
 Kiro rounds require Bubble 0.7.31 or newer; existing agents require 0.7.30.
 Real sandbox rounds need a stable
 installed executable because Bubble owns a host-global auth daemon. For dry-run
-capability checks only, `tauceti` can fetch it with `uvx`. `tauceti doctor`
+capability checks only, `epsiloneridani` can fetch it with `uvx`. `epsiloneridani doctor`
 reports whether the Bubble and Incus executables are present; the round preflight
 checks the Bubble version and capabilities. `TAUCETI_BUBBLE` overrides the
 executable, and `TAUCETI_BUBBLE_HOME` overrides the private Bubble home.
@@ -61,7 +61,7 @@ executable, and `TAUCETI_BUBBLE_HOME` overrides the private Bubble home.
 `--agent kiro` is available in Bubble with the same exact-model entitlement
 check as host mode. Bubble installs the checksum-pinned native Kiro CLI and
 allows only Kiro's documented authentication, runtime, management, telemetry,
-and download domains. TauCeti snapshots either the selected `KIRO_API_KEY` or
+and download domains. EpsilonEridani snapshots either the selected `KIRO_API_KEY` or
 the browser-login SQLite database into the read-only round mount; Kiro receives
 a private, writable copy inside the disposable container. Other provider
 credentials do not cross the boundary.
@@ -70,7 +70,7 @@ credentials do not cross the boundary.
 
 On macOS, Claude Code keeps its credentials in the login Keychain rather than in
 a file, but bubble seeds the in-container `claude` from a `.credentials.json`.
-So `tauceti` copies the current credential out of the Keychain into a private,
+So `epsiloneridani` copies the current credential out of the Keychain into a private,
 transient config directory used only by the bubble subprocess. The Keychain is
 read, never written; the first round unlocks it interactively if it is locked.
 The directory is removed after the bubble exits, or before the next round if the

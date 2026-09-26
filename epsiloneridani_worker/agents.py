@@ -1,4 +1,4 @@
-"""tauceti_worker.agents — prompt filling, the host/bubble checkout, and the agent launch: the host
+"""epsiloneridani_worker.agents — prompt filling, the host/bubble checkout, and the agent launch: the host
 argv path and the repo-scoped bubble sandbox path (plus per-worker $HOME isolation)."""
 
 from __future__ import annotations
@@ -438,7 +438,7 @@ def fill_prompt(path: Path, **subs) -> str:
     text = path.read_text()
     # An unfilled placeholder ships literal `__BIN__/git-safe-push` to the agent, which is the
     # command-not-found failure wrapper_bin exists to end. Fail here instead, but only for the
-    # prompts we ship: the progress prompt is served by the pinned TauCetiProgress build (written
+    # prompts we ship: the progress prompt is served by the pinned EpsilonEridaniProgress build (written
     # to a scratch file), and its placeholder set is that repo's business, not ours.
     if path.parent == HERE / "prompts":
         missing = sorted({m.group(0) for m in _PLACEHOLDER_RE.finditer(text)} - {f"__{k}__" for k in subs})
@@ -536,7 +536,7 @@ def clean_lake_cache_after_toolchain_bump(cfg: Config) -> None:
 
 
 def prepare_checkout(cfg: Config) -> bool:
-    """Clean checkout of TauCeti main; keep .lake for fast rebuilds, drop every other leftover."""
+    """Clean checkout of EpsilonEridani main; keep .lake for fast rebuilds, drop every other leftover."""
     sync_mathlib_pool(cfg)
     co = cfg.checkout
     if not (co / ".git").is_dir():
@@ -656,14 +656,14 @@ def run_agent_host(cwd: Path, prompt: str, profile: AuthoringProfile | str, logd
 # charged, which is the behaviour that existed before this classifier, so the cost of omitting one is
 # a single attempt rather than a retry loop. 401/403/404 are
 # deliberately absent: a real auth or entitlement failure must stay charged and stay loud, or a
-# misconfigured worker would retry for ever having reviewed nothing (TauCetiReview#105 is exactly
+# misconfigured worker would retry for ever having reviewed nothing (EpsilonEridaniReview#105 is exactly
 # that failure, and it burned two PRs' worth of scoreboards before a human noticed).
 _TRANSIENT_STATUSES = frozenset({408, 429, 500, 502, 503, 504, 529})
 
 # Claude Code in -p mode reports a provider failure as `API Error: <status> <text>` and, when the
 # call never produced a turn, that single line is the WHOLE log — observed verbatim as
 # "Failed to authenticate. API Error: 401 Invalid authentication credentials". Jeremy Kahn's report
-# (kim-em/TauCetiWorker, the #1434 casualty) shows the same shape carrying 529 Overloaded. The colon
+# (kim-em/EpsilonEridaniWorker, the #1434 casualty) shows the same shape carrying 529 Overloaded. The colon
 # is required: both observed samples have it, and making it optional would match prose like
 # "API Error529" or an agent quoting a status number.
 _API_ERROR_RE = re.compile(r"API Error:\s*(\d{3})\b", re.I)
@@ -879,16 +879,16 @@ BUBBLE_REPO = "git+https://github.com/kim-em/bubble.git"
 BUBBLE_MIN_VERSION = "0.7.30"
 KIRO_BUBBLE_MIN_VERSION = "0.7.31"
 
-# TauCeti's public, anonymous Lake artifact cache. Mathlib's separate cache is fetched by
-# `lake exe cache get`; this one contains TauCeti's own main-built outputs.
+# EpsilonEridani's public, anonymous Lake artifact cache. Mathlib's separate cache is fetched by
+# `lake exe cache get`; this one contains EpsilonEridani's own main-built outputs.
 #
 # The custom domain, NOT the bucket's `pub-<id>.r2.dev` development URL. That development URL is
 # disabled on this bucket and answers 401 for every path, root included, so every round's
 # `lake cache get` failed and fell through to a from-scratch `lake build` -- silently, because a
-# cache miss is non-fatal here. The custom domain is also what TauCeti's own CI publishes and reads
+# cache miss is non-fatal here. The custom domain is also what EpsilonEridani's own CI publishes and reads
 # through (the LAKE_CACHE_*_PUBLIC repo variables). Keep the two in step.
-TAUCETI_CACHE_DOMAIN = "cache.taucetiproject.org"
-TAUCETI_CACHE_SERVICE = "tauceti-public"
+TAUCETI_CACHE_DOMAIN = "cache.epsiloneridaniproject.org"
+TAUCETI_CACHE_SERVICE = "epsiloneridani-public"
 TAUCETI_CACHE_ARTIFACT_URL = f"https://{TAUCETI_CACHE_DOMAIN}/artifacts"
 TAUCETI_CACHE_REVISION_URL = f"https://{TAUCETI_CACHE_DOMAIN}/revisions"
 
@@ -929,8 +929,8 @@ def bubble_supports_lake_cache_service() -> bool:
 
 
 @functools.lru_cache(maxsize=1)
-def tauceti_cache_unreachable_reason() -> str | None:
-    """``None`` if TauCeti's public artifact cache serves anonymous reads, else why it does not.
+def epsiloneridani_cache_unreachable_reason() -> str | None:
+    """``None`` if EpsilonEridani's public artifact cache serves anonymous reads, else why it does not.
 
     Probes the revision endpoint rather than trusting the URL. A healthy bucket answers 404 for a
     path that holds no object -- including its own root -- so ANY 404 here means the host is serving
@@ -939,7 +939,7 @@ def tauceti_cache_unreachable_reason() -> str | None:
 
     That is not hypothetical. The worker pointed at the bucket's `pub-<id>.r2.dev` development URL
     after it had been disabled, so `lake cache get` failed on every round and the non-fatal fallback
-    quietly rebuilt TauCeti from source each time. A dead endpoint must stop a round in preflight,
+    quietly rebuilt EpsilonEridani from source each time. A dead endpoint must stop a round in preflight,
     where it is one loud line, not 30 minutes into a build the cache existed to avoid.
     """
     import urllib.error
@@ -957,7 +957,7 @@ def tauceti_cache_unreachable_reason() -> str | None:
         # Unreachable for a reason that is not an auth wall (DNS, TLS, offline). Do not block the
         # round on it: the round's own `lake cache get` retries, and a transient network fault must
         # not be indistinguishable from a misconfigured bucket.
-        log(f"could not probe TauCeti's artifact cache ({e}); continuing")
+        log(f"could not probe EpsilonEridani's artifact cache ({e}); continuing")
         return None
 
 
@@ -1064,7 +1064,7 @@ def _bubble_proxy_endpoint_mtime() -> int | None:
 def _auth_proxy_lock_path() -> Path:
     import tempfile
 
-    return Path(tempfile.gettempdir()) / f"tauceti-worker-auth-proxy-{os.getuid()}.lock"
+    return Path(tempfile.gettempdir()) / f"epsiloneridani-worker-auth-proxy-{os.getuid()}.lock"
 
 
 def ensure_fork_proxy_current() -> None:
@@ -1079,7 +1079,7 @@ def ensure_fork_proxy_current() -> None:
 
     A healthy endpoint explicitly advertises fork-push support, so unrelated Bubble upgrades do not churn
     the shared daemon. Missing, dead, or pre-capability endpoints are refreshed through Bubble's own
-    `gh proxy start`. The refresh is serialized under a host-global file lock so concurrent TauCeti workers
+    `gh proxy start`. The refresh is serialized under a host-global file lock so concurrent EpsilonEridani workers
     do not race; Bubble separately serializes all service installers. Fail-CLOSED throughout: if the refresh
     cannot publish a fresh endpoint we Die rather than burn a long round that cannot authenticate. Call this
     ONLY for rounds that push to a fork — a review-only worker must not be blocked by it."""
@@ -1144,12 +1144,12 @@ def shlex_split(s: str) -> list[str]:
 
 
 def bubble_name(cfg: Config) -> str:
-    return f"tauceti-worker-{cfg.wid}"
+    return f"epsiloneridani-worker-{cfg.wid}"
 
 
 def bubble_home(cfg: Config) -> Path:
     env = os.environ.get("TAUCETI_BUBBLE_HOME")
-    return Path(env) if env else (cfg.data_home / ".cache" / "tauceti-worker" / cfg.wid / "bubble")
+    return Path(env) if env else (cfg.data_home / ".cache" / "epsiloneridani-worker" / cfg.wid / "bubble")
 
 
 def ensure_bubble_home(cfg: Config) -> dict:
@@ -1270,7 +1270,7 @@ def agent_inner_cmd(profile: AuthoringProfile | str) -> str:
         effort = f" --effort {shlex.quote(profile.effort)}" if profile.effort else ""
         setup = (
             "set -eu; "
-            "export KIRO_HOME=/tmp/tauceti-kiro-home XDG_DATA_HOME=/tmp/tauceti-kiro-data; "
+            "export KIRO_HOME=/tmp/epsiloneridani-kiro-home XDG_DATA_HOME=/tmp/epsiloneridani-kiro-data; "
             'mkdir -p "$KIRO_HOME" "$XDG_DATA_HOME/kiro-cli"; '
             "if [ -s /opt/round/kiro.key ]; then "
             'export KIRO_API_KEY="$(cat /opt/round/kiro.key)"; '
@@ -1297,7 +1297,7 @@ def bubble_work_cmd(inner: str) -> str:
     """Trusted bootstrap run before the work agent inside Bubble.
 
     Bubble's noninteractive `--command` mode deliberately does not run a hook-generated build, so do
-    both cache fetches explicitly: Mathlib's `lake exe cache`, then Lake's built-in cache for TauCeti's
+    both cache fetches explicitly: Mathlib's `lake exe cache`, then Lake's built-in cache for EpsilonEridani's
     own outputs. Bubble's login shell supplies `MATHLIB_CACHE_GET_URL` and the generated user-level Lake
     cache config for the host-global proxy. Keep a Lake-cache miss and the preliminary build non-fatal:
     fix/fix-ci/bump/rebase rounds often start from a red tree, and repairing it is the agent's job. A
@@ -1307,7 +1307,7 @@ def bubble_work_cmd(inner: str) -> str:
     told apart. "No outputs for this revision" is ordinary: it is every round on a commit main has not
     built yet, and there is nothing to do but build them. Any OTHER failure means the cache did not
     answer, which is infrastructure being broken rather than cold, and it used to look identical in the
-    log to the ordinary case. It printed one `warning: TauCeti Lake cache miss` line and rebuilt the
+    log to the ordinary case. It printed one `warning: EpsilonEridani Lake cache miss` line and rebuilt the
     library from source, every round, for as long as the endpoint stayed down.
     """
     fetch = f"lake cache get --service {TAUCETI_CACHE_SERVICE} --repo {TAUCETI}"
@@ -1324,9 +1324,9 @@ def bubble_work_cmd(inner: str) -> str:
         "done; "
         'if [ "$tc_hit" != 1 ]; then '
         'if [ "$tc_cold" = 1 ]; then '
-        "echo 'warning: TauCeti Lake cache holds no outputs for this revision; building them' >&2; "
+        "echo 'warning: EpsilonEridani Lake cache holds no outputs for this revision; building them' >&2; "
         "else "
-        "echo 'error: TauCeti Lake cache did not answer (not a missing revision); building TauCeti "
+        "echo 'error: EpsilonEridani Lake cache did not answer (not a missing revision); building EpsilonEridani "
         "from scratch. The cache endpoint is probably broken -- this should not happen.' >&2; "
         "sed 's/^/  cache: /' \"$tc_log\" >&2; "
         "fi; "
@@ -1470,7 +1470,7 @@ def run_in_bubble(
         command_inner = f"bash -c {shlex.quote(bubble_work_cmd(command_inner))}"
     command = f"{tcenv} {command_inner}"
 
-    # Only work-agent rounds compile TauCeti. Bubble turns the two immutable public endpoints into
+    # Only work-agent rounds compile EpsilonEridani. Bubble turns the two immutable public endpoints into
     # capability-scoped routes through its host-global download cache; the upstream host is not exposed
     # to the container. Review/probe commands neither compile nor need an artifact-cache capability.
     cache_flags = (
@@ -1572,15 +1572,15 @@ def _kiro_review_model(reviewers: str) -> str | None:
 
 
 def review_in_bubble(w: Worker, pr: int, head: str, reviewers: str, opts: RoundOpts) -> int:
-    """Run the tauceti-review engine INSIDE bubble — a hard container boundary around an engine that
+    """Run the epsiloneridani-review engine INSIDE bubble — a hard container boundary around an engine that
     reads an untrusted PR diff and runs a model on it (and, once review gains tool use, runs that
     model's tools). The repo-scoped proxy can't reach a second repo, so we pre-stage everything the
     engine would otherwise fetch and run it OFFLINE: the engine itself, the roadmap, and the review
     store are host→container mounts; `--no-sync` makes the engine archive review records to the mounted
-    outbox but NOT push (the bubble can't reach TauCetiData) — do_review drains that outbox to
-    TauCetiData host-side afterwards. The only traffic that
-    crosses the boundary is the engine's TauCeti code clone + PR API + scoreboard post (all scoped to
-    TauCeti, already allowed by the proxy) and the reviewer model's provider egress. The engine has no
+    outbox but NOT push (the bubble can't reach EpsilonEridaniData) — do_review drains that outbox to
+    EpsilonEridaniData host-side afterwards. The only traffic that
+    crosses the boundary is the engine's EpsilonEridani code clone + PR API + scoreboard post (all scoped to
+    EpsilonEridani, already allowed by the proxy) and the reviewer model's provider egress. The engine has no
     Python deps, so we run the mounted source with the image's python3 — no uvx/uv/PyPI.
 
     The store is mounted READ-WRITE from the worker's persistent store_dir (not /tmp): it holds the
@@ -1599,7 +1599,7 @@ def review_in_bubble(w: Worker, pr: int, head: str, reviewers: str, opts: RoundO
     store = cfg.store_dir
     store.mkdir(parents=True, exist_ok=True)
     mounts = [f"{engine_dir}:/opt/engine:ro", f"{roadmap_dir}:/opt/roadmap:ro", f"{store}:/opt/review-store:rw"]
-    # No --rubrics-sha/--shadow (they'd re-fetch TauCetiReview). --no-mathlib for now; wiring
+    # No --rubrics-sha/--shadow (they'd re-fetch EpsilonEridaniReview). --no-mathlib for now; wiring
     # --mathlib-dir at the bubble's vendored .lake/packages/mathlib is the reuse-rubric refinement.
     # run_in_bubble prefixes `env PATH=… `, so the inner command must start with an executable, not the
     # `cd` shell builtin — carry the engine on PYTHONPATH instead of cwd (cwd is irrelevant: the engine
@@ -1622,7 +1622,7 @@ def review_in_bubble(w: Worker, pr: int, head: str, reviewers: str, opts: RoundO
         # container's provider-only credential first so that clean-room copy has
         # a source, while keeping the operator's live database outside Bubble.
         setup = (
-            "set -eu; export KIRO_HOME=/tmp/tauceti-kiro-home "
+            "set -eu; export KIRO_HOME=/tmp/epsiloneridani-kiro-home "
             "XDG_DATA_HOME=/home/user/.local/share; "
             'mkdir -p "$KIRO_HOME" "$XDG_DATA_HOME/kiro-cli"; '
             "if [ -s /opt/round/kiro.key ]; then "
@@ -1664,7 +1664,7 @@ def _worker_iso_home(wid: str, _base: Path | None = None) -> Path:
             base = Path(pwd.getpwuid(os.getuid()).pw_dir)
         except (ImportError, KeyError, OSError):
             base = Path(os.path.expanduser("~"))
-    root = base / ".tauceti"
+    root = base / ".epsiloneridani"
     # colima binds <home>/.colima/_lima/<profile>/ssh.sock.<16-digit id>; keep that whole path strictly
     # under UNIX_PATH_MAX (104) by bounding the per-worker component.
     sock_suffix = len("/.colima/_lima/colima-bubble-colima/ssh.sock.") + 16
@@ -1695,7 +1695,7 @@ def share_build_caches(wid: str, data_home: Path) -> dict[str, str]:
     Mathlib's `.ltar` cache also stays per-worker — as the download target. `lake exe cache get` takes
     no lock and, in any checkout older than mathlib4#42752, writes fixed-name temporaries, so pointing
     two workers at one directory risks a corrupt `.ltar` under a name every later run trusts. It is
-    pooled instead by hardlink, before the agent starts; see `tauceti_worker.build_caches`.
+    pooled instead by hardlink, before the agent starts; see `epsiloneridani_worker.build_caches`.
 
     Called on both isolate_home() paths, so a round child of a loop that predates this still gets it,
     and resolved through `_host_home()` (pwd, not $HOME) so it computes the same answer either way. An
@@ -1740,7 +1740,7 @@ _WORKER_CLAUDE_SETTINGS = {
 def _config_sources(real_claude: Path | None, iso_claude: Path) -> tuple[Path, ...]:
     """Every config dir a symlink in `iso_claude` could have been created from, newest first.
 
-    The current one, plus the one recorded in `.tauceti-creds-source` when this home was first
+    The current one, plus the one recorded in `.epsiloneridani-creds-source` when this home was first
     seeded. They differ when a worker id is relaunched against a different `$CLAUDE_CONFIG_DIR`, and
     without the recorded one a stale symlink into the ORIGINAL directory would survive the migration
     and keep feeding that operator's instructions to the round. `real_claude` is None on the
@@ -1748,7 +1748,7 @@ def _config_sources(real_claude: Path | None, iso_claude: Path) -> tuple[Path, .
     marker is the only surviving record of where the credential came from."""
     out = [] if real_claude is None else [real_claude]
     try:
-        recorded = (iso_claude / ".tauceti-creds-source").read_text().strip()
+        recorded = (iso_claude / ".epsiloneridani-creds-source").read_text().strip()
     except OSError:
         recorded = ""
     if recorded and Path(recorded) not in out:
@@ -1878,7 +1878,7 @@ def isolate_home(wid: str) -> Path:
     review / the --isolate-home flag). Gives the config dir its own agent-facing surface rather than
     the operator's (seed_worker_claude_config) and symlinks the worker's own tooling from the real
     config dir; copies the mutable Claude/Codex auth files in ONCE, then records the source dirs in
-    .tauceti-creds-source markers so mirror_creds() can re-mirror a fresher access token whenever the
+    .epsiloneridani-creds-source markers so mirror_creds() can re-mirror a fresher access token whenever the
     operator's external refresher rotates it. The worker itself never refreshes (never touches the
     single-use refresh token). The copy always lives at <home>/.claude and $CLAUDE_CONFIG_DIR is repointed
     there, so both the pacer and the spawned claude read the isolated creds even when the operator's real
@@ -1943,7 +1943,7 @@ def isolate_home(wid: str) -> Path:
     # source whenever the operator's external refresher rotates it (the worker never refreshes its own
     # tokens). So a reused --worker-id stays pinned to whatever account it was first seeded from. Record the
     # source and warn if it changes, rather than silently pacing/running the stale account.
-    marker = iso_claude / ".tauceti-creds-source"
+    marker = iso_claude / ".epsiloneridani-creds-source"
     if marker.exists():
         if marker.read_text().strip() != str(real_claude):
             log(
@@ -1963,7 +1963,7 @@ def isolate_home(wid: str) -> Path:
     # Record the real ~/.codex so mirror_creds() can re-mirror the codex token too (the Claude marker only
     # names the Claude source). Written unconditionally so homes seeded before this marker existed get it
     # backfilled on their next isolate_home() run.
-    codex_marker = iso_codex / ".tauceti-creds-source"
+    codex_marker = iso_codex / ".epsiloneridani-creds-source"
     if not codex_marker.exists():
         try:
             codex_marker.write_text(str(real_codex))
@@ -1978,7 +1978,7 @@ def isolate_home(wid: str) -> Path:
             _copy_kiro_auth_db(kiro_src, kiro_dst)
         except Die as e:
             log(f"WARNING: {e}; Kiro browser authentication was not isolated")
-    kiro_marker = iso_kiro_data / ".tauceti-creds-source"
+    kiro_marker = iso_kiro_data / ".epsiloneridani-creds-source"
     if kiro_marker.exists():
         if kiro_marker.read_text().strip() != str(real_kiro_data):
             log(

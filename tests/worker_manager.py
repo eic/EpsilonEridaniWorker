@@ -16,7 +16,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
-root = Path(tempfile.mkdtemp(prefix="tauceti-workers-test-"))
+root = Path(tempfile.mkdtemp(prefix="epsiloneridani-workers-test-"))
 for key in (
     "TAUCETI_CONFIG_HOME",
     "TAUCETI_WORKERS_CONFIG",
@@ -31,10 +31,10 @@ os.environ["TAUCETI_MANAGER_TEST_COMMAND"] = shlex.join(
     [sys.executable, "-c", "import os; os.read(int(os.environ['TAUCETI_PARENT_PIPE_FD']), 1)"]
 )
 
-import tauceti_worker.paths as worker_paths
-import tauceti_worker.worker_manager as wm
-from tauceti_worker.cli import build_parser
-from tauceti_worker.runtime_status import report_failure, report_runtime
+import epsiloneridani_worker.paths as worker_paths
+import epsiloneridani_worker.worker_manager as wm
+from epsiloneridani_worker.cli import build_parser
+from epsiloneridani_worker.runtime_status import report_failure, report_runtime
 
 
 def wait_for(predicate, timeout=10):
@@ -52,7 +52,7 @@ def start_manager(config):
         [
             sys.executable,
             "-m",
-            "tauceti_worker",
+            "epsiloneridani_worker",
             "workers",
             "--config",
             str(config),
@@ -80,7 +80,7 @@ try:
     wm.save_worker_specs(config, specs)
     assert wm.load_worker_specs(config) == specs
 
-    # Bare `tauceti workers` is the documented shorthand for `workers status`.
+    # Bare `epsiloneridani workers` is the documented shorthand for `workers status`.
     bare_workers = build_parser().parse_args(["workers"])
     assert bare_workers.workers_action is None
     assert bare_workers.json is False and bare_workers.watch is False
@@ -98,7 +98,7 @@ try:
     # Legacy command import produces the same semantic settings without retaining shell syntax.
     legacy = root / "workers.conf"
     legacy.write_text(
-        "./tauceti work --loop --worker-id worker2 --agent codex --only rebase,review --ignore-quota --auto-refresh\n"
+        "./epsiloneridani work --loop --worker-id worker2 --agent codex --only rebase,review --ignore-quota --auto-refresh\n"
     )
     imported = wm.parse_legacy_config(legacy)
     assert imported[0].id == "worker2"
@@ -197,9 +197,9 @@ try:
     # Human status is a scan-friendly block, with URLs and provider quota details on separate lines.
     legacy_log = root / "legacy-worker.log"
     legacy_log.write_text(
-        "2026-07-30 06:24:55 tauceti: agent-claude: exited 1; last lines of agent.log:\n"
+        "2026-07-30 06:24:55 epsiloneridani: agent-claude: exited 1; last lines of agent.log:\n"
         "    API Error: 529 Overloaded. This is a temporary server-side issue.\n"
-        "2026-07-30 06:24:56 tauceti: round rc=1; no-progress streak=5 — backing off 900s\n"
+        "2026-07-30 06:24:56 epsiloneridani: round rc=1; no-progress streak=5 — backing off 900s\n"
     )
     human_status = "\n".join(
         wm._worker_status_lines(
@@ -219,7 +219,7 @@ try:
                     "actual": "running",
                     "agent": "codex",
                     "phase": "review",
-                    "target": "PR #1441  https://github.com/TauCetiProject/TauCeti/pull/1441",
+                    "target": "PR #1441  https://github.com/eic/EpsilonEridani/pull/1441",
                     "spec": {
                         "id": "worker2",
                         "enabled": True,
@@ -280,7 +280,7 @@ worker2 — running
   pacing:   ignored (--ignore-quota; hard limits still apply)
   work:     review
             PR #1441
-            https://github.com/TauCetiProject/TauCeti/pull/1441
+            https://github.com/eic/EpsilonEridani/pull/1441
   activity: —
   runtime:  codex
 
@@ -300,12 +300,12 @@ worker3 — backing off
   activity: —
   reason:   claude agent: API Error: 529 Overloaded. This is a temporary
             server-side issue.
-  logs:     tauceti workers logs worker3"""
+  logs:     epsiloneridani workers logs worker3"""
     ), human_status
     assert max(map(len, human_status.splitlines())) <= 80
 
     if sys.platform != "darwin":
-        assert wm._service_path() == root / "config" / "systemd" / "user" / "tauceti-workers.service"
+        assert wm._service_path() == root / "config" / "systemd" / "user" / "epsiloneridani-workers.service"
         ca_bundle = root / "ca-bundle.pem"
         ca_bundle.write_text("test CA bundle")
         saved_candidates = worker_paths._ssl_cert_candidates
@@ -496,11 +496,11 @@ finally:
         except subprocess.TimeoutExpired:
             manager.terminate()
             manager.wait(5)
-    for state_file in (root / "state" / "tauceti" / "workers").glob("*.json"):
+    for state_file in (root / "state" / "epsiloneridani" / "workers").glob("*.json"):
         wm._stop_runner(state_file.stem)
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline:
-        ids = [path.stem for path in (root / "state" / "tauceti" / "workers").glob("*.json")]
+        ids = [path.stem for path in (root / "state" / "epsiloneridani" / "workers").glob("*.json")]
         if not any(wm.runner_status(wid).get("alive") for wid in ids):
             break
         time.sleep(0.05)

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """A host review posts its scoreboard to the PR, then best-effort publishes analytics/provenance
-records to TauCetiData with a git push (via _sync_review_outbox). The scoreboard is the live
+records to EpsilonEridaniData with a git push (via _sync_review_outbox). The scoreboard is the live
 auto-merge verdict, so an archive outage must warn and preserve the outbox without turning a posted
 review into failed work, charging the PR, or withholding the normal scoreboard-cache invalidation.
 
@@ -15,7 +15,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 wu = tc.work_units
 fails = 0
@@ -92,7 +92,7 @@ wu.me = lambda: "kim-em"
 CAND = tc.Candidate(726, "deadbeef", "build-green")
 
 try:
-    # 1) engine posts, but the TauCetiData publish FAILS -> review succeeds, no per-PR bump, warned.
+    # 1) engine posts, but the EpsilonEridaniData publish FAILS -> review succeeds, no per-PR bump, warned.
     #    The engine posted a verdict, so a prior error streak is CLEARED (reset on post, before the
     #    publish step) rather than bumped — the archive failure is never charged to the PR.
     wu._sync_review_outbox = lambda w, pr: 1  # push failed after retries

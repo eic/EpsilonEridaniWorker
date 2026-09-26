@@ -8,7 +8,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 NOW = 2_000_000_000
 fails = 0
@@ -54,7 +54,7 @@ check("malformed publisher fails open", tc._scoreboard_reviewer(tc.Meta({"submit
 class ContestComments:
     def review_comments(self, _pr):
         return [
-            {"id": 100, "in_reply_to_id": None, "body": "<!--tauceti-rubric:reuse-->"},
+            {"id": 100, "in_reply_to_id": None, "body": "<!--epsiloneridani-rubric:reuse-->"},
             {
                 "id": 101,
                 "in_reply_to_id": 100,

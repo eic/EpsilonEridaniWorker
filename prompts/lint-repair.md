@@ -1,4 +1,4 @@
-You are repairing the environment lint of TauCetiProject/TauCeti, an AIs-welcome Lean 4 library downstream of Mathlib, on pull request #__PR__. You are in a checkout of the repo, already on the PR's branch. TauCeti's daily full lint (`.github/workflows/lint-full.yml`) opened this PR because `main` carries environment-lint violations that are not in the grandfathered baseline. PR builds lint only the modules a change touches, so a change can break lint in a module it did not touch; this PR's build lints the whole library (it is on a `lint-repair/` branch and labelled `full-lint`), and it is red until those violations are fixed. Work autonomously to completion: make its build green by fixing `TauCeti/`, without weakening the library.
+You are repairing the environment lint of eic/EpsilonEridani, an AIs-welcome Lean 4 library downstream of Mathlib, on pull request #__PR__. You are in a checkout of the repo, already on the PR's branch. EpsilonEridani's daily full lint (`.github/workflows/lint-full.yml`) opened this PR because `main` carries environment-lint violations that are not in the grandfathered baseline. PR builds lint only the modules a change touches, so a change can break lint in a module it did not touch; this PR's build lints the whole library (it is on a `lint-repair/` branch and labelled `full-lint`), and it is red until those violations are fixed. Work autonomously to completion: make its build green by fixing `EpsilonEridani/`, without weakening the library.
 
 ## Bring the branch up to date first
 The daily lint comments on an open repair PR rather than replacing it, so `main` may have moved since this branch was cut. Start by merging it, then work from the current full lint:
@@ -6,7 +6,7 @@ The daily lint comments on an open repair PR rather than replacing it, so `main`
 git fetch -q origin main
 git merge --no-edit origin/main
 ```
-If the merge conflicts, resolve it (conflicts can only be in `TauCeti/`), or stop and say so.
+If the merge conflicts, resolve it (conflicts can only be in `EpsilonEridani/`), or stop and say so.
 
 ## What the violations usually are
 - **simpNF**: a `@[simp]` lemma whose left-hand side simp now rewrites, usually because a newer simp lemma elsewhere took it out of simp normal form, or because a newer `attribute [simp]` made an old lemma a simp lemma. The linter's message says which lemmas simp used. Fix it by restating the lemma so its left-hand side is in simp normal form, or by removing `@[simp]` from whichever of the two lemmas is redundant or points the wrong way. Check what uses a lemma (`grep -rn` for its name) before removing `@[simp]`.
@@ -17,15 +17,15 @@ Repair existing declarations only: restate, re-annotate, or (if redundant) remov
 
 The PR body and its comments list the violations the daily lint found, but always work from the current full lint: `bash scripts/lint-env.sh` with `LINT_ONLY_MODULES` unset lints the whole library and prints each new violation with the linter's explanation.
 
-- For a failing check's CI logs: `gh pr checks __PR__ --repo TauCetiProject/TauCeti`, then `gh run view <run-id> --repo TauCetiProject/TauCeti --log-failed`.
+- For a failing check's CI logs: `gh pr checks __PR__ --repo eic/EpsilonEridani`, then `gh run view <run-id> --repo eic/EpsilonEridani --log-failed`.
 - If the failure is genuinely transient infra (e.g. a cache fetch timeout) and everything below passes locally, push an empty commit to re-trigger CI (`git commit --allow-empty -m "chore: re-trigger CI"`) and say so.
 
 ## Rules of the repo (hard constraints)
-- Fix code under `TauCeti/` only. Do NOT edit `scripts/` (including `scripts/lint-baseline.txt` and `scripts/lint-nolints-allowlist.txt`), `.github/`, the lakefile, or the Lake pins. Do NOT add `@[nolint ...]`: every nolint must be allowlisted in a human-owned file, so CI rejects it. If a violation genuinely should be an exception, stop and say so in your report instead of silencing it.
-- Do NOT edit the root `TauCeti.lean`: it is intentionally empty.
-- Everything under `namespace TauCeti`. Tau Ceti does not preserve backwards compatibility: if you rename or restate a lemma, update every use in the repository in the same change.
-- **Never write to the roadmaps.** Do not open a PR or an issue in `TauCetiProject/TauCetiRoadmap`.
-- Must end green AND axiom-clean: no `sorry`, no `native_decide`, no new axioms (allowlist: `propext`, `Classical.choice`, `Quot.sound`), and no `set_option` in `TauCeti/` at all (CI rejects it; it is how `maxHeartbeats` overrides and linter silencing happen).
+- Fix code under `EpsilonEridani/` only. Do NOT edit `scripts/` (including `scripts/lint-baseline.txt` and `scripts/lint-nolints-allowlist.txt`), `.github/`, the lakefile, or the Lake pins. Do NOT add `@[nolint ...]`: every nolint must be allowlisted in a human-owned file, so CI rejects it. If a violation genuinely should be an exception, stop and say so in your report instead of silencing it.
+- Do NOT edit the root `EpsilonEridani.lean`: it is intentionally empty.
+- Everything under `namespace EpsilonEridani`. Tau Ceti does not preserve backwards compatibility: if you rename or restate a lemma, update every use in the repository in the same change.
+- **Never write to the roadmaps.** Do not open a PR or an issue in `eic/EpsilonEridaniRoadmap`.
+- Must end green AND axiom-clean: no `sorry`, no `native_decide`, no new axioms (allowlist: `propext`, `Classical.choice`, `Quot.sound`), and no `set_option` in `EpsilonEridani/` at all (CI rejects it; it is how `maxHeartbeats` overrides and linter silencing happen).
 
 ## Verify before pushing (ALL of these MUST pass — they are what the `build` check runs)
 ```
@@ -33,7 +33,7 @@ lake exe cache get
 git fetch -q origin main
 shim_args=(--fail-on-available); base_shims="$(mktemp)"; base_root="$(mktemp -d)"; have_base=0
 base_ref="$(git merge-base origin/main HEAD)"
-if git show "$base_ref":TauCeti/mathlib-shims.json > "$base_shims" 2>/dev/null; then git archive "$base_ref" TauCeti | tar -x -C "$base_root"; shim_args+=(--base-manifest "$base_shims" --base-root "$base_root"); have_base=1; fi
+if git show "$base_ref":EpsilonEridani/mathlib-shims.json > "$base_shims" 2>/dev/null; then git archive "$base_ref" EpsilonEridani | tar -x -C "$base_root"; shim_args+=(--base-manifest "$base_shims" --base-root "$base_root"); have_base=1; fi
 if [ "$have_base" = 1 ] && git diff --quiet "$base_ref" -- lake-manifest.json lean-toolchain; then shim_args+=(--only-new); fi
 if [ -f scripts/check-expired-mathlib-shims.py ]; then python3 scripts/check-expired-mathlib-shims.py "${shim_args[@]}"; fi
 rm -f "$base_shims"; rm -rf "$base_root"
@@ -55,7 +55,7 @@ Iterate until every one is green, and `lint-env.sh` prints `LINT-ENV: PASS`. Nev
   "__BIN__/git-safe-push"
   ```
   This compare-and-swaps the PR branch against the head you started from, so a concurrent agent's work is never silently clobbered. Do NOT run a raw `git push` (nor `--force` / `--force-with-lease`); the wrapper is the only sanctioned push. If it reports the branch moved or the lease was lost, another agent pushed — STOP and say so; do not work around it. A successful push updates the PR; CI re-runs automatically.
-- Do NOT open a new PR; do NOT touch files outside `TauCeti/` (the merge from `main` is the only exception).
+- Do NOT open a new PR; do NOT touch files outside `EpsilonEridani/` (the merge from `main` is the only exception).
 
 ## Report
 End with a concise summary: each violation you fixed and how, anything you judged should be a human-approved exception instead, and the exact result lines of the verification commands proving green. Do not claim green unless you saw it.

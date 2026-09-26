@@ -12,7 +12,7 @@ from types import SimpleNamespace
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 fails = 0
 
@@ -108,7 +108,7 @@ _dispatched = []
 
 
 def cli(argv, env):
-    """Run `tauceti <argv>` as far as the pacing validation, with the commands it can dispatch to stubbed
+    """Run `epsiloneridani <argv>` as far as the pacing validation, with the commands it can dispatch to stubbed
     out so nothing after it runs. Returns None when it got through, or the message it died with."""
     was = os.environ.get("TAUCETI_PACE")
     if env is None:

@@ -14,9 +14,9 @@ from types import SimpleNamespace
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
-from tauceti_worker import github as gh_mod  # noqa: E402
-from tauceti_worker.config import Die  # noqa: E402
-from tauceti_worker.constants import CLAIMS, TAUCETI  # noqa: E402
+from epsiloneridani_worker import github as gh_mod  # noqa: E402
+from epsiloneridani_worker.config import Die  # noqa: E402
+from epsiloneridani_worker.constants import CLAIMS, TAUCETI  # noqa: E402
 
 
 class Stub:
@@ -26,7 +26,7 @@ class Stub:
     `invitations` is the id `gh api /user/repository_invitations` yields for CLAIMS ("" for none).
     """
 
-    def __init__(self, *, push="false", invitations="", accept_ok=True, fork="alice/TauCeti"):
+    def __init__(self, *, push="false", invitations="", accept_ok=True, fork="alice/EpsilonEridani"):
         self.push = push
         self.invitations = invitations
         self.accept_ok = accept_ok
@@ -102,7 +102,7 @@ def shared_when_granted():
 
 def fork_when_not_granted():
     with Stub(push="false") as s:
-        assert gh_mod.claims_repo() == "alice/TauCeti"
+        assert gh_mod.claims_repo() == "alice/EpsilonEridani"
         assert not any(TAUCETI in " ".join(c) for c in s.calls), "canonical is never probed as a claim repo"
 
 
@@ -110,7 +110,7 @@ def fork_when_access_is_unknown():
     # A failed probe (network, rate limit, or a CLAIMS we cannot see) must pick the repo that always
     # works, not the one that would error on every acquire for the rest of the round.
     with Stub(push=None):
-        assert gh_mod.claims_repo() == "alice/TauCeti"
+        assert gh_mod.claims_repo() == "alice/EpsilonEridani"
 
 
 def pending_invitation_is_accepted_then_shared():
@@ -128,7 +128,7 @@ def pending_invitation_is_accepted_then_shared():
 
 def only_the_claims_invitation_is_ever_accepted():
     with Stub(push="false", invitations="") as s:
-        assert gh_mod.claims_repo() == "alice/TauCeti"
+        assert gh_mod.claims_repo() == "alice/EpsilonEridani"
         # No invitation matched, so nothing was accepted, and the filter that decides is an exact
         # full_name match: the worker must never become an accept-anything button.
         assert not hasattr(s, "accepted")
@@ -137,7 +137,7 @@ def only_the_claims_invitation_is_ever_accepted():
 
 def an_unacceptable_invitation_falls_through():
     with Stub(push="false", invitations="4242", accept_ok=False):
-        assert gh_mod.claims_repo() == "alice/TauCeti"
+        assert gh_mod.claims_repo() == "alice/EpsilonEridani"
 
 
 def no_writable_namespace_never_raises():

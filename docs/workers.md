@@ -11,19 +11,19 @@ Nothing needs to exist first. `workers add` creates the config, writes the
 definition, and starts a manager:
 
 ```bash
-tauceti workers add                        # an enabled worker1, the whole cascade
-tauceti workers add reviewer --only review # a focused, named worker
-tauceti workers                            # desired and actual state
-tauceti workers logs --follow reviewer     # its durable console log
+epsiloneridani workers add                        # an enabled worker1, the whole cascade
+epsiloneridani workers add reviewer --only review # a focused, named worker
+epsiloneridani workers                            # desired and actual state
+epsiloneridani workers logs --follow reviewer     # its durable console log
 ```
 
 Day-to-day controls:
 
 ```bash
-tauceti workers disable reviewer   # persist desired stopped state
-tauceti workers enable reviewer    # and start it again
-tauceti workers restart reviewer   # without changing desired state
-tauceti workers remove reviewer    # drop the definition and stop it
+epsiloneridani workers disable reviewer   # persist desired stopped state
+epsiloneridani workers enable reviewer    # and start it again
+epsiloneridani workers restart reviewer   # without changing desired state
+epsiloneridani workers remove reviewer    # drop the definition and stop it
 ```
 
 ## Editing the file directly
@@ -33,9 +33,9 @@ form, dropping comments and hand formatting. To keep those, or to set a field
 `add` does not cover, edit the file and apply it:
 
 ```bash
-tauceti workers edit          # $VISUAL, else $EDITOR, else vi
-tauceti workers apply --check # validate without reconciling
-tauceti workers apply         # reconcile, starting a manager if needed
+epsiloneridani workers edit          # $VISUAL, else $EDITOR, else vi
+epsiloneridani workers apply --check # validate without reconciling
+epsiloneridani workers apply         # reconcile, starting a manager if needed
 ```
 
 `workers edit` does not start a manager on its own; `workers apply` is the
@@ -65,7 +65,7 @@ each cycle. If your edit does not validate, the manager keeps the last good
 generation, leaves running workers alone, and says so once:
 
 ```
-tauceti workers: invalid configuration; keeping last good generation: ...
+epsiloneridani workers: invalid configuration; keeping last good generation: ...
 ```
 
 ## Where the config lives
@@ -74,15 +74,15 @@ The first of these that is set wins:
 
 | Source | Path |
 | --- | --- |
-| `tauceti workers --config PATH` | exactly that file |
+| `epsiloneridani workers --config PATH` | exactly that file |
 | `$TAUCETI_WORKERS_CONFIG` | exactly that file |
 | `$TAUCETI_CONFIG_HOME` | `$TAUCETI_CONFIG_HOME/workers.toml` |
-| `$XDG_CONFIG_HOME` | `$XDG_CONFIG_HOME/tauceti/workers.toml` |
-| macOS default | `~/Library/Application Support/tauceti/workers.toml` |
-| otherwise | `~/.config/tauceti/workers.toml` |
+| `$XDG_CONFIG_HOME` | `$XDG_CONFIG_HOME/epsiloneridani/workers.toml` |
+| macOS default | `~/Library/Application Support/epsiloneridani/workers.toml` |
+| otherwise | `~/.config/epsiloneridani/workers.toml` |
 
-`--config` belongs to `tauceti workers` itself, not to the action, so it goes
-before the action name: `tauceti workers --config ./workers.toml apply`.
+`--config` belongs to `epsiloneridani workers` itself, not to the action, so it goes
+before the action name: `epsiloneridani workers --config ./workers.toml apply`.
 
 Writes take an `flock` on a sibling `workers.toml.lock`, then replace the file
 atomically, so concurrent CLI and dashboard mutations serialize instead of
@@ -130,21 +130,21 @@ odd worker out is visible rather than mysterious.
 Put no secrets in it. The values are stored in plain `workers.toml`, and the
 whole worker definition is handed to its runner on a command line, where any
 process running as you can read it. Credentials belong in the provider
-mechanisms `tauceti` already uses (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`,
+mechanisms `epsiloneridani` already uses (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`,
 `KIRO_API_KEY`), which keep them in files rather than argv. Status output prints
 only the variable names for the same reason.
 
 Every worker enables `LAKE_ARTIFACT_CACHE=1` and
 `LAKE_RESTORE_ARTIFACTS=1` by default. The second setting belongs with the first:
 with the artifact cache writable, Lake may keep a build product in its store
-instead of the build directory, and TauCeti's audits (`lake exe axioms`, `lake
+instead of the build directory, and EpsilonEridani's audits (`lake exe axioms`, `lake
 exe module-system`) resolve `.olean`s through the Lean search path. Restoring the
 copy keeps them working, and measured on a 1500-declaration module, returning to
 a previously built state still fell from 4s of recompilation to 0s of restore.
 An explicit value in a worker's `env` table overrides either default.
 
 The trade is disk: old build generations remain in the store, and Lake supplies
-no selective eviction — `lake cache clean` empties it all or nothing. TauCeti
+no selective eviction — `lake cache clean` empties it all or nothing. EpsilonEridani
 records the toolchain on canonical `main` for each worker and clears that
 worker's default Lake cache when the pin changes. The first observed pin only
 seeds the record; there is deliberately no size- or calendar-based cleanup. An
@@ -206,9 +206,9 @@ logout and comes back after a reboot, leave its workers running while the servic
 takes over the manager socket:
 
 ```bash
-tauceti workers manager-stop --leave-workers
-tauceti workers service install
-tauceti workers service status
+epsiloneridani workers manager-stop --leave-workers
+epsiloneridani workers service install
+epsiloneridani workers service status
 ```
 
 Omit `manager-stop` when no detached manager is running. One runtime directory
@@ -289,7 +289,7 @@ folds the private copies an already-running fleet accumulated into the pool
 without re-downloading them.
 
 On macOS, `$HOME` stays unchanged because both Claude Code and GitHub CLI use the
-login Keychain. `tauceti` redirects `$CLAUDE_CONFIG_DIR` and `$CODEX_HOME`, which
+login Keychain. `epsiloneridani` redirects `$CLAUDE_CONFIG_DIR` and `$CODEX_HOME`, which
 isolates Codex, but host workers still share the login user's Claude account.
 Bubble rounds copy that shared Claude credential into a private transient
 directory without modifying the Keychain. See [the sandbox notes](sandbox.md)
@@ -314,33 +314,33 @@ edited is kept rather than replaced.
 | `<state>/logs/<id>/work-*.log` | Durable per-run console logs |
 | `<runtime>/manager.sock`, `w-<id>.sock` | Control sockets, mode 0600 |
 
-`<state>` is `$TAUCETI_WORKERS_STATE_DIR`, else `$XDG_STATE_HOME/tauceti/workers`,
-else `~/Library/Application Support/tauceti/state/workers` on macOS, else
-`~/.local/state/tauceti/workers`. `<runtime>` is `$TAUCETI_RUNTIME_DIR`, else
-`$XDG_RUNTIME_DIR/tauceti`, else `/tmp/tauceti-$(id -u)`; it must be owned by you
+`<state>` is `$TAUCETI_WORKERS_STATE_DIR`, else `$XDG_STATE_HOME/epsiloneridani/workers`,
+else `~/Library/Application Support/epsiloneridani/state/workers` on macOS, else
+`~/.local/state/epsiloneridani/workers`. `<runtime>` is `$TAUCETI_RUNTIME_DIR`, else
+`$XDG_RUNTIME_DIR/epsiloneridani`, else `/tmp/epsiloneridani-$(id -u)`; it must be owned by you
 and inaccessible to other users, or the manager refuses to start.
 
 Each managed worker publishes a structured state such as `waiting-quota`,
 `surveying`, `running`, or `backoff`, along with its current phase and target and
-the path to its logfile. That is what `tauceti workers status` and the
+the path to its logfile. That is what `epsiloneridani workers status` and the
 dashboard's workers view read.
 
 ## tmux is a viewer, not the supervisor
 
-`tauceti workers tmux` opens one dashboard window plus one log-following window
+`epsiloneridani workers tmux` opens one dashboard window plus one log-following window
 per enabled worker. Killing that session does not stop any worker, and running
 the command again rebuilds the view from the configuration and the durable logs.
 tmux is optional; workers run without it.
 
 ## Migrating from `workers.conf`
 
-`workers.conf` is a legacy line-oriented format: one `tauceti work --loop`
+`workers.conf` is a legacy line-oriented format: one `epsiloneridani work --loop`
 command per line, each with an explicit `--worker-id`. It is only ever read by
 the one-shot import, which refuses to overwrite an existing `workers.toml`
 without `--force`:
 
 ```bash
-tauceti workers import workers.conf
+epsiloneridani workers import workers.conf
 ```
 
 Anything the legacy parser does not recognize is an error naming the file, line,

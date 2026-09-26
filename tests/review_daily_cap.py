@@ -19,7 +19,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 TODAY = datetime.now(UTC).strftime("%Y-%m-%d")
 YEST = (datetime.now(UTC) - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -42,7 +42,7 @@ def store_with(rounds) -> Path:
 
 
 def skipped(count) -> bool:
-    """Mirror the survey-time decision in tauceti: skip when capped or fail-closed."""
+    """Mirror the survey-time decision in epsiloneridani: skip when capped or fail-closed."""
     return count is None or count >= CAP
 
 

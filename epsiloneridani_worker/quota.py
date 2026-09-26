@@ -1,4 +1,4 @@
-"""tauceti_worker.quota — the subscription pacer: read Codex/Claude usage and credentials and decide
+"""epsiloneridani_worker.quota — the subscription pacer: read Codex/Claude usage and credentials and decide
 which model may run now, plus the isolated-home credential mirroring."""
 
 from __future__ import annotations
@@ -73,7 +73,7 @@ CLAUDE_BOOTSTRAP_FILE = "bootstrap.json"
 
 # Where the shared bootstrap reservation lives, relative to the credential source: every worker
 # measuring this account contends for the same file, whatever its worker id or checkout.
-CLAUDE_QUOTA_DIRNAME = ".tauceti-quota"
+CLAUDE_QUOTA_DIRNAME = ".epsiloneridani-quota"
 
 # Environment the bootstrap request must NOT inherit. Every one of these can route a `claude -p` turn
 # to different credentials or a different backend than the one whose quota we just measured — an API
@@ -264,7 +264,7 @@ def _idle_init_block(curve: list[tuple[float, float]] | None = None) -> str | No
     An idle window is interpreted for PACING as the synthetic reading used=0 at elapsed=0. If the budget
     there is positive (or becomes positive immediately after 0) a bootstrap request is within the
     operator's policy. If the curve holds the budget at 0 for a stretch (τ₀ > 0), spending anything on
-    this window is against that policy, and TauCeti cannot wait the plateau out either: the window has
+    this window is against that policy, and EpsilonEridani cannot wait the plateau out either: the window has
     not opened, so there is no clock saying when τ₀% of it will have elapsed. It stays blocked until
     something else initializes the window, the operator changes the curve, or real telemetry appears.
     We do NOT quietly initialize the window to manufacture a clock."""
@@ -680,7 +680,7 @@ def _codex_valid_until(payload: dict, observed_at: float) -> float | None:
 def _idle_phrase(r: Reading) -> str:
     """The default account of an idle window: it reset, and nothing has opened the next cycle yet —
     plus, when the operator's pace curve is what forbids initializing it, that reason instead of the
-    raw telemetry note. An operator seeing this needs to know whether TauCeti is waiting on the
+    raw telemetry note. An operator seeing this needs to know whether EpsilonEridani is waiting on the
     provider or on their own curve."""
     blocked = _idle_init_block()
     why = blocked or r.detail
@@ -888,7 +888,7 @@ def _read_marker(p: Path) -> str | None:
 # >=0.139 won't parse an auth.json missing `refresh_token`; with a valid access token it never uses it,
 # so this constant satisfies the parser while the worker still holds no token that could rotate the
 # operator's single-use credential. See _mirror_creds_file.
-CODEX_RT_PLACEHOLDER = "rt.0.tauceti-worker-placeholder-never-a-real-refresh-token"
+CODEX_RT_PLACEHOLDER = "rt.0.epsiloneridani-worker-placeholder-never-a-real-refresh-token"
 
 
 def _mirror_creds_file(
@@ -966,7 +966,7 @@ def mirror_creds(cfg: Config) -> None:
     strip."""
     if sys.platform != "darwin":
         iso_claude = claude_dir(cfg.home)
-        src_claude = _read_marker(iso_claude / ".tauceti-creds-source")
+        src_claude = _read_marker(iso_claude / ".epsiloneridani-creds-source")
         if src_claude:
             _mirror_creds_file(
                 Path(src_claude) / ".credentials.json",
@@ -975,7 +975,7 @@ def mirror_creds(cfg: Config) -> None:
                 tok_key="accessToken",
                 rt_key="refreshToken",
             )
-    src_codex = _read_marker(codex_dir(cfg.home) / ".tauceti-creds-source")
+    src_codex = _read_marker(codex_dir(cfg.home) / ".epsiloneridani-creds-source")
     if src_codex:  # absent on homes seeded before this marker existed
         _mirror_creds_file(
             Path(src_codex) / "auth.json",
@@ -1058,12 +1058,12 @@ def _store_reason(store: str, cfg_path: Path, checkout: Path) -> str:
     if store == "project-layer":
         return (
             f"{checkout}/.codex/config.toml exists, and a trusted project config layer overrides the "
-            f"user one — so TauCeti cannot tell which store codex will use for a round that runs in "
+            f"user one — so EpsilonEridani cannot tell which store codex will use for a round that runs in "
             f"that checkout"
         )
     if store.startswith("unreadable:"):
         return f"{cfg_path} could not be read ({store.split(':', 1)[1]}), so its credential store is unknown"
-    why = _STORE_WHY.get(store, "TauCeti does not recognise that store and will not assume it is the file")
+    why = _STORE_WHY.get(store, "EpsilonEridani does not recognise that store and will not assume it is the file")
     return f'{cfg_path} sets cli_auth_credentials_store = "{store}", so {why}'
 
 
@@ -1073,7 +1073,7 @@ def _para(text: str) -> str:
 
     Never split a long word: the long words here are paths and email addresses, and both must survive
     intact to be copied, pasted, or compared. Default textwrap would break them at their hyphens
-    (`kevin-other@…`, `/home/kim/.codex-tauceti`), so an over-width line is the lesser evil."""
+    (`kevin-other@…`, `/home/kim/.codex-epsiloneridani`), so an over-width line is the lesser evil."""
     return textwrap.fill(" ".join(text.split()), width=88, break_long_words=False, break_on_hyphens=False)
 
 
@@ -1099,7 +1099,7 @@ class CodexAccount:
 
     def matches(self, requested: str) -> bool:
         """--account accepts either the email or the workspace UUID; both are what the operator can
-        actually see (the email in ChatGPT's UI, the UUID in `tauceti doctor`)."""
+        actually see (the email in ChatGPT's UI, the UUID in `epsiloneridani doctor`)."""
         want = requested.strip().lower()
         return bool(want) and want in {v.lower() for v in (self.email, self.account_id) if v}
 
@@ -1112,7 +1112,7 @@ class Quota:
     """The pacer. Every read here is pure: it may fetch usage and cache it, but it never spends quota.
     Breaking a post-reset deadlock costs a real request, so it lives behind one explicit method —
     authorize_claude_launch — that a caller invokes only once it has actual work to run. A dashboard
-    refresh, `tauceti status`, or an `auto` selection that lands on codex must never spend."""
+    refresh, `epsiloneridani status`, or an `auto` selection that lands on codex must never spend."""
 
     def __init__(self, cfg: Config):
         self.cfg = cfg
@@ -1271,7 +1271,7 @@ class Quota:
             pass  # no user config ⇒ codex's default, which is file
         except (OSError, tomllib.TOMLDecodeError) as e:
             # NOT "codex would fail to start anyway": a permission or transient I/O error can clear
-            # before launch, and TauCeti's entitlement probe passes --ignore-user-config, so some codex
+            # before launch, and EpsilonEridani's entitlement probe passes --ignore-user-config, so some codex
             # invocations start happily on a config we could not read. We simply do not know.
             return f"unreadable:{type(e).__name__}"
         else:
@@ -1300,7 +1300,7 @@ class Quota:
         naming the real one. Telling an isolated worker's operator to re-login into the mirror would send
         them to a file mirror_creds() overwrites from the original on the next round."""
         d = codex_dir(self.cfg.home)
-        src = _read_marker(d / ".tauceti-creds-source")
+        src = _read_marker(d / ".epsiloneridani-creds-source")
         return Path(src) if src else d
 
     def codex_account_problem(self, requested: str) -> str | None:
@@ -1316,14 +1316,14 @@ class Quota:
         src = self._codex_creds_source()
 
         # codex consults CODEX_API_KEY / CODEX_ACCESS_TOKEN BEFORE its persisted credential store, and
-        # TauCeti's agent launcher clears only OPENAI_API_KEY. Either variable would therefore let the
+        # EpsilonEridani's agent launcher clears only OPENAI_API_KEY. Either variable would therefore let the
         # round spend an account we never inspected, while --account reported a clean pass. There is no
         # honest way to check them (an opaque key names no account), so refuse to certify anything.
         for var in ("CODEX_API_KEY", "CODEX_ACCESS_TOKEN"):
             if os.environ.get(var, "").strip():
                 return _para(
                     f"--account {requested}, but ${var} is set in this environment. codex reads that "
-                    f"ahead of {src}/auth.json, so the round could spend a credential TauCeti cannot "
+                    f"ahead of {src}/auth.json, so the round could spend a credential EpsilonEridani cannot "
                     f"identify and did not check. Unset ${var} and re-run, so the account named by the "
                     f"credential file is the account that actually pays."
                 )
@@ -1337,7 +1337,7 @@ class Quota:
                 _para(
                     f"--account {requested} cannot be verified: "
                     f"{_store_reason(store, codex_dir(self.cfg.home) / 'config.toml', self.cfg.checkout)}. "
-                    f"Any account TauCeti read from {src}/auth.json could be one codex is not using."
+                    f"Any account EpsilonEridani read from {src}/auth.json could be one codex is not using."
                 )
                 + "\n\n"
                 + _para(
@@ -1370,14 +1370,14 @@ class Quota:
                     f"chatgpt.com first, or paste the URL codex prints into a private window."
                 )
                 + "\n\n"
-                + _para("Then re-run TauCeti; this check will confirm it took.")
+                + _para("Then re-run EpsilonEridani; this check will confirm it took.")
             )
 
         isolated = (
             _para("To keep both accounts on this machine you can use an isolated $CODEX_HOME, like this:")
             + "\n\n"
-            + f"    CODEX_HOME=~/.codex-tauceti codex login       # sign in as {requested}\n"
-            + f"    CODEX_HOME=~/.codex-tauceti tauceti work --agent codex --account {requested}"
+            + f"    CODEX_HOME=~/.codex-epsiloneridani codex login       # sign in as {requested}\n"
+            + f"    CODEX_HOME=~/.codex-epsiloneridani epsiloneridani work --agent codex --account {requested}"
         )
         if acct is None:
             # _read_json_file conflates "absent" with "unreadable or not JSON". Distinguish them here:
@@ -1386,7 +1386,7 @@ class Quota:
             if _safe_exists(codex_dir(self.cfg.home) / "auth.json"):
                 return _para(
                     f"--account {requested}, but the Codex credential at {src}/auth.json could not be "
-                    f"read — it is unreadable or not valid JSON, so TauCeti cannot tell which account "
+                    f"read — it is unreadable or not valid JSON, so EpsilonEridani cannot tell which account "
                     f"it would spend under. Check its permissions and contents before re-running; if it "
                     f"is genuinely corrupt, `{pfx}codex login` will rewrite it."
                 )
@@ -1412,7 +1412,7 @@ class Quota:
             return (
                 _para(
                     f"--account {requested}, but the identity claims in {src}/auth.json disagree with "
-                    f"each other, so TauCeti cannot say which account it would spend under. That is what "
+                    f"each other, so EpsilonEridani cannot say which account it would spend under. That is what "
                     f"a half-written credential looks like — if something was rotating it, let that "
                     f"finish before re-running."
                 )
@@ -1424,7 +1424,7 @@ class Quota:
         return (
             _para(
                 f"--account {requested}, but {src}/auth.json is authenticated as {acct.describe()}. "
-                f"TauCeti will not switch accounts for you."
+                f"EpsilonEridani will not switch accounts for you."
             )
             + "\n\n"
             + switch_with("To switch this machine's Codex account:")
@@ -1455,7 +1455,7 @@ class Quota:
                 "codex",
                 False,
                 None,
-                error=f"codex credential store is not verifiably the file TauCeti paces against ({store})",
+                error=f"codex credential store is not verifiably the file EpsilonEridani paces against ({store})",
             )
         auth = self._codex_creds()
         if not auth:
@@ -1595,11 +1595,11 @@ class Quota:
         """Rotate this worker's Claude access token when it has expired or is about to, and report
         whether the credential on disk actually changed.
 
-        An unattended `tauceti work --loop` has nobody to re-run `claude` for it, so without this a token
+        An unattended `epsiloneridani work --loop` has nobody to re-run `claude` for it, so without this a token
         expiry ends the run: every poll reads HTTP 401 and sleeps.
 
         OFF unless the operator sets --auto-refresh / $TAUCETI_AUTO_REFRESH=1, and that is a deliberate
-        default. Both providers issue single-use refresh tokens: exchanging one retires it. TauCeti can
+        default. Both providers issue single-use refresh tokens: exchanging one retires it. EpsilonEridani can
         serialize its OWN processes on this host (the flock below), but it cannot serialize an
         interactive `claude` sharing the file, a second refresher, or a copy of the credential on another
         machine — for any of those, a rotation here logs the other one out, and only the operator knows
@@ -1650,7 +1650,7 @@ class Quota:
 
     def claude(self, *, refresh: bool = False, renew: bool = False) -> Provider:
         """Read the Claude usage endpoint and report whether opus may run. PURE: it reads, it never
-        spends. A dashboard refresh, `tauceti status`, and an `auto` selection that ends up picking
+        spends. A dashboard refresh, `epsiloneridani status`, and an `auto` selection that ends up picking
         codex must all be able to call this without making a Claude request.
 
         `renew` is the one exception, and it is opt-in per caller rather than a property of the read.
@@ -1926,9 +1926,9 @@ class Quota:
     # (which record where their credentials were seeded from) and workers from other checkouts.
     def _claude_creds_source(self) -> Path:
         """The canonical credential location this worker is measuring — the operator's real claude dir
-        even when running under an isolated $HOME (isolate_home leaves a .tauceti-creds-source marker)."""
+        even when running under an isolated $HOME (isolate_home leaves a .epsiloneridani-creds-source marker)."""
         d = claude_dir(self.cfg.home)
-        src = _read_marker(d / ".tauceti-creds-source")
+        src = _read_marker(d / ".epsiloneridani-creds-source")
         return Path(src) if src else d
 
     def _claude_account_key(self) -> str:
@@ -2081,7 +2081,7 @@ class Quota:
 
         argv = [*(shlex.split(CLAUDE_CMD) or ["claude"]), "-p", CLAUDE_BOOTSTRAP_PROMPT]
         env = {k: v for k, v in os.environ.items() if k not in CLAUDE_BOOTSTRAP_DROP_ENV}
-        return argv, env, tempfile.mkdtemp(prefix="tauceti-quota-bootstrap-")
+        return argv, env, tempfile.mkdtemp(prefix="epsiloneridani-quota-bootstrap-")
 
     def _claude_bootstrap_request(self) -> tuple[bool, str]:
         """ONE small `claude -p` turn, purely to open a window the endpoint reports as reset but not

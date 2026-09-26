@@ -1,6 +1,6 @@
 # Docker deployment
 
-The Compose deployment packages TauCetiWorker, Lean, GitHub CLI, Codex, Claude
+The Compose deployment packages EpsilonEridaniWorker, Lean, GitHub CLI, Codex, Claude
 Code, and the checksum-pinned Kiro CLI for an unattended Linux host.
 
 ## Requirements
@@ -28,7 +28,7 @@ Start the worker and follow its logs:
 
 ```bash
 docker compose up -d
-docker compose logs -f tauceti claude-refresh codex-refresh
+docker compose logs -f epsiloneridani claude-refresh codex-refresh
 ```
 
 Starting the deployment also starts the credential refreshers. They copy access-only
@@ -36,7 +36,7 @@ credentials into the volumes mounted by the worker, so they must run before chec
 the worker environment. Once they have started, an optional check is:
 
 ```bash
-docker compose run --rm tauceti ./tauceti doctor
+docker compose run --rm epsiloneridani ./epsiloneridani doctor
 ```
 
 Codex, Claude, and Kiro credentials should report `[ok]` when configured. Missing `bubble`, `incus`, and `pi`
@@ -64,7 +64,7 @@ Then apply it normally:
 docker compose up -d
 ```
 
-The options are appended to `tauceti work --loop`. Edit or remove the line and run
+The options are appended to `epsiloneridani work --loop`. Edit or remove the line and run
 `docker compose up -d` again to change or clear them; credentials and worker data are
 retained.
 
@@ -83,7 +83,7 @@ operator-installed `pi` runner). You can inspect either balance without sending
 a model prompt:
 
 ```bash
-docker compose run --rm tauceti ./tauceti usage --json
+docker compose run --rm epsiloneridani ./epsiloneridani usage --json
 ```
 
 ## Operations
@@ -143,4 +143,4 @@ Bubble round. Agents can access their provider access tokens and the GitHub cred
 and have unrestricted network access. Use it only on a trusted, dedicated Docker host.
 
 The deployment was adapted from
-[eohjelle/TauCetiWorker-docker](https://github.com/eohjelle/TauCetiWorker-docker).
+[eohjelle/EpsilonEridaniWorker-docker](https://github.com/eohjelle/EpsilonEridaniWorker-docker).

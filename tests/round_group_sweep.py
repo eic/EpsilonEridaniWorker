@@ -24,7 +24,7 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 pass_ = 0
 fail = 0
@@ -108,7 +108,7 @@ print("== 3. a round that exits 0 leaves a backgrounded grandchild; the sweep cl
 WID = "sweep-test"
 env = dict(os.environ, TAUCETI_WORKER_ID=WID, TAUCETI_TEST_HOLD="300")
 round_proc = subprocess.Popen(
-    [sys.executable, str(REPO / "tauceti"), "_round", "--worker-id", WID],
+    [sys.executable, str(REPO / "epsiloneridani"), "_round", "--worker-id", WID],
     start_new_session=True,
     env=env,
     stdout=subprocess.DEVNULL,

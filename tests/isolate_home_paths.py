@@ -20,7 +20,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 fails = 0
 
@@ -76,7 +76,7 @@ def main():
         home = iso_home_base("a-sixteen-char-id", long_base)
         socklen = len(str(home / LIMA_SOCK))
         check(f"darwin long-root home fits ({socklen})", socklen < UNIX_PATH_MAX)
-        check("darwin long-root anchored under .tauceti", home.parent.name == ".tauceti")
+        check("darwin long-root anchored under .epsiloneridani", home.parent.name == ".epsiloneridani")
         check(
             "darwin long-root deterministic",
             iso_home_base("a-sixteen-char-id", long_base) == iso_home_base("a-sixteen-char-id", long_base),

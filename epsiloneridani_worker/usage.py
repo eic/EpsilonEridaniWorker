@@ -137,7 +137,7 @@ def kiro_process_env(
         root = private_root
         if root is None:
             state = env.get("TAUCETI_DATA_HOME")
-            root = Path(state) / "kiro-api-profile" if state else Path(env.get("HOME", ".")) / ".tauceti-kiro-api"
+            root = Path(state) / "kiro-api-profile" if state else Path(env.get("HOME", ".")) / ".epsiloneridani-kiro-api"
         env["KIRO_HOME"] = str(root / "home")
         if sys.platform == "darwin":
             env["HOME"] = str(root / "profile")
@@ -156,7 +156,7 @@ def _kiro_acp_usage(*, timeout: float = 30.0, env: dict[str, str] | None = None)
     The command value is a tagged object, not the string ``"/usage"``. This
     protocol exchange creates an empty session but sends no model prompt.
     """
-    with tempfile.TemporaryDirectory(prefix="tauceti-kiro-usage-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="epsiloneridani-kiro-usage-") as tmp:
         tmp_path = Path(tmp)
         child_env = dict(os.environ if env is None else env)
         source_home = Path(child_env.get("HOME", os.path.expanduser("~")))
@@ -221,7 +221,7 @@ def _kiro_acp_usage(*, timeout: float = 30.0, env: dict[str, str] | None = None)
                                     "id": message["id"],
                                     "error": {
                                         "code": -32601,
-                                        "message": "TauCeti usage does not service ACP agent requests",
+                                        "message": "EpsilonEridani usage does not service ACP agent requests",
                                     },
                                 }
                             )
@@ -242,7 +242,7 @@ def _kiro_acp_usage(*, timeout: float = 30.0, env: dict[str, str] | None = None)
                         "params": {
                             "protocolVersion": 1,
                             "clientCapabilities": {},
-                            "clientInfo": {"name": "tauceti", "version": "0.1.0"},
+                            "clientInfo": {"name": "epsiloneridani", "version": "0.1.0"},
                         },
                     }
                 )

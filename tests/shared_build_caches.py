@@ -26,8 +26,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
-from tauceti_worker import build_caches
+import epsiloneridani_worker as tc
+from epsiloneridani_worker import build_caches
 
 fails = 0
 
@@ -64,7 +64,7 @@ def main():
     }
     orig_host_home, orig_platform = tc.agents._host_home, tc.agents.sys.platform
     tc.agents._host_home = lambda: LOGIN_HOME
-    data_home = Path("/srv/tauceti/state/worker1/home")
+    data_home = Path("/srv/epsiloneridani/state/worker1/home")
     try:
         # --- default Lake artifact policy ---------------------------------------------------------
         clear(env)

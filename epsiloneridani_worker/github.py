@@ -1,4 +1,4 @@
-"""tauceti_worker.github — the gh CLI wrapper: PR/issue queries, reactions, fork resolution, and
+"""epsiloneridani_worker.github — the gh CLI wrapper: PR/issue queries, reactions, fork resolution, and
 GitHub REST rate-limit handling."""
 
 from __future__ import annotations
@@ -52,10 +52,10 @@ def can_push(repo: str) -> bool | None:
 
 
 def claims_repo() -> str:
-    """Where this worker publishes its cooperative claim leases (`refs/tauceti-claims/<key>`).
+    """Where this worker publishes its cooperative claim leases (`refs/epsiloneridani-claims/<key>`).
 
     `$CLAIM_REPO` overrides everything, verbatim: that is how a fleet pins one namespace of its own
-    (`CLAIM_REPO=<you>/TauCeti` in every container) without asking anyone for access. It is read on
+    (`CLAIM_REPO=<you>/EpsilonEridani` in every container) without asking anyone for access. It is read on
     every call rather than cached, so a worker can be repointed without a restart. Everything else is
     resolved once per process (two API calls at most) by `_resolve_claims_repo`."""
     return os.environ.get("CLAIM_REPO", "").strip() or _resolve_claims_repo()
@@ -531,7 +531,7 @@ class GitHub:
             f"are not advancing). This issue calls for an infrastructure repair, not a one-off "
             f"manual review. The worker re-checks each round and will close this issue's PR-side "
             f"concern once #{pr} merges or is closed.\n\n"
-            f"<!--tauceti-review-stuck:{pr}-->"
+            f"<!--epsiloneridani-review-stuck:{pr}-->"
         )
 
     def ensure_stuck_issue(self, pr: int, reason: str, diagnostic: str = "") -> None:
@@ -609,10 +609,10 @@ class GitHub:
             return False
         return any(
             isinstance(c, dict)
-            and c.get("author") == "tauceti-review-bot[bot]"
+            and c.get("author") == "epsiloneridani-review-bot[bot]"
             and isinstance(c.get("body"), str)
             and c["body"].startswith("Merge-queue recovery for head `")
-            and f"<!--tauceti-rebase:v1 {head}-->" in (c.get("body") or "").splitlines()
+            and f"<!--epsiloneridani-rebase:v1 {head}-->" in (c.get("body") or "").splitlines()
             for c in comments
         )
 

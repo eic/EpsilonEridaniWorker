@@ -17,7 +17,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 
 def W(name, used, elapsed, status):
@@ -83,7 +83,7 @@ for name, chosen, p, expected in cases:
 
 
 # ...and the ROUND applies the same rule, not just the loop between rounds. A one-shot
-# `tauceti work --agent claude --ignore-quota` used to skip the usage read entirely and launch into
+# `epsiloneridani work --agent claude --ignore-quota` used to skip the usage read entirely and launch into
 # whatever was there, which is the very thing the flag's own help says it does not do.
 def resolve(chosen, p, *, agent="claude", quota_cmd=None):
     """(model, bootstrap) or the NoProgress/SystemExit it raised, and how the pacer was asked. The real

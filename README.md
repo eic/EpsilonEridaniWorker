@@ -1,6 +1,6 @@
 # Tau Ceti Worker
 
-`tauceti` keeps the [TauCeti](https://github.com/TauCetiProject/TauCeti) Lean
+`epsiloneridani` keeps the [EpsilonEridani](https://github.com/eic/EpsilonEridani) Lean
 library moving, using a "bring your own agent" approach. Run it with no command
 and you get a dashboard of the work the queue needs right now: PRs to review,
 fixes a review asked for, a Mathlib bump that needs adapting, roadmap targets.
@@ -10,9 +10,9 @@ and let it pick the most useful job each round until you stop it.
 
 It runs as your authenticated `gh` account: you set up `gh auth`, the worker acts
 as that account, and it treats that account's own PRs as the ones it tends. The
-repo is hardwired to `TauCetiProject/TauCeti`. This is an operator's tool for that
+repo is hardwired to `eic/EpsilonEridani`. This is an operator's tool for that
 project, not a general framework. You author through **your own fork**: the worker
-forks `TauCetiProject/TauCeti` once, automatically, pushes authored branches and
+forks `eic/EpsilonEridani` once, automatically, pushes authored branches and
 fixes there, and opens PRs from it, so you do **not** need write access to the
 canonical repo. (A fine-grained token scoped only to the canonical repo is not
 enough.) Set `TAUCETI_FORK=<owner>/<repo>` to use an existing fork instead.
@@ -43,24 +43,24 @@ additional requirements; see [the sandbox notes](docs/sandbox.md).
 Install it as a tool, no clone needed:
 
 ```bash
-uv tool install git+https://github.com/TauCetiProject/TauCetiWorker
+uv tool install git+https://github.com/eic/EpsilonEridaniWorker
 
-tauceti doctor                     # report the tools and credentials this host can use
-tauceti                            # the dashboard: see the available work, launch it
-tauceti status                     # the same survey, non-interactive (--json for scripts)
-tauceti usage --json               # prompt-free Kiro/OpenRouter credit telemetry
-tauceti work --only review         # one round of a specific kind of work, then exit
-tauceti work --loop --only review  # a focused worker: keep reviewing (or fix / roadmap / ...)
-tauceti work --loop                # fully automatic: keep picking the most useful job
+epsiloneridani doctor                     # report the tools and credentials this host can use
+epsiloneridani                            # the dashboard: see the available work, launch it
+epsiloneridani status                     # the same survey, non-interactive (--json for scripts)
+epsiloneridani usage --json               # prompt-free Kiro/OpenRouter credit telemetry
+epsiloneridani work --only review         # one round of a specific kind of work, then exit
+epsiloneridani work --loop --only review  # a focused worker: keep reviewing (or fix / roadmap / ...)
+epsiloneridani work --loop                # fully automatic: keep picking the most useful job
 ```
 
-Ctrl-C stops the current round and exits. From a clone you can run `./tauceti`
+Ctrl-C stops the current round and exits. From a clone you can run `./epsiloneridani`
 instead, a small PEP 723 `uv` shim that runs the same package; every command
 below works either way, and this README writes the installed form.
 
 ## The dashboard
 
-Bare `tauceti` opens an interactive dashboard ([Textual](https://textual.textualize.io/)).
+Bare `epsiloneridani` opens an interactive dashboard ([Textual](https://textual.textualize.io/)).
 The table lists each kind of work with a number, how many PRs are ready, and a
 sample. The survey is fetched once in the background and refreshed on `r` (or
 every 90s), so moving the cursor never re-queries GitHub. It reacts to single
@@ -82,11 +82,11 @@ In the Workers view, arrows select a worker, Space persists enabled/disabled
 desired state, Ctrl-R restarts it, and Enter follows its current logfile.
 
 Your agent, sandbox, and roadmap selections persist in `dashboard.json` under
-the TauCeti config directory, so the dashboard reopens where you left it. They
-are dashboard-only: a bare `tauceti work` never reads them, and an explicit
+the EpsilonEridani config directory, so the dashboard reopens where you left it. They
+are dashboard-only: a bare `epsiloneridani work` never reads them, and an explicit
 `TAUCETI_ROADMAP_ONLY` or `TAUCETI_ROADMAP_SKIP` in the environment still wins.
 Clone-based and installed invocations share this user-level file. Over a pipe or
-with no TTY the dashboard prints a one-shot snapshot instead. Use `tauceti
+with no TTY the dashboard prints a one-shot snapshot instead. Use `epsiloneridani
 status` in scripts.
 
 ## What a round does
@@ -96,13 +96,13 @@ A round does exactly one unit of work: the first of these that applies.
 | Step | What it does |
 |------|--------------|
 | **Rebase** | Reconcile one of our conflicting PRs, or a fork update requested by the merge sweep for the current head. Both use the existing per-PR rebase-attempt cap; `keep` pauses recovery. |
-| **Bump** | Adapt a red `bump-mathlib/` PR (the review bot opens those to move the Mathlib dependency forward) so `TauCeti/` builds against the new Mathlib. The worker never opens a bump itself. |
-| **Lint repair** | Fix `TauCeti/` on a red `lint-repair/` PR. PR builds lint only the modules a change touches, so TauCeti's daily full lint opens one of these when main carries environment-lint violations elsewhere (for example, a new simp lemma that takes an older one out of simp normal form). The worker never opens one itself. |
-| **Progress** | When the global eight-hour cadence is due, update one roadmap's generated `STATUS.md` and `PROGRESS.md` through TauCetiProgress. |
+| **Bump** | Adapt a red `bump-mathlib/` PR (the review bot opens those to move the Mathlib dependency forward) so `EpsilonEridani/` builds against the new Mathlib. The worker never opens a bump itself. |
+| **Lint repair** | Fix `EpsilonEridani/` on a red `lint-repair/` PR. PR builds lint only the modules a change touches, so EpsilonEridani's daily full lint opens one of these when main carries environment-lint violations elsewhere (for example, a new simp lemma that takes an older one out of simp normal form). The worker never opens one itself. |
+| **Progress** | When the global eight-hour cadence is due, update one roadmap's generated `STATUS.md` and `PROGRESS.md` through EpsilonEridaniProgress. |
 | **Fix CI** | Repair one of our PRs whose `build` check is red. It cannot be reviewed until it builds, so this comes before Fix. |
 | **Fix** | Address the review findings on one of our PRs: fix the code, or contest a wrong finding on its thread. |
-| **Review** | Review an open PR whose head is green but not yet reviewed, with the `tauceti-review` engine. Maintenance on our own PRs takes priority so author-action work (`ci-failed` or `awaiting-author`) cannot be starved by unrelated reviews. |
-| **Roadmap** | Otherwise, open a new PR advancing a [roadmap](https://github.com/TauCetiProject/TauCetiRoadmap) target. |
+| **Review** | Review an open PR whose head is green but not yet reviewed, with the `epsiloneridani-review` engine. Maintenance on our own PRs takes priority so author-action work (`ci-failed` or `awaiting-author`) cannot be starved by unrelated reviews. |
+| **Roadmap** | Otherwise, open a new PR advancing a [roadmap](https://github.com/eic/EpsilonEridaniRoadmap) target. |
 
 Review selection is cooperative across community workers. The worker named by
 the latest scoreboard gets a 20-minute first-refusal window on that PR's next
@@ -116,7 +116,7 @@ to do", so a transient outage never falls through to authoring.
 
 A review has two outputs with different roles. The head-pinned scoreboard posted
 on the PR is the live verdict that auto-merge reads. Detailed run records are also
-kept in a local outbox for the public TauCetiData analytics/provenance archive;
+kept in a local outbox for the public EpsilonEridaniData analytics/provenance archive;
 failure or lack of permission to publish that archive does not stop the posted
 review from counting.
 
@@ -132,13 +132,13 @@ applies. `--only <task>[,<task>...]` pins it to particular kinds, and `--skip`
 drops kinds from the cascade (the two combine by subtraction):
 
 ```bash
-tauceti work --loop --only review     # only review open PRs
-tauceti work --loop --only fix,fix-ci # only tend to our own PRs
-tauceti work --loop --skip roadmap    # everything except authoring new PRs
+epsiloneridani work --loop --only review     # only review open PRs
+epsiloneridani work --loop --only fix,fix-ci # only tend to our own PRs
+epsiloneridani work --loop --skip roadmap    # everything except authoring new PRs
 ```
 
 Roadmap rounds steer toward one area, a subdirectory of the
-[roadmap](https://github.com/TauCetiProject/TauCetiRoadmap):
+[roadmap](https://github.com/eic/EpsilonEridaniRoadmap):
 
 - `--roadmap-only <area>` pins it. An empty value means all areas. With nothing
   set, each round picks a fresh random area, so an unpinned `--loop` roams the
@@ -151,7 +151,7 @@ Roadmap rounds steer toward one area, a subdirectory of the
   and only then migration of the source.
 
 ```bash
-tauceti work --only roadmap --roadmap-only Topology --source ../existing-library
+epsiloneridani work --only roadmap --roadmap-only Topology --source ../existing-library
 ```
 
 Roadmap workers also avoid finer-grained targets other contributors have claimed
@@ -168,9 +168,9 @@ the flag, or pass a comma list; a leading `#` is fine) points it at particular
 pull requests instead:
 
 ```bash
-tauceti work --pr 412                  # whatever the cascade wants to do to #412
-tauceti work --pr 412,415 --only fix   # only those PRs, and only the fix unit
-tauceti work --pr 412 --dry-run        # what it would do to #412, doing nothing
+epsiloneridani work --pr 412                  # whatever the cascade wants to do to #412
+epsiloneridani work --pr 412,415 --only fix   # only those PRs, and only the fix unit
+epsiloneridani work --pr 412 --dry-run        # what it would do to #412, doing nothing
 ```
 
 `--pr` only ever *removes* work. It cannot make a PR actionable that the round
@@ -220,13 +220,13 @@ an exact model ID and first checks that the logged-in account advertises it—it
 Auto router is never used. For example:
 
 ```bash
-tauceti work --agent kiro                              # exact gpt-5.6-sol
-tauceti work --agent kiro --author-model claude-opus-5
+epsiloneridani work --agent kiro                              # exact gpt-5.6-sol
+epsiloneridani work --agent kiro --author-model claude-opus-5
 ```
 
 Run `kiro-cli chat --list-models --format json` to see which exact IDs your
 account currently has. `KIRO_API_KEY` is supported for headless runs; when set,
-TauCeti isolates Kiro's browser-login store so the persisted login cannot take
+EpsilonEridani isolates Kiro's browser-login store so the persisted login cannot take
 precedence over the key.
 
 For an explicit provider, `--author-model` and `--author-effort` override the
@@ -236,14 +236,14 @@ and sandbox.
 
 ### Credit telemetry
 
-`tauceti usage` reads Kiro subscription credits and OpenRouter balances without
+`epsiloneridani usage` reads Kiro subscription credits and OpenRouter balances without
 sending a model prompt. It is observability only and never changes provider
 selection or loop pacing:
 
 ```bash
-tauceti usage --provider kiro
-tauceti usage --provider openrouter --json
-tauceti usage --kiro-burn-rate 2.4 --openrouter-burn-rate 1.50
+epsiloneridani usage --provider kiro
+epsiloneridani usage --provider openrouter --json
+epsiloneridani usage --kiro-burn-rate 2.4 --openrouter-burn-rate 1.50
 ```
 
 The optional burn rates estimate rounds remaining. Kiro is queried through its
@@ -253,18 +253,18 @@ ACP `usage` command and fractional `used`/`limit` values are preserved. An
 
 ### Which account: `--account`
 
-TauCeti spends whatever account the agent CLIs are already logged into. If you
+EpsilonEridani spends whatever account the agent CLIs are already logged into. If you
 have several ChatGPT accounts and care which one pays, `--account` makes that
 explicit:
 
 ```bash
-tauceti doctor                 # shows which Codex account the credential is for
-tauceti work --agent codex --account you@example.com
+epsiloneridani doctor                 # shows which Codex account the credential is for
+epsiloneridani work --agent codex --account you@example.com
 ```
 
 It is a check, never a switch: a credential for a different account exits the
 round before spending anything. Codex only, because its credential carries the
-account identity and `codex login status` will not show it. To run TauCeti on one
+account identity and `codex login status` will not show it. To run EpsilonEridani on one
 account while your interactive `codex` keeps another, give it a private
 credential directory with `CODEX_HOME`; see
 [the reference](docs/reference.md#codex-accounts).
@@ -300,21 +300,21 @@ describe what you want, and a manager keeps reality matching it. Nothing needs t
 exist first:
 
 ```bash
-tauceti workers add                        # an enabled worker1, the whole cascade
-tauceti workers add reviewer --only review # a focused, named worker
-tauceti workers                            # desired and actual state
-tauceti workers logs --follow reviewer     # its durable console log
+epsiloneridani workers add                        # an enabled worker1, the whole cascade
+epsiloneridani workers add reviewer --only review # a focused, named worker
+epsiloneridani workers                            # desired and actual state
+epsiloneridani workers logs --follow reviewer     # its durable console log
 ```
 
 `add` writes the definition to `workers.toml`, under
-`$XDG_CONFIG_HOME/tauceti/` or the platform default, and starts a manager. From
+`$XDG_CONFIG_HOME/epsiloneridani/` or the platform default, and starts a manager. From
 there, `enable`, `disable`, `restart`, and `remove` adjust one worker each. The
 manager validates the whole file before applying it, starts missing enabled
 workers, gracefully stops disabled or removed ones, restarts only definitions
 that changed, and backs off repeated failures.
 
-For fields that `add` does not expose, run `tauceti workers edit`, validate with
-`tauceti workers apply --check`, then apply. Editing while the manager runs is
+For fields that `add` does not expose, run `epsiloneridani workers edit`, validate with
+`epsiloneridani workers apply --check`, then apply. Editing while the manager runs is
 safe: it keeps the last valid generation if the new file fails validation. A
 later `enable`, `disable`, `add`, or `remove` rewrites the file canonically and
 drops comments and hand formatting.
@@ -324,9 +324,9 @@ an existing manager over to a native user service that survives logout and
 returns after a reboot:
 
 ```bash
-tauceti workers manager-stop --leave-workers
-tauceti workers service install
-tauceti workers service status
+epsiloneridani workers manager-stop --leave-workers
+epsiloneridani workers service install
+epsiloneridani workers service status
 ```
 
 This installs a systemd user service on Linux or a LaunchAgent on macOS. Omit
@@ -337,21 +337,21 @@ that worker's state, checkout, review store, and logs, and isolates its mutable
 agent credentials where the platform allows, so credential refreshes don't race.
 Workers coordinate through GitHub rather than through each other, so adding
 workers adds throughput. Ad-hoc rounds take the same id through
-`tauceti work --worker-id alice`.
+`epsiloneridani work --worker-id alice`.
 
 [The workers documentation](docs/workers.md) has the full `workers.toml` schema,
 every action, the credential isolation rules, and the tmux viewer.
 
 ## Pacing against quota
 
-`tauceti` paces Codex and Claude against their session and weekly subscription
+`epsiloneridani` paces Codex and Claude against their session and weekly subscription
 limits with no setup beyond logging in with the official CLIs. A provider is
 available only while its used percentage is strictly below the budget for the
 elapsed fraction of every reported window; `--agent auto` prefers Codex, to spare
 the scarcer Opus, falls back to Claude, and sleeps when neither has room. A
 provider held back by the pace line wakes when the rising budget overtakes its
 usage, which is normally well before the window resets. Usage it cannot read
-counts as unavailable rather than free. The dashboard and `tauceti status` show
+counts as unavailable rather than free. The dashboard and `epsiloneridani status` show
 current usage and why a provider is waiting.
 
 | Control | Effect |
@@ -363,7 +363,7 @@ current usage and why a provider is waiting.
 | `--quota-cmd CMD` | Your own pacer, run as `<cmd> <agent>`: the first stdout token is the model to run; empty output means wait |
 
 `TAUCETI_PACE` and `TAUCETI_QUOTA_CMD` set the corresponding controls by
-default. After a Claude window resets, `tauceti` may make one small request to
+default. After a Claude window resets, `epsiloneridani` may make one small request to
 start its usage clock, but only after it has found work and confirmed the other
 window has room.
 [The quota notes](docs/quota.md) cover credential sources, the macOS Keychain,
@@ -372,8 +372,8 @@ and that bootstrap in detail.
 ## Further documentation
 
 - [Persistent workers](docs/workers.md): the `workers.toml` schema, every
-  `tauceti workers` action, state on disk, and running past logout.
-- [`tauceti work` reference](docs/reference.md): every flag and environment
+  `epsiloneridani workers` action, state on disk, and running past logout.
+- [`epsiloneridani work` reference](docs/reference.md): every flag and environment
   variable.
 - [Quota and pacing](docs/quota.md): credential sources, Claude's two windows,
   and the window bootstrap.

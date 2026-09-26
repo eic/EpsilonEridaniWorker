@@ -24,7 +24,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 NOW = 1_760_000_000.0
 fails = 0
@@ -55,8 +55,8 @@ def survey_with(prs, *, minutes_ago):
                 number=n,
                 head_oid=f"head{n}",
                 head_ref=f"r{n}",
-                head_owner="TauCetiProject",
-                head_repo="TauCeti",
+                head_owner="eic",
+                head_repo="EpsilonEridani",
                 is_draft=False,
                 mergeable="MERGEABLE",
                 author="kim-em",

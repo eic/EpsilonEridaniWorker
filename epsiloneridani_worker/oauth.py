@@ -5,14 +5,14 @@ replacement. Two processes holding the same token can therefore race, and the lo
 credential the server has already retired. Everything here exists to make that safe:
 
   * an exclusive flock on the credential file serializes every rotation on one host, whoever starts it
-    (`tauceti work --loop`, several isolated workers sharing one source file, or the Docker refresher);
+    (`epsiloneridani work --loop`, several isolated workers sharing one source file, or the Docker refresher);
   * a rotated refresh token is persisted even when the rest of the response is unusable, so a retry
     never replays a token the server has already consumed;
   * a success marker enforces a minimum interval between rotations, and an attempt marker bounds how
     often a FAILING credential may be retried — a TUI that polls every few seconds must not turn into a
     request flood against the token endpoint.
 
-This module is stdlib-only (the `tauceti` package depends on rich/textual and nothing else), so it is
+This module is stdlib-only (the `epsiloneridani` package depends on rich/textual and nothing else), so it is
 importable from the pacer without adding a dependency.
 """
 
@@ -38,7 +38,7 @@ CLAUDE_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
 CLAUDE_SCOPE = "user:profile user:inference user:sessions:claude_code user:mcp_servers"
 CODEX_TOKEN_URL = "https://auth.openai.com/oauth/token"
 CODEX_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann"
-CODEX_REFRESH_PLACEHOLDER = "rt.0.tauceti-worker-placeholder-never-a-real-refresh-token"
+CODEX_REFRESH_PLACEHOLDER = "rt.0.epsiloneridani-worker-placeholder-never-a-real-refresh-token"
 
 
 @dataclass(frozen=True)

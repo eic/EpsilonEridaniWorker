@@ -174,7 +174,7 @@ def failure_summary(log_file: Path | None, reason: str = "") -> str:
         # stdout (review prose) can flush around stderr (the command and its
         # error). A new subprocess echo ends the prose phase, and die() is the
         # parent's final stderr write: anything later is buffered review text.
-        if line.startswith("tauceti-review:"):
+        if line.startswith("epsiloneridani-review:"):
             candidates.append(line)
             break
         if line.startswith("$ ") or line.startswith("=== running review"):
@@ -269,7 +269,7 @@ def recover_review_failures(state: Path, log_dir: Path, *, worker: str, pr: int,
         )
     if not attempts:
         return {}
-    value = {"schema": "tauceti.review-failure/v1", "pr": pr, "attempts": attempts}
+    value = {"schema": "epsiloneridani.review-failure/v1", "pr": pr, "attempts": attempts}
     atomic_json(_path(state, pr), value)
     return value
 
@@ -301,7 +301,7 @@ def record_review_failure(
     }
     previous = read_review_failure(state, pr)
     attempts = previous.get("attempts") if isinstance(previous.get("attempts"), list) else []
-    value = {"schema": "tauceti.review-failure/v1", "pr": pr, "attempts": [*attempts, attempt][-3:]}
+    value = {"schema": "epsiloneridani.review-failure/v1", "pr": pr, "attempts": [*attempts, attempt][-3:]}
     atomic_json(_path(state, pr), value)
     return value
 

@@ -17,7 +17,7 @@ from types import SimpleNamespace
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 calls = []
 
@@ -153,7 +153,7 @@ print(
 # recorded fetch time does to the verdict. The stubs above pin the pacing rule; this pins the plumbing
 # that has to carry the instant — and the entries that must not be believed at all.
 cache = tc.Quota.__new__(tc.Quota)
-cache.cache_dir = Path(tempfile.mkdtemp(prefix="tauceti-quota-cache-"))
+cache.cache_dir = Path(tempfile.mkdtemp(prefix="epsiloneridani-quota-cache-"))
 cache._idle_notes = lambda _readings: ({}, False)
 try:
     cache._store_raw("claude", stale, "fp", time.time() + 7200, fetched_at)

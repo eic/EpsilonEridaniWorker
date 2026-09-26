@@ -14,17 +14,17 @@ if [[ "${TAUCETI_SKIP_GIT_IDENTITY:-0}" != 1 ]]; then
   fi
   git_name="$(git config --system user.name)"
   git_email="$(git config --system user.email)"
-  if [[ "$git_name" == "TauCeti Worker" ]]; then
-    echo >&2 "tauceti-entrypoint: WARNING: GitHub identity unavailable; commits use the fallback identity"
+  if [[ "$git_name" == "EpsilonEridani Worker" ]]; then
+    echo >&2 "epsiloneridani-entrypoint: WARNING: GitHub identity unavailable; commits use the fallback identity"
   fi
-  echo "tauceti-entrypoint: git author $git_name <$git_email>"
+  echo "epsiloneridani-entrypoint: git author $git_name <$git_email>"
 fi
 
-# Compose supplies the stable `./tauceti work --loop` command as separate arguments.
+# Compose supplies the stable `./epsiloneridani work --loop` command as separate arguments.
 # Append operator options from .env using Python's shell-like parser; never evaluate them
 # as shell code. Restrict this to the worker command so setup and diagnostic overrides are
 # unaffected.
-if [[ -n "${TAUCETI_WORKER_ARGS:-}" && "${1:-}" == "./tauceti" && "${2:-}" == "work" && "${3:-}" == "--loop" ]]; then
+if [[ -n "${TAUCETI_WORKER_ARGS:-}" && "${1:-}" == "./epsiloneridani" && "${2:-}" == "work" && "${3:-}" == "--loop" ]]; then
   exec python3 -c '
 import os
 import shlex
@@ -33,7 +33,7 @@ import sys
 try:
     extra = shlex.split(os.environ["TAUCETI_WORKER_ARGS"])
 except ValueError as error:
-    sys.exit(f"tauceti-entrypoint: TAUCETI_WORKER_ARGS has invalid quoting: {error}")
+    sys.exit(f"epsiloneridani-entrypoint: TAUCETI_WORKER_ARGS has invalid quoting: {error}")
 argv = sys.argv[1:] + extra
 os.execvp(argv[0], argv)
 ' "$@"

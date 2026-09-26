@@ -18,7 +18,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 fails = 0
 
@@ -43,7 +43,7 @@ def node(number, *, build=None, author="kim", bot=False, labels=("awaiting-revie
         "headRefOid": f"head{number}",
         "headRefName": f"branch-{number}",
         "headRepositoryOwner": {"login": "kim"},
-        "headRepository": {"name": "TauCeti"},
+        "headRepository": {"name": "EpsilonEridani"},
         "updatedAt": "2026-09-17T01:00:00Z",
         "author": {"login": author, "__typename": "Bot" if bot else "User"},
         "labels": {"nodes": [{"name": n} for n in labels]},
@@ -64,7 +64,7 @@ class FakeGH(tc.GitHub):
     """A GitHub client whose `gh` calls replay scripted pages and record the argv they were asked for."""
 
     def __init__(self, pages):
-        super().__init__("TauCetiProject/TauCeti")
+        super().__init__("eic/EpsilonEridani")
         self.pages = list(pages)
         self.calls = []
 
@@ -85,7 +85,7 @@ check("the PR's updatedAt survives into PRInfo", pr.updated_at, "2026-09-17T01:0
 check(
     "head fields carry through",
     (pr.head_oid, pr.head_ref, pr.head_owner, pr.head_repo),
-    ("head1", "branch-1", "kim", "TauCeti"),
+    ("head1", "branch-1", "kim", "EpsilonEridani"),
 )
 
 for state, want in (("FAILURE", (False, True)), ("ERROR", (False, True)), ("PENDING", (False, False))):
@@ -103,9 +103,9 @@ check(
 )
 
 # gh spells a Bot author `app/<login>`; matching it keeps the two paths comparable field for field.
-gh = FakeGH([page([node(4, author="tauceti-review-bot", bot=True)])])
+gh = FakeGH([page([node(4, author="epsiloneridani-review-bot", bot=True)])])
 pr = tc.PRInfo.from_json(gh.open_prs()[0])
-check("a bot author keeps gh's spelling", (pr.author, pr.author_is_bot), ("app/tauceti-review-bot", True))
+check("a bot author keeps gh's spelling", (pr.author, pr.author_is_bot), ("app/epsiloneridani-review-bot", True))
 
 # --- paging ----------------------------------------------------------------
 gh = FakeGH([page([node(1), node(2)], more=True, cursor="C1"), page([node(3)])])

@@ -3,7 +3,7 @@
 
 Checks the riskiest jq→Python ports — the pure-over-the-PR-list selectors that don't depend on the
 per-PR scoreboard ledger — by running the EXACT round.sh jq strings against a snapshot of `gh pr list`
-and comparing to tauceti's Python classifications. Ledger-dependent kinds (review/fix/abandon) are
+and comparing to epsiloneridani's Python classifications. Ledger-dependent kinds (review/fix/abandon) are
 validated separately by live behavior; this harness covers the mechanical list filtering.
 
 Usage:
@@ -21,9 +21,9 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 
-# Load the `tauceti` single-file program as a module (no .py extension; main() is guarded).
+# Load the `epsiloneridani` single-file program as a module (no .py extension; main() is guarded).
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 FIELDS = [
     "number",
@@ -42,7 +42,7 @@ except tc.Die:
     # This harness compares jq-vs-Python agreement, not specific PRs, so it holds for any login.
     # When `gh` isn't authenticated (e.g. in CI), fall back to a placeholder so it still runs; the
     # bot/fork/bump partitions of the fixture are exercised regardless of who ME is.
-    ME = "tauceti-ci-placeholder"
+    ME = "epsiloneridani-ci-placeholder"
 TAUCETI = tc.TAUCETI
 
 # jq mirror of PRInfo.from_json's build signal: the commit STATUS (a StatusContext with

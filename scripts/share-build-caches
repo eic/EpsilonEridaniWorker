@@ -2,7 +2,7 @@
 """Fold the caches an already-running fleet accumulated into the machine pool.
 
 From this version on, a worker downloads Mathlib artifacts into its own directory and exchanges
-finished files with the pool by hardlink before each round (see `tauceti_worker.build_caches`), and
+finished files with the pool by hardlink before each round (see `epsiloneridani_worker.build_caches`), and
 every worker shares one `ELAN_HOME`. Workers that ran before that still hold private copies of
 everything they ever fetched — on the fleet this was written for, five copies of Mathlib's `.ltar`
 cache (32 GB) and 22 toolchain installs covering 6 distinct toolchains (63 GB).
@@ -13,7 +13,7 @@ cache (32 GB) and 22 toolchain installs covering 6 distinct toolchains (63 GB).
 
 `--link` only ever ADDS names to the pool, and a hardlink is atomic, so it is safe alongside a live
 fleet. `--prune` is not: it deletes, and it must not race a round that is reading or writing what it
-deletes. Stop the fleet first (`tauceti workers stop --all`).
+deletes. Stop the fleet first (`epsiloneridani workers stop --all`).
 
 What `--prune` will delete is decided per file, never per tree:
 
@@ -43,7 +43,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
-from tauceti_worker.build_caches import link_into, same_device, walk  # noqa: E402
+from epsiloneridani_worker.build_caches import link_into, same_device, walk  # noqa: E402
 
 # Per-worker source -> pool destination: (label, subpath of the worker home, subpath of the pool,
 # subdirectories to pool). For elan only the immutable per-toolchain payload is pooled:

@@ -1,4 +1,4 @@
-"""tauceti_worker.intentions — discover cross-contributor claims on the intentions board.
+"""epsiloneridani_worker.intentions — discover cross-contributor claims on the intentions board.
 
 A claim is an open issue in the roadmap repo labelled `intention` + `roadmap/<area>` that has
 been claimed (the intentions bot assigns the claimant). Roadmap workers avoid targets claimed

@@ -3,7 +3,7 @@
 
 Claude Code and gh both keep their credentials in the login Keychain, which `security` resolves through
 $HOME. Repointing $HOME therefore made both unreachable: the pacer found no Claude creds and parked
-every non-default worker in a 300s sleep for ever (kim-em/TauCetiWorker#135, Jeremy Kahn), and gh lost
+every non-default worker in a 300s sleep for ever (kim-em/EpsilonEridaniWorker#135, Jeremy Kahn), and gh lost
 its token (Bryan's report). It isolated nothing in exchange, because the Keychain is one per-login-user
 store. So on macOS the isolation is $CLAUDE_CONFIG_DIR + $CODEX_HOME and $HOME is left alone; off macOS
 $HOME still moves and the same two variables ride along.
@@ -20,7 +20,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 agents = tc.agents
 codex_dir = tc.quota.codex_dir
@@ -109,7 +109,7 @@ with tempfile.TemporaryDirectory() as root:
     check("macOS redirects HOME only for Kiro", env["TAUCETI_KIRO_PROCESS_HOME"], str(iso))
     check("data root is exported", env["TAUCETI_DATA_HOME"], str(iso))
     check("codex credential is copied in", (iso / ".codex" / "auth.json").exists(), True)
-    check("codex source marker recorded", (iso / ".codex" / ".tauceti-creds-source").read_text(), str(real / ".codex"))
+    check("codex source marker recorded", (iso / ".codex" / ".epsiloneridani-creds-source").read_text(), str(real / ".codex"))
     check(
         "Kiro credential database is snapshotted",
         (iso / "Library" / "Application Support" / "kiro-cli" / "data.sqlite3").exists(),
@@ -201,7 +201,7 @@ with tempfile.TemporaryDirectory() as root:
         (iso / ".codex" / "auth.json").read_text(),
         '{"tokens": {"access_token": "the-one-actually-in-use"}}',
     )
-    check("marker names the custom dir", (iso / ".codex" / ".tauceti-creds-source").read_text(), str(custom))
+    check("marker names the custom dir", (iso / ".codex" / ".epsiloneridani-creds-source").read_text(), str(custom))
 
 # --- the worker's data follows the WORKER, not $HOME ----------------------------------------------
 # This is the migration hazard: the review store holds an outbox of unpublished records and the

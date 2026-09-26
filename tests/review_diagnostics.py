@@ -10,9 +10,9 @@ from types import SimpleNamespace
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-from tauceti_worker import agents
-from tauceti_worker import github as gh_mod
-from tauceti_worker.review_diagnostics import (
+from epsiloneridani_worker import agents
+from epsiloneridani_worker import github as gh_mod
+from epsiloneridani_worker.review_diagnostics import (
     clear_review_failure,
     failure_summary,
     public_review_failure,
@@ -54,7 +54,7 @@ with tempfile.TemporaryDirectory() as raw:
     # Cleanup chatter can follow that too; the final line is not the diagnosis.
     log.write_text(
         "setup\nOSError: [Errno 7] Argument list too long: 'codex'\n"
-        + "tauceti-review: command failed (1): python runner/review.py "
+        + "epsiloneridani-review: command failed (1): python runner/review.py "
         + "--option " * 200
         + "\ncleanup finished\n"
     )
@@ -70,7 +70,7 @@ with tempfile.TemporaryDirectory() as raw:
     )
     check("wrapper does not hide E2BIG", "Argument list too long" in value["attempts"][-1]["summary"], True)
     check("public E2BIG survives wrapper", "OS argument limit" in public_review_failure(value), True)
-    log.write_text("gh: API rate limit exceeded for user\ntauceti-review: command failed (1): gh pr diff 42\n")
+    log.write_text("gh: API rate limit exceeded for user\nepsiloneridani-review: command failed (1): gh pr diff 42\n")
     value = record_review_failure(state, worker="w", pr=42, head="a" * 40, provider="codex", code=1, log_file=log)
     check(
         "GitHub failure is distinguished from provider quota", value["attempts"][-1]["category"], "checkout-or-network"
@@ -82,9 +82,9 @@ with tempfile.TemporaryDirectory() as raw:
     check("bounded tail excludes ancient errors", failure_summary(log), "fatal: connection reset")
     check("missing log preserves reason", failure_summary(state / "missing", "Not logged in"), "Not logged in")
 
-    generic = "tauceti-review: command failed (1): python runner/review.py"
+    generic = "epsiloneridani-review: command failed (1): python runner/review.py"
     for prefix in (
-        "$ git clone -q https://github.com/TauCetiProject/TauCeti /tmp/code\n",
+        "$ git clone -q https://github.com/eic/EpsilonEridani /tmp/code\n",
         "git clone completed successfully\n",
         "[correctness]   ! Request timed out\n",
         "=" * 72 + "\nThe model is not available and github has a rate limit\n" + "=" * 72 + "\n",
@@ -109,7 +109,7 @@ with tempfile.TemporaryDirectory() as raw:
         "=" * 72 + "\nReview prose: unknown model\n"
         "$ python runner/post.py\n"
         "gh: Resource not accessible by integration (HTTP 403)\n"
-        "tauceti-review: command failed (1): python runner/post.py\n"
+        "epsiloneridani-review: command failed (1): python runner/post.py\n"
         "More prose: No space left on device\n" + "=" * 72 + "\n"
     )
     value = record_review_failure(state, worker="w", pr=44, head="a" * 40, provider="codex", code=1, log_file=log)
@@ -127,11 +127,11 @@ with tempfile.TemporaryDirectory() as raw:
         check(
             "post-layer HTTP failures retain their category", value["attempts"][-1]["category"], "checkout-or-network"
         )
-    log.write_text("=" * 72 + "\nunknown model\ntauceti-review: review step wrote no post plan\n" + "=" * 72)
+    log.write_text("=" * 72 + "\nunknown model\nepsiloneridani-review: review step wrote no post plan\n" + "=" * 72)
     check(
         "missing post plan excludes buffered prose",
         failure_summary(log),
-        "tauceti-review: review step wrote no post plan",
+        "epsiloneridani-review: review step wrote no post plan",
     )
     value = record_review_failure(
         state,
@@ -194,7 +194,7 @@ check("home user redacted", "alice" in clean, False)
 check("credential URL redacted", "token@" in clean, False)
 
 adversarial = {
-    "schema": "tauceti.review-failure/v1",
+    "schema": "epsiloneridani.review-failure/v1",
     "attempts": [
         {
             "at": "now ](https://example.com)",
@@ -246,7 +246,7 @@ check("E2BIG raw summary stays private", "do-not-copy" in public, False)
 
 class FakeGitHub(gh_mod.GitHub):
     def __init__(self, existing=None):
-        super().__init__("TauCetiProject/TauCeti")
+        super().__init__("eic/EpsilonEridani")
         self.existing = existing or []
         self.calls = []
 

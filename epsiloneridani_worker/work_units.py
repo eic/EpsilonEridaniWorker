@@ -1,4 +1,4 @@
-"""tauceti_worker.work_units — the want-gated cascade: pick one actionable PR per round and dispatch
+"""epsiloneridani_worker.work_units — the want-gated cascade: pick one actionable PR per round and dispatch
 its work unit (review/fix/fix-ci/rebase/bump/roadmap) on the host or in a bubble."""
 
 from __future__ import annotations
@@ -466,8 +466,8 @@ def run_round(w: Worker, opts: RoundOpts) -> int:
 # Authoring/fixing stages whose success MUST leave a mark on GitHub (a push, a new PR, or — for a
 # contested fix — a comment). `review` is excluded: it posts a scoreboard and its rc is the engine's.
 # `progress` is excluded too, and for a sharper reason: _progress_snapshot looks for a mark in
-# TAUCETI, and a progress round's PR lands in TauCetiRoadmap, so the guard would report "nothing
-# landed" on every successful report. Its postcondition is `tauceti-progress apply`'s own exit code,
+# TAUCETI, and a progress round's PR lands in EpsilonEridaniRoadmap, so the guard would report "nothing
+# landed" on every successful report. Its postcondition is `epsiloneridani-progress apply`'s own exit code,
 # which already distinguishes opened / already-in-flight / already-merged.
 PROGRESS_GUARDED = {"rebase", "fix", "fix-ci", "bump", "lint-repair", "roadmap"}
 
@@ -569,7 +569,7 @@ def _progressed(w: Worker, c: Candidate, pre: dict | None) -> bool:
     new = now - pre["prs"]
     if not new:
         return False
-    # A new PR appeared — but only one carrying a tauceti-target marker is THIS round's authoring work.
+    # A new PR appeared — but only one carrying a epsiloneridani-target marker is THIS round's authoring work.
     # An unrelated/human PR (or, under multi-worker, another worker's concurrent PR) that shows up
     # mid-round must not mask this round's no-op. Conservative: if we can't read a body, assume ours.
     for num in new:
@@ -585,7 +585,7 @@ def _host_agent_binary(stage: str, model: str) -> str | None:
     """The executable a HOST `stage` must resolve on PATH to run `model` (None ⇒ nothing to gate).
 
     A review round shells the review engine, which gates on a literal `codex`/`claude`/`pi` via its own
-    shutil.which (TauCetiReview runner/cli.py) and ignores TAUCETI_CLAUDE_CMD / PI_RUN. Every other model
+    shutil.which (EpsilonEridaniReview runner/cli.py) and ignores TAUCETI_CLAUDE_CMD / PI_RUN. Every other model
     stage launches via host_agent_argv, so preflight the EXACT argv[0] it will exec — which honours a
     custom TAUCETI_CLAUDE_CMD wrapper or PI_RUN path, so we neither miss a real gap nor false-block a
     working custom launcher."""
@@ -853,7 +853,7 @@ def do_review(w: Worker, sv: Survey, c: Candidate, opts: RoundOpts, bubble: bool
                     "uvx",
                     "--from",
                     f"git+https://github.com/{REVIEW}",
-                    "tauceti-review",
+                    "epsiloneridani-review",
                     str(pr),
                     "--store",
                     str(w.cfg.store_dir),
@@ -883,8 +883,8 @@ def do_review(w: Worker, sv: Survey, c: Candidate, opts: RoundOpts, bubble: bool
             w.counters.write(errkey, 0)
             clear_review_failure(w.cfg.state, pr)
             # The engine archived this round's records to <store>/outbox but did NOT push (--no-sync).
-            # Publish them to TauCetiData with the host's creds. The posted scoreboard is the live
-            # auto-merge verdict; TauCetiData is the analytics/provenance archive, so a sync failure is
+            # Publish them to EpsilonEridaniData with the host's creds. The posted scoreboard is the live
+            # auto-merge verdict; EpsilonEridaniData is the analytics/provenance archive, so a sync failure is
             # visible and non-lossy but must not turn a successfully posted review into failed work.
             srv = _sync_review_outbox(w, pr)
             if srv != 0:
@@ -893,7 +893,7 @@ def do_review(w: Worker, sv: Survey, c: Candidate, opts: RoundOpts, bubble: bool
                 # successful review path: the scoreboard already landed and can drive auto-merge.
                 warn_red(
                     f"review #{pr}: review posted and counts for auto-merge, but publishing its "
-                    f"analytics/provenance records to TauCetiData FAILED — records kept in "
+                    f"analytics/provenance records to EpsilonEridaniData FAILED — records kept in "
                     f"{w.cfg.store_dir / 'outbox'}. This archive failure is NOT charged to the PR; "
                     f"check the host's git/gh credentials. A later review retries the whole outbox."
                 )
@@ -906,7 +906,7 @@ def do_review(w: Worker, sv: Survey, c: Candidate, opts: RoundOpts, bubble: bool
             w.rs.bust(pr)
         elif rc == REVIEW_PROVIDER_DOWN_EXIT:
             # The engine stopped because the reviewer's provider is unusable — a revoked credential or
-            # an exhausted subscription window — and it deliberately posted nothing (TauCetiReview#117).
+            # an exhausted subscription window — and it deliberately posted nothing (EpsilonEridaniReview#117).
             # That is MACHINE-WIDE in the same sense as an archive service outage: the next
             # PR the loop picks would abort identically, so charging it to whichever PR happened to be
             # this round's candidate is charging a PR for someone else's outage. Three of them strand
@@ -946,23 +946,23 @@ def do_review(w: Worker, sv: Survey, c: Candidate, opts: RoundOpts, bubble: bool
 
 
 def _sync_review_outbox(w: Worker, pr: int) -> int:
-    """Drain the worker's review outbox into TauCetiData using the host's gh/git creds. Reviews run
-    with --no-sync (a bubble can't push to TauCetiData), so the host publishes here. Returns the
+    """Drain the worker's review outbox into EpsilonEridaniData using the host's gh/git creds. Reviews run
+    with --no-sync (a bubble can't push to EpsilonEridaniData), so the host publishes here. Returns the
     engine rc: nonzero means the push failed after archive.sync's retries (the outbox is preserved
     write-if-absent, so a later round re-drains it). An empty outbox is a no-op — a round that
     produced no new records is not a publish failure."""
     outbox = w.cfg.store_dir / "outbox"
     if not outbox.is_dir() or not any(p.is_file() for p in outbox.rglob("*")):
         return 0
-    # A contributor without write access to TauCetiData cannot push archive records there. The review
+    # A contributor without write access to EpsilonEridaniData cannot push archive records there. The review
     # itself already counts through its posted scoreboard; retain the records locally for a future
     # contributor-publishing path without treating archival as operational review state.
     # The maintainer's identity returns push=true, so the sync below runs and a genuine outage still
     # surfaces loudly. A failed/ambiguous check falls through to the sync (preserving the loud-fail).
-    perm = gh_run(["gh", "api", "repos/TauCetiProject/TauCetiData", "--jq", ".permissions.push"])
+    perm = gh_run(["gh", "api", "repos/eic/EpsilonEridaniData", "--jq", ".permissions.push"])
     if perm.returncode == 0 and perm.stdout.strip() == "false":
         log(
-            f"  review #{pr}: no write access to TauCetiData — review posted and counts for "
+            f"  review #{pr}: no write access to EpsilonEridaniData — review posted and counts for "
             f"auto-merge; analytics/provenance records kept in {outbox}"
         )
         return 0
@@ -981,7 +981,7 @@ def _sync_review_outbox(w: Worker, pr: int) -> int:
             "uvx",
             "--from",
             f"git+https://github.com/{REVIEW}",
-            "tauceti-review",
+            "epsiloneridani-review",
             str(pr),
             "--sync-only",
             "--store",
@@ -995,15 +995,15 @@ def _sync_review_outbox(w: Worker, pr: int) -> int:
     p = subprocess.run(argv, capture_output=True, text=True)
     if p.returncode == 0:
         m = re.search(r"synced (\d+) file", (p.stdout or "") + (p.stderr or ""))
-        log(f"  review #{pr}: synced {m.group(1) if m else '?'} record(s) to TauCetiData")
+        log(f"  review #{pr}: synced {m.group(1) if m else '?'} record(s) to EpsilonEridaniData")
     else:
         logf = w.cfg.logdir / f"sync-{pr}-{time.strftime('%Y%m%d-%H%M%S')}.log"
         try:
             w.cfg.logdir.mkdir(parents=True, exist_ok=True)
             logf.write_text((p.stdout or "") + (p.stderr or ""))
-            log(f"  review #{pr}: TauCetiData sync FAILED (rc={p.returncode}); detail → {logf}")
+            log(f"  review #{pr}: EpsilonEridaniData sync FAILED (rc={p.returncode}); detail → {logf}")
         except OSError:
-            log(f"  review #{pr}: TauCetiData sync FAILED (rc={p.returncode})")
+            log(f"  review #{pr}: EpsilonEridaniData sync FAILED (rc={p.returncode})")
     return p.returncode
 
 
@@ -1013,7 +1013,7 @@ def _refund_infra_failure(w, c, label: str, charged: tuple[str, ...]) -> None:
 
     The budgets exist to stop re-running an agent on work it cannot change. A 529 is not that: the
     agent never ran. Charging it anyway retires PRs for reasons that have nothing to do with them —
-    TauCetiProject/TauCeti#1434 was flagged "needs a human" after three consecutive fix rounds died
+    eic/EpsilonEridani#1434 was flagged "needs a human" after three consecutive fix rounds died
     to `API Error: 529 Overloaded`, having never attempted the fix once. This is the same rule the
     host-agent-binary preflight above already applies: a failure every PR would have hit is charged
     to none of them.
@@ -1131,7 +1131,7 @@ def do_rebase(w, sv, c, opts, bubble) -> int | None:
 
 
 def do_bump(w, sv, c, opts, bubble) -> int | None:
-    """Adapt a red bump-mathlib PR (the bot bumped mathlib; TauCeti/ needs to catch up). Same
+    """Adapt a red bump-mathlib PR (the bot bumped mathlib; EpsilonEridani/ needs to catch up). Same
     shape as a fix: claim the branch, check the PR out, drive the agent on prompts/bump.md to green it."""
     pr, head = c.pr, c.head
     keys = (f"bump-{pr}-{head[:12]}", f"bump-pr-{pr}")  # count up front so an un-checkout-able PR can't loop
@@ -1141,9 +1141,9 @@ def do_bump(w, sv, c, opts, bubble) -> int | None:
 
 
 def do_lint_repair(w, sv, c, opts, bubble) -> int | None:
-    """Green a red lint-repair PR (TauCeti's daily full lint found violations on main that PR builds
+    """Green a red lint-repair PR (EpsilonEridani's daily full lint found violations on main that PR builds
     could not see). Same shape as a bump: claim the branch, check the PR out, drive the agent on
-    prompts/lint-repair.md to fix TauCeti/ until the PR's full lint passes."""
+    prompts/lint-repair.md to fix EpsilonEridani/ until the PR's full lint passes."""
     pr, head = c.pr, c.head
     keys = (f"lint-repair-{pr}-{head[:12]}", f"lint-repair-pr-{pr}")  # counted up front, as for bump
     for key in keys:
@@ -1152,10 +1152,10 @@ def do_lint_repair(w, sv, c, opts, bubble) -> int | None:
 
 
 def do_progress(w, sv, c, opts, bubble) -> int | None:
-    """Write the per-roadmap progress report: STATUS.md + PROGRESS.md, as a PR to TauCetiRoadmap.
+    """Write the per-roadmap progress report: STATUS.md + PROGRESS.md, as a PR to EpsilonEridaniRoadmap.
 
     The division of labour is the point of this kind. Every decision and every mechanical step is
-    `tauceti-progress`, a tested tool: it picks the roadmap and the commit window, extracts from git
+    `epsiloneridani-progress`, a tested tool: it picks the roadmap and the commit window, extracts from git
     the declarations that actually landed, writes both files, and opens the pull request. The model is
     handed a bounded context and asked for prose, nothing else — it never touches git or the API.
 
@@ -1224,7 +1224,7 @@ def _best_effort_log(msg: str) -> None:
 
 
 def _progress_tool_failed(w, sub: str, proc) -> str:
-    """Persist a failing `tauceti-progress <sub>`'s WHOLE output; return the reason to raise Die with.
+    """Persist a failing `epsiloneridani-progress <sub>`'s WHOLE output; return the reason to raise Die with.
 
     These three subcommands must be captured rather than inherited — `prompt`'s stdout IS the prompt,
     and `plan`'s carries the verdict — so on failure their output only exists in this process. It used
@@ -1271,13 +1271,13 @@ def _progress_tool_failed(w, sub: str, proc) -> str:
     # dies without printing a newline produces exactly one line, so a line count alone bounds nothing:
     # a megabyte of output became a megabyte-long log call and a megabyte-long Die message.
     lines = (saved.splitlines() or [""])[-PROGRESS_TOOL_TAIL:]
-    _best_effort_log(f"  progress: tauceti-progress {sub} exited {proc.returncode}; last lines:")
+    _best_effort_log(f"  progress: epsiloneridani-progress {sub} exited {proc.returncode}; last lines:")
     for line in lines:
         _best_effort_log("    " + _clip(line))
     # The LAST non-empty line: for a traceback that is the exception itself, which the leading frames
     # never name. Anything shorter than a tail loses it, which is exactly how this went undiagnosed.
     summary = next((s.strip() for s in reversed(saved.splitlines()) if s.strip()), "")
-    return f"tauceti-progress {sub} failed (rc={proc.returncode}): {_clip(summary)}{where}"
+    return f"epsiloneridani-progress {sub} failed (rc={proc.returncode}): {_clip(summary)}{where}"
 
 
 def _do_progress_inner(w, opts) -> int | None:
@@ -1305,7 +1305,7 @@ def _do_progress_inner(w, opts) -> int | None:
         if subprocess.run(["git", "clone", "-q", f"https://github.com/{ROADMAP}", str(roadmap_dir)]).returncode:
             raise Die(f"cloning {ROADMAP} failed")
 
-    # `plan` and `facts` read TauCeti history, so they need the full-history checkout, not a shallow one.
+    # `plan` and `facts` read EpsilonEridani history, so they need the full-history checkout, not a shallow one.
     if not prepare_checkout(w.cfg):
         raise Die("checkout failed")
 
@@ -1324,7 +1324,7 @@ def _do_progress_inner(w, opts) -> int | None:
         # byte raises UnicodeDecodeError inside subprocess.run — before there is a CompletedProcess to
         # inspect. The failure would then skip the counter, the saved output and the Die path entirely,
         # and surface as a bare decode error naming nothing. Mojibake beats losing the diagnostic.
-        log(f"  $ tauceti-progress {args[0]} …")
+        log(f"  $ epsiloneridani-progress {args[0]} …")
         return subprocess.run(
             progress_argv(w.cfg.state, *args),
             capture_output=capture,
@@ -1363,11 +1363,11 @@ def _do_progress_inner(w, opts) -> int | None:
         != 0
     ):
         w.counters.incr("progress-err")
-        raise Die("tauceti-progress facts failed")
+        raise Die("epsiloneridani-progress facts failed")
 
     # 3) The only model step: two prose bodies. The prompt forbids touching anything else.
     #
-    # The prompt comes from TauCetiProgress, not from this repository. It used to live in both, the
+    # The prompt comes from EpsilonEridaniProgress, not from this repository. It used to live in both, the
     # copies drifted, and a fix to report length was very nearly made to the one nothing read. Serving
     # it from the pinned build keeps the words a model is given and the checks its output must pass as
     # one versioned thing. No new failure mode: `plan` and `facts` above already ran from that build.
@@ -1554,7 +1554,7 @@ def do_roadmap(w, sv, c, opts, bubble) -> int:
                 AGENT=opts.agent_name,
                 FORK=fork_owner,
                 WORKERID=w.cfg.wid,
-                ROADMAP_DIR="/opt/roadmap/TauCetiRoadmap",
+                ROADMAP_DIR="/opt/roadmap/EpsilonEridaniRoadmap",
                 REVIEW_DIR="/opt/review",
                 RUBRICS=(
                     f"/opt/rubrics/{RUBRIC_BUNDLE}"
@@ -1578,7 +1578,7 @@ def do_roadmap(w, sv, c, opts, bubble) -> int:
         AGENT=opts.agent_name,
         FORK=fork_owner,
         WORKERID=w.cfg.wid,
-        ROADMAP_DIR=str(refs / "roadmap" / "TauCetiRoadmap"),
+        ROADMAP_DIR=str(refs / "roadmap" / "EpsilonEridaniRoadmap"),
         REVIEW_DIR=str(refs / "review"),
         RUBRICS=(str(bundle) if bundle is not None else f"{refs / 'review' / 'rubrics'} (read every .md file in it)"),
         SOURCE_GUIDANCE=source_guidance,

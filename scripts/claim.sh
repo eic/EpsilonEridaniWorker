@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # claim.sh — optional, cooperative task de-contention for Tau Ceti agents.
 #
-# A claim is a custom git ref `refs/tauceti-claims/<key>` in the work repo, pointing at an orphan
+# A claim is a custom git ref `refs/epsiloneridani-claims/<key>` in the work repo, pointing at an orphan
 # commit whose message is a JSON lease {owner, expires_at, ...}. Acquire/renew/takeover/release are
 # all done with ONE atomic GitHub primitive — `git push --force-with-lease=<ref>:[<oid>]`:
 #   * expected EMPTY  → create-only (succeeds iff the ref does not exist)
@@ -23,19 +23,19 @@
 #   claim.sh list    [--full]              # list live claim refs (--full fetches each lease)
 #   claim.sh gc                            # CAS-delete expired claims
 #
-# Env: CLAIM_REPO (default TauCetiProject/TauCeti), TAUCETI_WORKER_ID (default host-pid),
+# Env: CLAIM_REPO (default eic/EpsilonEridani), TAUCETI_WORKER_ID (default host-pid),
 #      CLAIM_TTL (default 1500), CLAIM_GITDIR_BASE (per-repo scratch parent),
 #      CLAIM_GITDIR (explicit scratch object store override).
 set -uo pipefail
 
-REPO="${CLAIM_REPO:-TauCetiProject/TauCeti}"
+REPO="${CLAIM_REPO:-eic/EpsilonEridani}"
 URL="https://github.com/$REPO"
 WID="${TAUCETI_WORKER_ID:-$(hostname)-$$}"
 DEFAULT_TTL="${CLAIM_TTL:-1500}"
-GITDIR="${CLAIM_GITDIR:-${CLAIM_GITDIR_BASE:-$HOME/.cache/tauceti-claims}/${REPO//\//__}.git}"
-NS="refs/tauceti-claims"
-export GIT_AUTHOR_NAME="tauceti-claim" GIT_AUTHOR_EMAIL="claim@tauceti.invalid"
-export GIT_COMMITTER_NAME="tauceti-claim" GIT_COMMITTER_EMAIL="claim@tauceti.invalid"
+GITDIR="${CLAIM_GITDIR:-${CLAIM_GITDIR_BASE:-$HOME/.cache/epsiloneridani-claims}/${REPO//\//__}.git}"
+NS="refs/epsiloneridani-claims"
+export GIT_AUTHOR_NAME="epsiloneridani-claim" GIT_AUTHOR_EMAIL="claim@epsiloneridani.invalid"
+export GIT_COMMITTER_NAME="epsiloneridani-claim" GIT_COMMITTER_EMAIL="claim@epsiloneridani.invalid"
 
 now() { date +%s; }
 ref_of() { printf '%s/%s' "$NS" "$1"; }
@@ -70,7 +70,7 @@ build_oid() { printf '%s' "$1" | g commit-tree "$(empty_tree)"; }
 # payload KEY EXPIRES — the lease JSON for a claim I'm taking now.
 payload() {
     local n; n=$(now)
-    jq -nc --arg s "tauceti-claim/v1" --arg o "$WID" --arg h "$(hostname)" \
+    jq -nc --arg s "epsiloneridani-claim/v1" --arg o "$WID" --arg h "$(hostname)" \
         --argjson pid "$$" --argjson aq "$n" --argjson ex "$2" --arg res "$1" \
         --arg observed "${CLAIM_OBSERVED_OID:-}" \
         '{schema:$s, owner:$o, host:$h, pid:$pid, acquired_at:$aq, expires_at:$ex,

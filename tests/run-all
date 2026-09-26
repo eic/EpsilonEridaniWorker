@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run the whole test suite and report pass/fail. Exit 0 only if every test passes.
 #
-# The tests are standalone scripts (not pytest): each loads the `tauceti` program and exits 0/1.
+# The tests are standalone scripts (not pytest): each loads the `epsiloneridani` program and exits 0/1.
 # This runner knows how each one wants to be invoked, and which one to skip in a plain CI box:
 #   - most are stdlib-only         -> `uv run python <file>`
 #   - parity_selectors needs a snapshot, not the network -> pass the bundled fixture as its arg

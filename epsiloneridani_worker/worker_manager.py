@@ -37,7 +37,7 @@ from .runtime_status import STATUS_ENV, read_json, update_status
 
 CONFIG_VERSION = 1
 DEFAULT_INTERVAL = 2.0
-TMUX_SESSION = "tauceti-workers"
+TMUX_SESSION = "epsiloneridani-workers"
 _WORKER_KEYS = {
     "id",
     "enabled",
@@ -62,34 +62,34 @@ _WORKER_KEYS = {
 
 WORKERS_EPILOG = """\
 quickstart:
-  tauceti workers add                         add workerN and start the manager
-  tauceti workers add reviewer --only review  add a focused reviewer
-  tauceti workers                             inspect desired and actual state
-  tauceti workers logs --follow reviewer      follow its durable log
+  epsiloneridani workers add                         add workerN and start the manager
+  epsiloneridani workers add reviewer --only review  add a focused reviewer
+  epsiloneridani workers                             inspect desired and actual state
+  epsiloneridani workers logs --follow reviewer      follow its durable log
 
 hand-edited config:
-  tauceti workers edit                        create or edit workers.toml
-  tauceti workers apply --check               validate without reconciling
-  tauceti workers apply                       reconcile, starting a manager if needed
+  epsiloneridani workers edit                        create or edit workers.toml
+  epsiloneridani workers apply --check               validate without reconciling
+  epsiloneridani workers apply                       reconcile, starting a manager if needed
 
 long-running service:
-  tauceti workers service install             install and start the native user service
-  tauceti workers service status              inspect the native user service
-  tauceti workers manager-stop                stop a detached manager and its workers
-  tauceti workers manager-stop --leave-workers
+  epsiloneridani workers service install             install and start the native user service
+  epsiloneridani workers service status              inspect the native user service
+  epsiloneridani workers manager-stop                stop a detached manager and its workers
+  epsiloneridani workers manager-stop --leave-workers
                                               stop only the manager
 
 configuration (first that is set wins):
-  tauceti workers --config PATH apply         an explicit file, before the action
+  epsiloneridani workers --config PATH apply         an explicit file, before the action
   $TAUCETI_WORKERS_CONFIG                     exact default config path
   $TAUCETI_CONFIG_HOME                        directory holding workers.toml
-  $XDG_CONFIG_HOME                            root holding tauceti/workers.toml
-  platform default                            macOS Application Support, else ~/.config/tauceti
+  $XDG_CONFIG_HOME                            root holding epsiloneridani/workers.toml
+  platform default                            macOS Application Support, else ~/.config/epsiloneridani
 
-  tauceti workers import workers.conf         import the legacy line-oriented format once
+  epsiloneridani workers import workers.conf         import the legacy line-oriented format once
 
 full reference:
-  https://github.com/TauCetiProject/TauCetiWorker/blob/main/docs/workers.md
+  https://github.com/eic/EpsilonEridaniWorker/blob/main/docs/workers.md
 """
 
 
@@ -98,7 +98,7 @@ class WorkersError(Exception):
 
 
 def workers_die(message: str) -> NoReturn:
-    print(f"tauceti workers: {message}", file=sys.stderr)
+    print(f"epsiloneridani workers: {message}", file=sys.stderr)
     raise SystemExit(2)
 
 
@@ -108,10 +108,10 @@ def config_home() -> Path:
         return Path(override).expanduser()
     xdg = os.environ.get("XDG_CONFIG_HOME")
     if xdg:
-        return Path(xdg).expanduser() / "tauceti"
+        return Path(xdg).expanduser() / "epsiloneridani"
     if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / "tauceti"
-    return Path.home() / ".config" / "tauceti"
+        return Path.home() / "Library" / "Application Support" / "epsiloneridani"
+    return Path.home() / ".config" / "epsiloneridani"
 
 
 def default_workers_config() -> Path:
@@ -125,10 +125,10 @@ def workers_state_dir() -> Path:
         return Path(override).expanduser()
     xdg = os.environ.get("XDG_STATE_HOME")
     if xdg:
-        return Path(xdg).expanduser() / "tauceti" / "workers"
+        return Path(xdg).expanduser() / "epsiloneridani" / "workers"
     if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / "tauceti" / "state" / "workers"
-    return Path.home() / ".local" / "state" / "tauceti" / "workers"
+        return Path.home() / "Library" / "Application Support" / "epsiloneridani" / "state" / "workers"
+    return Path.home() / ".local" / "state" / "epsiloneridani" / "workers"
 
 
 def workers_runtime_dir() -> Path:
@@ -136,9 +136,9 @@ def workers_runtime_dir() -> Path:
     if override:
         root = Path(override).expanduser()
     elif os.environ.get("XDG_RUNTIME_DIR"):
-        root = Path(os.environ["XDG_RUNTIME_DIR"]) / "tauceti"
+        root = Path(os.environ["XDG_RUNTIME_DIR"]) / "epsiloneridani"
     else:
-        root = Path("/tmp") / f"tauceti-{os.getuid()}"
+        root = Path("/tmp") / f"epsiloneridani-{os.getuid()}"
     try:
         root.mkdir(parents=True, exist_ok=True, mode=0o700)
     except OSError as exc:
@@ -437,7 +437,7 @@ def _config_lock(path: Path):
 
 
 def _write_worker_specs(path: Path, specs: list[WorkerSpec]) -> None:
-    lines = ["# Managed by `tauceti workers`; edit while the manager is running and it will reconcile.", "version = 1"]
+    lines = ["# Managed by `epsiloneridani workers`; edit while the manager is running and it will reconcile.", "version = 1"]
     for spec in specs:
         lines += ["", "[[workers]]"]
         for key, value in spec.as_dict().items():
@@ -843,7 +843,7 @@ def run_manager(config: Path, interval: float = DEFAULT_INTERVAL) -> int:
                 return {"ok": True}
             return {"ok": False, "error": f"unknown action: {action}"}
 
-        print(f"tauceti workers: managing {config} every {interval:g}s", flush=True)
+        print(f"epsiloneridani workers: managing {config} every {interval:g}s", flush=True)
         try:
             while not exiting:
                 try:
@@ -855,7 +855,7 @@ def run_manager(config: Path, interval: float = DEFAULT_INTERVAL) -> int:
                     error = str(exc)
                     if error != last_error:
                         print(
-                            f"tauceti workers: invalid configuration; keeping last good generation: {error}",
+                            f"epsiloneridani workers: invalid configuration; keeping last good generation: {error}",
                             file=sys.stderr,
                         )
                     last_error = error
@@ -884,7 +884,7 @@ def run_manager(config: Path, interval: float = DEFAULT_INTERVAL) -> int:
                             delay = min(5 * (2 ** min(failures - 1, 6)), 300)
                             launch_failures[wid] = (fingerprint, failures, time.time() + delay)
                             print(
-                                f"tauceti workers: wrapper {wid} exited before publishing terminal state; "
+                                f"epsiloneridani workers: wrapper {wid} exited before publishing terminal state; "
                                 f"retrying in {delay}s",
                                 file=sys.stderr,
                             )
@@ -1116,7 +1116,7 @@ def _legacy_backoff_reason(item: dict) -> str | None:
         (
             index
             for index in range(len(lines) - 1, -1, -1)
-            if re.search(r"tauceti: round (?:rc=\d+|timed out|no progress)", lines[index])
+            if re.search(r"epsiloneridani: round (?:rc=\d+|timed out|no progress)", lines[index])
         ),
         None,
     )
@@ -1260,7 +1260,7 @@ def _worker_status_lines(config: Path, snapshots: list[dict], online: bool, *, w
             label = "retry" if state == "backoff" else "recheck"
             lines.extend(_status_field(label, [_format_until(item["next_action_at"])], width))
         if state == "backoff":
-            lines.extend(_status_field("logs", [f"tauceti workers logs {item['id']}"], width))
+            lines.extend(_status_field("logs", [f"epsiloneridani workers logs {item['id']}"], width))
     return lines
 
 
@@ -1403,11 +1403,11 @@ def cmd_tmux(config: Path, attach: bool) -> int:
             check=True,
         )
         subprocess.run(
-            [tmux, "set-window-option", "-t", f"{TMUX_SESSION}:dashboard", "@tauceti-managed", "dashboard"],
+            [tmux, "set-window-option", "-t", f"{TMUX_SESSION}:dashboard", "@epsiloneridani-managed", "dashboard"],
             check=True,
         )
     result = subprocess.run(
-        [tmux, "list-windows", "-t", TMUX_SESSION, "-F", "#{window_name}\t#{@tauceti-managed}"],
+        [tmux, "list-windows", "-t", TMUX_SESSION, "-F", "#{window_name}\t#{@epsiloneridani-managed}"],
         capture_output=True,
         text=True,
         check=True,
@@ -1435,7 +1435,7 @@ def cmd_tmux(config: Path, attach: bool) -> int:
                 check=True,
             )
             subprocess.run(
-                [tmux, "set-window-option", "-t", f"{TMUX_SESSION}:{name}", "@tauceti-managed", "worker"],
+                [tmux, "set-window-option", "-t", f"{TMUX_SESSION}:{name}", "@epsiloneridani-managed", "worker"],
                 check=True,
             )
     for name in sorted(name for name, marker in managed.items() if marker == "worker" and name not in wanted):
@@ -1511,7 +1511,7 @@ WantedBy=default.target
 
 
 def _launchd_label() -> str:
-    return "org.tauceti.workers"
+    return "org.epsiloneridani.workers"
 
 
 def _service_path() -> Path:
@@ -1519,7 +1519,7 @@ def _service_path() -> Path:
         return Path.home() / "Library" / "LaunchAgents" / f"{_launchd_label()}.plist"
     raw = os.environ.get("XDG_CONFIG_HOME")
     base = Path(raw).expanduser() if raw else Path.home() / ".config"
-    return base / "systemd" / "user" / "tauceti-workers.service"
+    return base / "systemd" / "user" / "epsiloneridani-workers.service"
 
 
 def service_action(action: str, config: Path) -> int:
@@ -1568,7 +1568,7 @@ def service_action(action: str, config: Path) -> int:
         return subprocess.run(["launchctl", "bootstrap", domain, str(path)]).returncode
     systemctl = shutil.which("systemctl")
     if systemctl is None:
-        workers_die("systemctl is unavailable; run `tauceti workers manager` directly")
+        workers_die("systemctl is unavailable; run `epsiloneridani workers manager` directly")
     if action == "install":
         path.parent.mkdir(parents=True, exist_ok=True)
         if path.is_symlink():
@@ -1600,8 +1600,8 @@ def parse_legacy_config(path: Path) -> list[WorkerSpec]:
         if not line or line.startswith("#"):
             continue
         argv = shlex.split(line)
-        if len(argv) < 3 or Path(argv[0]).name != "tauceti" or argv[1] != "work" or "--loop" not in argv:
-            raise WorkersError(f"{path}:{number}: expected a `tauceti work --loop` command")
+        if len(argv) < 3 or Path(argv[0]).name != "epsiloneridani" or argv[1] != "work" or "--loop" not in argv:
+            raise WorkersError(f"{path}:{number}: expected a `epsiloneridani work --loop` command")
         values: dict = {"only": []}
         flags = iter(argv[2:])
         for token in flags:
@@ -1695,7 +1695,7 @@ def add_workers_parser(subparsers) -> None:
         action="store_true",
         help="renew this worker's Claude access token when it expires, instead of parking until a "
         "human runs `claude`. Only safe when nothing else uses the same credential file "
-        "(see `tauceti work --help`)",
+        "(see `epsiloneridani work --help`)",
     )
     add.add_argument("--roadmap-only", help="pin roadmap rounds to one area")
     add.add_argument("--roadmap-skip", default="", help="comma-separated roadmap areas to exclude")
@@ -1748,7 +1748,7 @@ def cmd_workers(args) -> int:
                     if not args.watch:
                         raise
                     healthy = False
-                    print(f"tauceti workers: {exc}", file=sys.stderr)
+                    print(f"epsiloneridani workers: {exc}", file=sys.stderr)
                 if not args.watch:
                     return 0 if healthy else 1
                 time.sleep(2)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """OAuth rotation contract: provider payloads, rotation safety, and atomic credential updates.
 
-The rotation core lives in `tauceti_worker.oauth`, shared by the standalone refresher daemon and the
+The rotation core lives in `epsiloneridani_worker.oauth`, shared by the standalone refresher daemon and the
 pacer's own auto-refresh, so this exercises the module rather than the script.
 """
 
@@ -18,7 +18,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from tauceti_worker import oauth  # noqa: E402
+from epsiloneridani_worker import oauth  # noqa: E402
 
 
 def jwt(exp):

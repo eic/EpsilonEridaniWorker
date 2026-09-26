@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Single-writer OAuth refresher for an unattended TauCeti Docker worker.
+"""Single-writer OAuth refresher for an unattended EpsilonEridani Docker worker.
 
-The rotation itself lives in `tauceti_worker.oauth`, shared with the pacer's own auto-refresh so
+The rotation itself lives in `epsiloneridani_worker.oauth`, shared with the pacer's own auto-refresh so
 there is exactly one implementation of single-use-token handling. This file is the daemon around it:
 the poll loop, the env-var knobs, and the back-off on a persistent failure.
 """
@@ -16,10 +16,10 @@ import threading
 from pathlib import Path
 
 try:
-    from tauceti_worker import oauth
+    from epsiloneridani_worker import oauth
 except ModuleNotFoundError:  # installed standalone (Docker) — the checkout is the script's grandparent
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from tauceti_worker import oauth
+    from epsiloneridani_worker import oauth
 
 
 def _positive_env(name: str, default: int) -> int:

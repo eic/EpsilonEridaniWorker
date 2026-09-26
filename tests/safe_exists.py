@@ -8,7 +8,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-from tauceti_worker.quota import _safe_exists
+from epsiloneridani_worker.quota import _safe_exists
 
 fails = 0
 
@@ -21,7 +21,7 @@ def check(name, cond):
 
 
 # Matches Path.exists() for the ordinary cases.
-check("present path -> True", _safe_exists(REPO / "tauceti"))
+check("present path -> True", _safe_exists(REPO / "epsiloneridani"))
 check("absent path -> False", not _safe_exists(REPO / "does-not-exist-xyz"))
 
 

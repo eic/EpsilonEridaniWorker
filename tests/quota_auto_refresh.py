@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """With --auto-refresh, the worker renews its Claude access token instead of stalling on HTTP 401.
 
-An unattended `tauceti work --loop` has nobody to re-run `claude` for it, so a token expiry ends the
+An unattended `epsiloneridani work --loop` has nobody to re-run `claude` for it, so a token expiry ends the
 run: every poll reads 401 and sleeps. An operator who has told us the credential file is exclusively
 this worker's can opt into renewing it.
 
@@ -22,8 +22,8 @@ from unittest.mock import patch
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc  # noqa: E402
-from tauceti_worker import oauth  # noqa: E402
+import epsiloneridani_worker as tc  # noqa: E402
+from epsiloneridani_worker import oauth  # noqa: E402
 
 if sys.platform == "darwin":
     print("[SKIP] auto-refresh is Linux-only (macOS keeps the credential in the login Keychain)")
@@ -69,7 +69,7 @@ def setup(tmp, *, expired=True, refresh="operator-refresh", opt_in=True):
     src, dst = real / ".claude", iso / ".claude"
     for d in (src, dst):
         d.mkdir(parents=True)
-    (dst / ".tauceti-creds-source").write_text(str(src))
+    (dst / ".epsiloneridani-creds-source").write_text(str(src))
     os.environ["CLAUDE_CONFIG_DIR"] = str(dst)
     os.environ.pop("TAUCETI_AUTO_REFRESH", None)
     if opt_in:
@@ -144,7 +144,7 @@ try:
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 
-# 2b) Renewal is opt-in per caller. `tauceti status` and the dashboard read the same verdict, and must
+# 2b) Renewal is opt-in per caller. `epsiloneridani status` and the dashboard read the same verdict, and must
 #     not consume the operator's single-use refresh token or rewrite their credential file to do it.
 tmp = Path(tempfile.mkdtemp())
 try:

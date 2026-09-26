@@ -20,7 +20,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 # Isolate the prefs file: persistence must land here, not in the operator's real ~/.config.
-_CFGDIR = tempfile.mkdtemp(prefix="tauceti-prefs-")
+_CFGDIR = tempfile.mkdtemp(prefix="epsiloneridani-prefs-")
 for _key in (
     "TAUCETI_CONFIG_HOME",
     "TAUCETI_WORKERS_CONFIG",
@@ -36,7 +36,7 @@ os.environ.pop("TAUCETI_ROADMAP_SKIP", None)
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 assert tc.default_workers_config().is_relative_to(Path(_CFGDIR)), (
     f"dashboard test configuration escaped its temporary root: {tc.default_workers_config()}"
@@ -109,7 +109,7 @@ def loader():
     return fake_survey(), {}, ["algebra", "topology"]
 
 
-CFG = SimpleNamespace(logdir=Path("/tmp/tauceti-test"), home=Path(_CFGDIR), state=Path(_CFGDIR) / "state")
+CFG = SimpleNamespace(logdir=Path("/tmp/epsiloneridani-test"), home=Path(_CFGDIR), state=Path(_CFGDIR) / "state")
 
 
 async def await_survey(app, pilot):
@@ -204,7 +204,7 @@ async def test_cursor_before_load():
 async def test_sticky_env_focus():
     """#5: a transient TAUCETI_ROADMAP_ONLY override must NOT be written into prefs by an unrelated
     dial change, or it becomes sticky on later runs that have no env override."""
-    cfgdir = tempfile.mkdtemp(prefix="tauceti-prefs-env-")
+    cfgdir = tempfile.mkdtemp(prefix="epsiloneridani-prefs-env-")
     os.environ["XDG_CONFIG_HOME"] = cfgdir
     os.environ["TAUCETI_ROADMAP_ONLY"] = "EnvOnly"
     try:
@@ -250,14 +250,14 @@ def test_random_default():
     }
     orig_choice = tc.random.choice
     tc.work_units.fetch_ref = lambda *a, **k: True
-    tc.work_units.ensure_fork = lambda: "alice/TauCeti"  # do_roadmap forks before launching; stub it
+    tc.work_units.ensure_fork = lambda: "alice/EpsilonEridani"  # do_roadmap forks before launching; stub it
     tc.work_units.administrative_hold_avoid_list = lambda *_args: "none"
     tc.work_units.prepare_checkout = lambda cfg: True
     tc.work_units.run_agent_host = lambda cwd, prompt, work_model, logdir: (captured.update(prompt=prompt), 0)[1]
     cfg = SimpleNamespace(
-        state=Path("/tmp/tauceti-test/state"),
-        checkout=Path("/tmp/tauceti-test/co"),
-        logdir=Path("/tmp/tauceti-test"),
+        state=Path("/tmp/epsiloneridani-test/state"),
+        checkout=Path("/tmp/epsiloneridani-test/co"),
+        logdir=Path("/tmp/epsiloneridani-test"),
         wid="default",
     )
     w = SimpleNamespace(cfg=cfg, gh=object())
@@ -308,15 +308,15 @@ def test_skip_edge_cases():
         )
     }
     tc.work_units.fetch_ref = lambda *a, **k: True
-    tc.work_units.ensure_fork = lambda: "alice/TauCeti"  # do_roadmap forks before launching; stub it
+    tc.work_units.ensure_fork = lambda: "alice/EpsilonEridani"  # do_roadmap forks before launching; stub it
     tc.work_units.administrative_hold_avoid_list = lambda *_args: "none"
     tc.work_units.prepare_checkout = lambda cfg: True
     tc.work_units.run_agent_host = lambda cwd, prompt, work_model, logdir: (captured.update(prompt=prompt), 0)[1]
     tc.work_units.roadmap_areas = lambda gh: ["algebra", "topology"]
     cfg = SimpleNamespace(
-        state=Path("/tmp/tauceti-test/state"),
-        checkout=Path("/tmp/tauceti-test/co"),
-        logdir=Path("/tmp/tauceti-test"),
+        state=Path("/tmp/epsiloneridani-test/state"),
+        checkout=Path("/tmp/epsiloneridani-test/co"),
+        logdir=Path("/tmp/epsiloneridani-test"),
         wid="default",
     )
     w = SimpleNamespace(cfg=cfg, gh=object())
@@ -375,7 +375,7 @@ def test_bare_cli_ignores_prefs():
     """Requirement 1: a saved dashboard pref must NOT be read by a bare CLI run. roadmap_only()/
     roadmap_skip() consult only the env, so with a prefs file present but the env unset they stay
     at their unset defaults."""
-    cfgdir = tempfile.mkdtemp(prefix="tauceti-prefs-cli-")
+    cfgdir = tempfile.mkdtemp(prefix="epsiloneridani-prefs-cli-")
     old_xdg = os.environ.get("XDG_CONFIG_HOME")
     old_only = os.environ.pop("TAUCETI_ROADMAP_ONLY", None)
     old_skip = os.environ.pop("TAUCETI_ROADMAP_SKIP", None)
@@ -398,7 +398,7 @@ def test_bare_cli_ignores_prefs():
 def test_dashboard_uses_saved_pref():
     """Requirement 1 (other half): the dashboard DOES apply the saved only/skip — on init it seeds the
     process env (so its display and any launched round inherit it) when the env is unset."""
-    cfgdir = tempfile.mkdtemp(prefix="tauceti-prefs-dash-")
+    cfgdir = tempfile.mkdtemp(prefix="epsiloneridani-prefs-dash-")
     old_xdg = os.environ.get("XDG_CONFIG_HOME")
     old_only = os.environ.pop("TAUCETI_ROADMAP_ONLY", None)
     old_skip = os.environ.pop("TAUCETI_ROADMAP_SKIP", None)
@@ -424,7 +424,7 @@ def test_dashboard_uses_saved_pref():
 async def test_skip_dashboard():
     """The [x] skip control: the TextPrompt sets a normalized TAUCETI_ROADMAP_SKIP, updates the
     survey row immediately, and persists the user-chosen skip to prefs."""
-    cfgdir = tempfile.mkdtemp(prefix="tauceti-prefs-skip-")
+    cfgdir = tempfile.mkdtemp(prefix="epsiloneridani-prefs-skip-")
     old_xdg = os.environ.get("XDG_CONFIG_HOME")
     old_skip = os.environ.pop("TAUCETI_ROADMAP_SKIP", None)
     os.environ["XDG_CONFIG_HOME"] = cfgdir
@@ -481,7 +481,7 @@ def test_dashboard_migrates_host_pref():
     """The sandbox pref key was renamed host -> bubble when the default flipped to host. An old prefs
     file (only the `host` key) must migrate as bubble = not host, so a user who was reviewing untrusted
     PRs in bubble (host=false) is NOT silently un-sandboxed on upgrade. A present `bubble` key wins."""
-    cfgdir = tempfile.mkdtemp(prefix="tauceti-prefs-mig-")
+    cfgdir = tempfile.mkdtemp(prefix="epsiloneridani-prefs-mig-")
     old_xdg = os.environ.get("XDG_CONFIG_HOME")
     old_only = os.environ.pop("TAUCETI_ROADMAP_ONLY", None)
     old_skip = os.environ.pop("TAUCETI_ROADMAP_SKIP", None)

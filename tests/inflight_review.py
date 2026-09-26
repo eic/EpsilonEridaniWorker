@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """In-flight review de-contention (the worker-side early skip).
 
-The review engine posts a `<!--tauceti-review-in-progress {json}-->` marker on a head it is reviewing,
+The review engine posts a `<!--epsiloneridani-review-in-progress {json}-->` marker on a head it is reviewing,
 with an embedded `expires_at` so a crashed reviewer self-clears. De-contention is on the head ALONE (a
 commit is reviewed once, regardless of model). The worker now reads the SAME marker during the survey so
 it skips a head a peer already holds BEFORE paying the engine's build+launch cost — instead of
@@ -19,7 +19,7 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 NOW = 1_700_000_000
 HEAD = "509d78605409abcdef0123456789abcdef012345"
@@ -29,7 +29,7 @@ OTHER = "0000000000000000000000000000000000000000"
 def marker(head, providers, expires_at):
     """A PR issue comment carrying an in-progress marker, byte-for-byte like the engine posts."""
     payload = {
-        "schema": "tauceti-review-in-progress/v1",
+        "schema": "epsiloneridani-review-in-progress/v1",
         "nonce": "n",
         "providers": providers,
         "head": head,
@@ -39,7 +39,7 @@ def marker(head, providers, expires_at):
     }
     body = (
         f"🔍 Review in progress — `{','.join(providers)}` reviewing `{head[:12]}`."
-        f"\n<!--tauceti-review-in-progress {json.dumps(payload, separators=(',', ':'))}-->"
+        f"\n<!--epsiloneridani-review-in-progress {json.dumps(payload, separators=(',', ':'))}-->"
     )
     return {"id": 1, "body": body}
 
@@ -59,10 +59,10 @@ CASES = [
         {"claude"},
     ),
     ("expired + fresh on head", [marker(HEAD, ["codex"], NOW - 30), marker(HEAD, ["claude"], NOW + 1700)], {"claude"}),
-    ("malformed marker json", [{"id": 1, "body": "<!--tauceti-review-in-progress {nope-->"}], set()),
+    ("malformed marker json", [{"id": 1, "body": "<!--epsiloneridani-review-in-progress {nope-->"}], set()),
     (
         "missing expires_at",
-        [{"id": 1, "body": '<!--tauceti-review-in-progress {"head":"%s","providers":["codex"]}-->' % HEAD}],
+        [{"id": 1, "body": '<!--epsiloneridani-review-in-progress {"head":"%s","providers":["codex"]}-->' % HEAD}],
         set(),
     ),
 ]

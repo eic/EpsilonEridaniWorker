@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A failing `tauceti-progress` subcommand writes its WHOLE output down, not a clipped prefix.
+"""A failing `epsiloneridani-progress` subcommand writes its WHOLE output down, not a clipped prefix.
 
 The regression this pins: `plan`'s output used to be sliced to 400 characters straight into the main
 log. A Python traceback is longer than that before it reaches the exception, so every progress
@@ -20,11 +20,11 @@ from types import SimpleNamespace
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 # A real traceback, long enough that any prefix cap would cut it before the exception line.
 FRAMES = "\n".join(
-    f'  File "/state/cache/uvx/tauceti-progress/{"f" * 40}/lib/progress/plan.py", line {n}, in step{n}\n'
+    f'  File "/state/cache/uvx/epsiloneridani-progress/{"f" * 40}/lib/progress/plan.py", line {n}, in step{n}\n'
     f"    result = step{n + 1}()"
     for n in range(1, 12)
 )
@@ -50,7 +50,7 @@ def run(sub, stdout="", stderr="", logdir=None, logger=None):
     """Drive the helper, capturing what it sends to the main log. Returns (reason, lines)."""
     lines = []
     w = SimpleNamespace(cfg=SimpleNamespace(logdir=logdir))
-    proc = subprocess.CompletedProcess(args=["tauceti-progress", sub], returncode=1, stdout=stdout, stderr=stderr)
+    proc = subprocess.CompletedProcess(args=["epsiloneridani-progress", sub], returncode=1, stdout=stdout, stderr=stderr)
     saved = tc.work_units.log
     tc.work_units.log = logger or (lambda msg="": lines.append(str(msg)))
     try:
@@ -165,7 +165,7 @@ with tempfile.TemporaryDirectory() as tmp:
         checks.append(check("a logger that raises does not mask the tool failure", False, repr(exc)))
 
 # ----- the apply path still distinguishes success, no-progress and failure -----------------------
-src = (REPO / "tauceti_worker" / "work_units.py").read_text()
+src = (REPO / "epsiloneridani_worker" / "work_units.py").read_text()
 checks.append(
     check("apply treats 0 and EX_NOPROGRESS as non-failures", "if proc.returncode not in (0, EX_NOPROGRESS):" in src)
 )

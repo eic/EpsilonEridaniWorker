@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 
 def check(name, got, want):
@@ -39,7 +39,7 @@ checks.append(
     check(
         "progress tool cache is keyed by its immutable ref",
         progress_cmd[1:3],
-        ["--cache-dir", f"/worker-state/cache/uvx/tauceti-progress/{tc.PROGRESS_REF}"],
+        ["--cache-dir", f"/worker-state/cache/uvx/epsiloneridani-progress/{tc.PROGRESS_REF}"],
     )
 )
 checks.append(check("progress tool still receives its command", progress_cmd[-1], "due"))

@@ -3,20 +3,20 @@
 # requires-python = ">=3.11"
 # dependencies = ["rich", "textual>=8,<9"]  # used ONLY by the TUI/status render; every other path is stdlib.
 # ///
-"""./tauceti — source-checkout entry point.
+"""./epsiloneridani — source-checkout entry point.
 
-The worker is the `tauceti_worker/` package; this is a thin PEP 723 shim so `./tauceti …` keeps
+The worker is the `epsiloneridani_worker/` package; this is a thin PEP 723 shim so `./epsiloneridani …` keeps
 working from a clone (uv resolves rich/textual, then runs the package). An installed wheel exposes
-the same CLI as the `tauceti` console script (tauceti_worker.cli:cli_main); this file is not part
+the same CLI as the `epsiloneridani` console script (epsiloneridani_worker.cli:cli_main); this file is not part
 of the wheel. `uv run --script` puts this file's directory on sys.path, so the sibling
-tauceti_worker package imports cleanly; the explicit insert keeps that true regardless of cwd."""
+epsiloneridani_worker package imports cleanly; the explicit insert keeps that true regardless of cwd."""
 
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from tauceti_worker.cli import cli_main
+from epsiloneridani_worker.cli import cli_main
 
 if __name__ == "__main__":
     raise SystemExit(cli_main())

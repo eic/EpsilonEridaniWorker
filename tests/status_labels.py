@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Regression guard for the survey's status-label breakdown — the per-round "open PRs" line.
 
-The line replaced a bare non-draft / build-green count with totals bucketed by TauCeti's status labels
+The line replaced a bare non-draft / build-green count with totals bucketed by EpsilonEridani's status labels
 (the STATUS_LABELS pipeline), each paired with the subset the worker itself authored. This locks in:
   - every STATUS_LABELS bucket is present and in that fixed order (a zero bucket is still listed);
   - a bucket's total counts open NON-DRAFT PRs carrying that label; drafts never count;
@@ -15,8 +15,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import tauceti_worker as tc
-from tauceti_worker.survey import Survey, bucket_status_labels
+import epsiloneridani_worker as tc
+from epsiloneridani_worker.survey import Survey, bucket_status_labels
 
 ME = "kim-em"
 PEER = "someone-else"

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """A provider outage must not spend a PR's fix budget.
 
-TauCetiProject/TauCeti#1434 was retired as "fix attempts are spent (3/3) — needs a human" after three
+eic/EpsilonEridani#1434 was retired as "fix attempts are spent (3/3) — needs a human" after three
 consecutive fix rounds died to `API Error: 529 Overloaded`. The agent never attempted the fix once, so
 all three attempts were charged for a failure that had nothing to do with that PR. Rounds 55, 56 and 58
 of one day's log, one PR, permanently flagged for a human because the provider was busy.
@@ -18,7 +18,7 @@ from types import SimpleNamespace
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 agents = tc.agents
 wu = tc.work_units
@@ -67,8 +67,8 @@ cases = [
                 "fetching mathlib cache",
                 "warning: transient failure: API Error: 503, retrying",
                 "cache ok",
-                "building TauCeti.Analysis",
-                "error: TauCeti/Foo.lean:12:0: unknown identifier",
+                "building EpsilonEridani.Analysis",
+                "error: EpsilonEridani/Foo.lean:12:0: unknown identifier",
                 "build failed with 1 error",
                 "agent: giving up",
             ]

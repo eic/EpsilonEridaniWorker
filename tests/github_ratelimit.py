@@ -18,7 +18,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 PRIMARY = "HTTP 403: API rate limit exceeded for user ID 477956"
 SECONDARY = "You have exceeded a secondary rate limit. Please wait a few minutes before you try again."

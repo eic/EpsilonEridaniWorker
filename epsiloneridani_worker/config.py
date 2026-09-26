@@ -1,4 +1,4 @@
-"""tauceti_worker.config — per-worker Config resolution, the roadmap/claims env dials, worker-slot
+"""epsiloneridani_worker.config — per-worker Config resolution, the roadmap/claims env dials, worker-slot
 locking, and logging."""
 
 from __future__ import annotations
@@ -83,7 +83,7 @@ def roadmap_areas(gh) -> list[str]:
     """The roadmap areas a user can steer toward: the subdirectories of the roadmap repo (each
     holds a README.md + Suggested.lean). Listed over the API so the TUI can offer a picker. Returns []
     if it can't be fetched (the picker then falls back to free-text entry)."""
-    out = gh.api_jq(f"repos/{ROADMAP}/contents/TauCetiRoadmap", '.[] | select(.type=="dir") | .name')
+    out = gh.api_jq(f"repos/{ROADMAP}/contents/EpsilonEridaniRoadmap", '.[] | select(.type=="dir") | .name')
     return sorted(out.splitlines()) if out else []
 
 
@@ -135,7 +135,7 @@ class Config:
     data_home: Path  # the worker's own data root: per-worker, and independent of where $HOME points
     state: Path  # HERE/state/<wid>
     checkout: Path  # host authoring checkout
-    store_dir: Path  # tauceti-review persistent store
+    store_dir: Path  # epsiloneridani-review persistent store
     sbcache: Path  # scoreboard meta cache dir
     logdir: Path  # HERE/logs/<wid>
     quota_cache: Path  # raw provider usage responses
@@ -152,7 +152,7 @@ class Config:
         # owner per claim.sh invocation, so in host mode a worker can't renew or recognise its own
         # branch/<pr> lease and git-safe-push fails closed with "lease lost (another agent took over)".
         os.environ["TAUCETI_WORKER_ID"] = wid
-        # Lake may otherwise leave a cache hit only in its local store, where TauCeti's later
+        # Lake may otherwise leave a cache hit only in its local store, where EpsilonEridani's later
         # `lake exe axioms` and `lake exe module-system` audits cannot resolve it. Enable the store
         # and restore its artifacts into the build directory as one default policy. A manager's
         # per-worker `env` table is already present by this point, so setdefault preserves explicit
@@ -176,14 +176,14 @@ class Config:
         # Per-worker, per-repository claim scratch. claim.sh defaults this under $HOME, which was
         # per-worker only while $HOME moved; use the worker data root while letting a dynamic
         # CLAIM_REPO select its own child store. An explicit CLAIM_GITDIR still overrides the base.
-        os.environ.setdefault("CLAIM_GITDIR_BASE", str(dh / ".cache" / "tauceti-claims"))
+        os.environ.setdefault("CLAIM_GITDIR_BASE", str(dh / ".cache" / "epsiloneridani-claims"))
         return Config(
             wid=wid,
             home=h,
             data_home=dh,
             state=state,
-            checkout=HERE / "checkouts" / wid / "TauCeti",
-            store_dir=dh / ".cache" / "tauceti-review" / wid / "store" / "TauCetiProject__TauCeti",
+            checkout=HERE / "checkouts" / wid / "EpsilonEridani",
+            store_dir=dh / ".cache" / "epsiloneridani-review" / wid / "store" / "eic__EpsilonEridani",
             sbcache=state / "cache" / "scoreboard",
             logdir=HERE / "logs" / wid,
             quota_cache=state / "cache",
@@ -224,7 +224,7 @@ def one_line(text: str, limit: int = 200) -> str:
 
 
 def log(msg: str) -> None:
-    line = f"{time.strftime('%F %T')} tauceti: {msg}"
+    line = f"{time.strftime('%F %T')} epsiloneridani: {msg}"
     print(line, file=sys.stderr, flush=True)
     if _LOG_FH is not None:
         try:

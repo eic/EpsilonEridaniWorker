@@ -11,7 +11,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 fails = 0
 
@@ -31,7 +31,7 @@ def rejects(name, args, only, needle):
         check(name, False)
 
 
-tmp = Path(tempfile.mkdtemp(prefix="tauceti-source-"))
+tmp = Path(tempfile.mkdtemp(prefix="epsiloneridani-source-"))
 source = tmp / "material"
 source.mkdir()
 subprocess.run(["git", "init", "-q", "-b", "main", str(source)], check=True)

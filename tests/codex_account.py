@@ -30,7 +30,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 fails = 0
 
@@ -81,7 +81,7 @@ def auth_json(*, email="a@example.com", acct="acct-1", plan="pro", id_email=None
     }
 
 
-tmp = tempfile.mkdtemp(prefix="tauceti-account-")
+tmp = tempfile.mkdtemp(prefix="epsiloneridani-account-")
 home = Path(tmp) / "home"
 codex = home / ".codex"
 codex.mkdir(parents=True)
@@ -157,7 +157,7 @@ try:
     check("wrong account -> a problem", msg is None, False)
     check_in("names the requested account", "other@example.com", msg)
     check_in("names the account actually authenticated", "kim@example.com", msg)
-    check_in("states that TauCeti will not switch", "will not switch accounts", msg)
+    check_in("states that EpsilonEridani will not switch", "will not switch accounts", msg)
     check_in("gives the switch command", "codex login", msg)
     # The account picker is the step that actually fails for someone with several ChatGPT accounts:
     # codex's OAuth flow sends no prompt=select_account, so it completes as whoever the browser is.
@@ -185,7 +185,7 @@ try:
     real = Path(tmp) / "real-home" / ".codex"
     real.mkdir(parents=True)
     write(auth_json(email="kim@example.com"))
-    (codex / ".tauceti-creds-source").write_text(str(real))
+    (codex / ".epsiloneridani-creds-source").write_text(str(real))
     msg = q().codex_account_problem("other@example.com")
     check_in("isolated home -> names the real credential source", str(real), msg)
     check("isolated home -> does NOT name the mirror", str(codex / "auth.json") in msg, False)
@@ -206,7 +206,7 @@ try:
         q().codex_account_problem("stale@example.com") is None,
         False,
     )
-    (codex / ".tauceti-creds-source").unlink()
+    (codex / ".epsiloneridani-creds-source").unlink()
 
     # --- identity must be CORRELATED, not unioned field-by-field -----------------------------------
     # An account id from one token beside an email from another describes an account that need not
@@ -268,7 +268,7 @@ try:
     )
 
     # --- an environment credential outranks the file we check --------------------------------------
-    # codex reads CODEX_API_KEY / CODEX_ACCESS_TOKEN ahead of auth.json, and TauCeti's launcher clears
+    # codex reads CODEX_API_KEY / CODEX_ACCESS_TOKEN ahead of auth.json, and EpsilonEridani's launcher clears
     # only OPENAI_API_KEY. Certifying the file while one of these is set would be a false pass.
     write(auth_json(email="kim@example.com", acct="acct-kim"))
     for var in ("CODEX_API_KEY", "CODEX_ACCESS_TOKEN"):
@@ -283,7 +283,7 @@ try:
     # Verified against codex 0.146.0: with cli_auth_credentials_store = "ephemeral", `codex login
     # status` reports "Not logged in" while a perfectly good auth.json sits on disk; with "keyring" it
     # reads the keyring and does not fall back to the file. A file left over from before the switch
-    # would therefore let TauCeti certify an account codex has stopped using — a fail-OPEN, which is the
+    # would therefore let EpsilonEridani certify an account codex has stopped using — a fail-OPEN, which is the
     # one direction this check must never fail. Unset resolves to `file` (codex doctor reports
     # "auth storage mode = File"), which is why the default path needs no config at all.
     write(auth_json(email="kim@example.com", acct="acct-kim"))

@@ -30,7 +30,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 seed = tc.agents.seed_worker_claude_config
 fails = 0
@@ -151,7 +151,7 @@ def main():
         iso7.mkdir(parents=True)
         for item in ("skills", "settings.json", "CLAUDE.md"):
             (iso7 / item).symlink_to(other / item)
-        (iso7 / ".tauceti-creds-source").write_text(str(other))
+        (iso7 / ".epsiloneridani-creds-source").write_text(str(other))
         seed(real, iso7)
         check("a stale link into the ORIGINAL config dir is migrated", not (iso7 / "CLAUDE.md").is_symlink())
         check("its skills shelf is migrated too", not (iso7 / "skills").is_symlink())
@@ -161,7 +161,7 @@ def main():
         iso8.mkdir(parents=True)
         for item in ("skills", "settings.json", "CLAUDE.md"):
             (iso8 / item).symlink_to(real / item)
-        (iso8 / ".tauceti-creds-source").write_text(str(real))
+        (iso8 / ".epsiloneridani-creds-source").write_text(str(real))
         seed(None, iso8)  # what a loop child of an old parent calls
         check("a loop child migrates from the recorded source alone", not (iso8 / "CLAUDE.md").is_symlink())
         check("and gets the worker settings", (iso8 / "settings.json").is_file())

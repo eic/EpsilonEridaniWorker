@@ -8,14 +8,14 @@
 #
 # Inputs:
 #   TAUCETI_AUTHOR_CLAIM_KEY   the author/<area>/<target-id> claim acquired in shell before the agent ran
-#   TAUCETI_TARGET_MARKER      the exact <!--tauceti-target:v1 {...}--> string the PR body must contain
+#   TAUCETI_TARGET_MARKER      the exact <!--epsiloneridani-target:v1 {...}--> string the PR body must contain
 #   TAUCETI_CLAIM_SH           path to claim.sh (default: alongside this script)
 # All `gh pr create` flags pass through unchanged.
 set -uo pipefail
 
 CLAIM_KEY="${TAUCETI_AUTHOR_CLAIM_KEY:-}"
 MARKER="${TAUCETI_TARGET_MARKER:-}"
-REQUIRE_MARKER="${TAUCETI_REQUIRE_TARGET_MARKER:-}"   # 1 ⇒ body must carry SOME <!--tauceti-target--> marker
+REQUIRE_MARKER="${TAUCETI_REQUIRE_TARGET_MARKER:-}"   # 1 ⇒ body must carry SOME <!--epsiloneridani-target--> marker
 CLAIM_SH="${TAUCETI_CLAIM_SH:-$(cd "$(dirname "$0")" && pwd)/claim.sh}"
 
 die() { echo "gh-safe-pr-create: $*" >&2; exit 1; }
@@ -50,9 +50,9 @@ if [[ -n "$MARKER" ]]; then
 Add it to the PR body (it lets other agents and the dup-sweeper recognize this target)."
 elif [[ "$REQUIRE_MARKER" == "1" ]]; then
     body="$(pr_body_from_args "$@")"
-    grep -qE '<!--tauceti-target:v1 \{[^}]*"id"[[:space:]]*:[[:space:]]*"[^"]+"[^}]*\}-->' <<<"$body" \
+    grep -qE '<!--epsiloneridani-target:v1 \{[^}]*"id"[[:space:]]*:[[:space:]]*"[^"]+"[^}]*\}-->' <<<"$body" \
         || die "PR body is missing a target marker. Add a line like:
-  <!--tauceti-target:v1 {\"focus\":\"<area>\",\"id\":\"<slug>\"}-->
+  <!--epsiloneridani-target:v1 {\"focus\":\"<area>\",\"id\":\"<slug>\"}-->
 It lets other agents and the dup-sweeper recognize which roadmap target this PR authors."
 fi
 

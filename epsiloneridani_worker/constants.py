@@ -1,4 +1,4 @@
-"""tauceti_worker.constants — repo names, per-PR budgets, loop timing, rate-limit regexes, and the
+"""epsiloneridani_worker.constants — repo names, per-PR budgets, loop timing, rate-limit regexes, and the
 agent/task tables."""
 
 from __future__ import annotations
@@ -14,9 +14,9 @@ ROADMAP = "eic/EpsilonEridaniRoadmap"
 
 REVIEW = "eic/EpsilonEridaniReview"
 
-# The shared cooperative-claim namespace: a repository that holds nothing but `refs/tauceti-claims/*`
+# The shared cooperative-claim namespace: a repository that holds nothing but `refs/epsiloneridani-claims/*`
 # leases, so operators can coordinate without anyone holding write access to canonical. Push access is
-# granted automatically to the author of any merged TauCeti PR (canonical's `claims-access` workflow);
+# granted automatically to the author of any merged EpsilonEridani PR (canonical's `claims-access` workflow);
 # until then a worker claims in its own fork instead. See github.claims_repo.
 CLAIMS = "eic/epsiloneridani-claims"
 
@@ -25,7 +25,7 @@ CLAIMS = "eic/epsiloneridani-claims"
 MAX_FIX_ATTEMPTS = 3  # per-head: stop re-running the fixer on a commit it can't change (a stuck
 
 # head never advances a review round, so CI's round cap can't catch it).
-# The review-ROUND budget lives in CI now (TauCeti housekeeping closes a PR reviewed to its cap while
+# The review-ROUND budget lives in CI now (EpsilonEridani housekeeping closes a PR reviewed to its cap while
 # still blocking). The worker no longer caps its own review rounds — it keeps reviewing on every new
 # head until the PR merges or CI closes it — so every PR reaches a terminal state.
 MAX_INFRA_REFUNDS = 20  # per-head: how many times a provider outage may hand an attempt back before
@@ -34,24 +34,24 @@ MAX_INFRA_REFUNDS = 20  # per-head: how many times a provider outage may hand an
 # matched the transient patterns, an uncapped refund would retry it until a human noticed.
 MAX_REVIEW_ERRORS = 3  # per PR: after this many review rounds that ERROR without posting a verdict
 
-# The tauceti-review engine's exit status for "I stopped because the provider is unusable, and I
-# posted nothing" (TauCetiReview `runner/review.py: PROVIDER_DOWN_EXIT`). It is a separate status
+# The epsiloneridani-review engine's exit status for "I stopped because the provider is unusable, and I
+# posted nothing" (EpsilonEridaniReview `runner/review.py: PROVIDER_DOWN_EXIT`). It is a separate status
 # precisely so this side can tell an outage from a review that failed on its own merits, and decline
 # to charge a PR for it. Kept distinct from the numbers the engine returns for ordinary failure; if
 # the engine ever renumbers, do_review would simply stop recognising the carve-out and go back to
 # charging, which is the pre-existing behaviour rather than a new failure mode.
 REVIEW_PROVIDER_DOWN_EXIT = 3
 
-# Progress reporting (TauCetiProgress). Pinned by SHA, not a branch: the worker's generator and the
-# merge gate in TauCetiRoadmap must run the SAME version, or the worker can emit headers the gate does
+# Progress reporting (EpsilonEridaniProgress). Pinned by SHA, not a branch: the worker's generator and the
+# merge gate in EpsilonEridaniRoadmap must run the SAME version, or the worker can emit headers the gate does
 # not recognise and every report wedges. Bump this together with the two pins in
-# TauCetiRoadmap/.github/workflows/progress-*.yml.
+# EpsilonEridaniRoadmap/.github/workflows/progress-*.yml.
 PROGRESS = os.environ.get("TAUCETI_PROGRESS_REPO", "eic/EpsilonEridaniProgress")
 PROGRESS_REF = os.environ.get("TAUCETI_PROGRESS_REF", "6d26dd3ebcee77d49c10355cce9daf632cc03325")
 PROGRESS_TTL = int(os.environ.get("TAUCETI_PROGRESS_TTL", "600"))  # seconds a `due` verdict stays fresh
 MAX_PROGRESS_ERRORS = 3  # consecutive failed progress rounds before backing off
 PROGRESS_ATTEMPT_GAP = int(os.environ.get("TAUCETI_PROGRESS_GAP", "28800"))  # min seconds between attempts
-# Lines of a failing `tauceti-progress` subcommand echoed into the main log. The whole output is
+# Lines of a failing `epsiloneridani-progress` subcommand echoed into the main log. The whole output is
 # saved to a file regardless; this is only how much of it a reader sees without opening that file.
 # Matches the 20 lines `agents.run_to_logfile` tails for the review engine.
 PROGRESS_TOOL_TAIL = 20
@@ -106,7 +106,7 @@ MAX_BUMP_PR_ATTEMPTS = 5  # per-PR lifetime backstop for bump fixing across head
 BUMP_HEAD_PREFIX = "bump-mathlib/"  # branch prefix the review bot opens its mathlib-bump PRs on
 MAX_LINT_REPAIR_ATTEMPTS = 3  # per-head: stop trying to green a red lint-repair head
 MAX_LINT_REPAIR_PR_ATTEMPTS = 6  # per-PR lifetime backstop for lint repair across heads
-# Branch prefix of the repair PR TauCeti's daily full lint (.github/workflows/lint-full.yml) opens
+# Branch prefix of the repair PR EpsilonEridani's daily full lint (.github/workflows/lint-full.yml) opens
 # when main carries environment-lint violations that PR builds, which lint only changed modules,
 # could not see.
 LINT_REPAIR_HEAD_PREFIX = "lint-repair/"
@@ -115,7 +115,7 @@ LINT_REPAIR_HEAD_PREFIX = "lint-repair/"
 # are open.
 MAX_OPEN_PRS = 8
 
-# The status labels TauCeti's CI keeps on every open PR to track where it sits in the review pipeline.
+# The status labels EpsilonEridani's CI keeps on every open PR to track where it sits in the review pipeline.
 # The survey counts open PRs into these buckets for the per-round "open PRs" line, in lifecycle order
 # (a PR climbs CI -> review -> author fixes -> merge). `ci-failed` and `awaiting-author` are both
 # author-action states, split because a red build is read in the build log and a changes request in
@@ -219,14 +219,14 @@ COMMENTS_MEMO_S = 5  # in-memory window over which one survey pass coalesces its
 
 # (scoreboard meta + in-flight marker share one read); << the round/dashboard cadence
 
-# In-flight review de-contention. The review engine (TauCetiReview) posts a PR comment marking a head
+# In-flight review de-contention. The review engine (EpsilonEridaniReview) posts a PR comment marking a head
 # as under review and embeds an `expires_at` so a crashed reviewer self-clears. De-contention is on the
 # head ALONE (a commit is reviewed once, regardless of model), and the engine's coordinate() remains the
 # authoritative claim. The worker reads the SAME marker during the survey so it can skip a head a peer is
 # already reviewing BEFORE paying the engine's build+launch cost — and, crucially, without busy-looping
 # on the one PR a peer holds. The marker format is owned by the engine; we parse only the head and the
 # expiry, so the engine's TTL value stays its own concern.
-REVIEW_INPROGRESS_RE = re.compile(r"<!--tauceti-review-in-progress (.*?)-->", re.S)
+REVIEW_INPROGRESS_RE = re.compile(r"<!--epsiloneridani-review-in-progress (.*?)-->", re.S)
 
 
 # Agents.
@@ -272,7 +272,7 @@ CLAUDE_CMD = os.environ.get("TAUCETI_CLAUDE_CMD", "claude")
 
 
 # Task taxonomy. Every task drives a model; merge/abandon/dedup housekeeping lives in the repo's CI now.
-# `progress` writes the per-roadmap STATUS.md / PROGRESS.md reports in TauCetiRoadmap.
+# `progress` writes the per-roadmap STATUS.md / PROGRESS.md reports in EpsilonEridaniRoadmap.
 ALLOWED_TASKS = ["rebase", "review", "fix-ci", "fix", "bump", "progress", "roadmap", "lint-repair"]
 
 WORK_TASKS = list(ALLOWED_TASKS)
@@ -301,7 +301,7 @@ KIND_BY_NAME = {name: num for num, name in KIND_KEYS.items()}  # "rebase" -> "1"
 # (opt in with --bubble; the host is the default).
 SANDBOX_DEFAULT = {t: True for t in WORK_TASKS}
 # `progress` is the exception: there is no untrusted checkout to confine. It needs `gh` against
-# TauCetiRoadmap (the bubble proxy is scoped to TauCeti) and the model is handed bounded text rather
+# EpsilonEridaniRoadmap (the bubble proxy is scoped to EpsilonEridani) and the model is handed bounded text rather
 # than a working tree to roam. Its remaining exposure — merged PR descriptions reaching the model — is
 # bounded by the merge gate, which only ever admits two markdown files in one directory.
 SANDBOX_DEFAULT["progress"] = False

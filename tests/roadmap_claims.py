@@ -14,7 +14,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-from tauceti_worker import intentions as it  # noqa: E402
+from epsiloneridani_worker import intentions as it  # noqa: E402
 
 fails = 0
 
@@ -46,7 +46,7 @@ check(
 )
 check(
     "parse_scope strips HTML-comment markers",
-    it.parse_scope('### Items in scope\n\nfoo <!--tauceti-claim:v1 {"x":1}--> bar') == "foo bar",
+    it.parse_scope('### Items in scope\n\nfoo <!--epsiloneridani-claim:v1 {"x":1}--> bar') == "foo bar",
 )
 check("parse_scope falls back to whole body when no section", it.parse_scope("just a sentence") == "just a sentence")
 check("parse_scope empty -> empty", it.parse_scope("") == "")

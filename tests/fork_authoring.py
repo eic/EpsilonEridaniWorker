@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fork-based PR authoring (kim-em/bubble#320 + TauCetiWorker fork migration).
+"""Fork-based PR authoring (kim-em/bubble#320 + EpsilonEridaniWorker fork migration).
 
 The worker authors and fixes from the contributor's OWN fork: the branch is pushed there and the PR
 is opened from it, so no canonical write access is needed (Bryan's report — a read-only account could
@@ -26,10 +26,10 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
-TAUCETI = tc.constants.TAUCETI  # "TauCetiProject/TauCeti"
-FORK = "alice/TauCeti"
+TAUCETI = tc.constants.TAUCETI  # "eic/EpsilonEridani"
+FORK = "alice/EpsilonEridani"
 fails = 0
 
 
@@ -83,17 +83,17 @@ def run_ensure_fork(scenario, env_fork=None):
 
 def test_ensure_fork():
     # existing fork resolved by parent (a same-named repo with a DIFFERENT parent must not match)
-    sc = {"repo_list": lambda: _repo_list_json("TauCetiProject", "TauCeti")}
+    sc = {"repo_list": lambda: _repo_list_json("eic", "EpsilonEridani")}
     check("ensure_fork: existing fork resolved by parent", run_ensure_fork(sc) == FORK)
 
     # resolve-by-parent: a same-named repo whose parent is someone ELSE is not our fork
-    tc.github.gh_run = fake_gh({"repo_list": lambda: _repo_list_json("SomeoneElse", "TauCeti", "alice/TauCeti")})
+    tc.github.gh_run = fake_gh({"repo_list": lambda: _repo_list_json("SomeoneElse", "EpsilonEridani", "alice/EpsilonEridani")})
     check("ensure_fork: wrong-parent same-name not matched", tc.github._find_fork() is None)
 
     # no fork yet -> create, then resolve (the list flips to the real fork after `gh repo fork`)
     sc = {
         "forked": False,
-        "repo_list": lambda: _repo_list_json("TauCetiProject", "TauCeti") if sc.get("forked") else "[]",
+        "repo_list": lambda: _repo_list_json("eic", "EpsilonEridani") if sc.get("forked") else "[]",
     }
     check("ensure_fork: absent -> create -> resolve", run_ensure_fork(sc) == FORK)
 
@@ -107,10 +107,10 @@ def test_ensure_fork():
 
     # $TAUCETI_FORK override wins with no repo-list call
     sc = {"repo_list": lambda: (_ for _ in ()).throw(AssertionError("should not list"))}
-    check("ensure_fork: $TAUCETI_FORK override", run_ensure_fork(sc, env_fork="bob/MyTauCeti") == "bob/MyTauCeti")
+    check("ensure_fork: $TAUCETI_FORK override", run_ensure_fork(sc, env_fork="bob/MyEpsilonEridani") == "bob/MyEpsilonEridani")
 
     # fork resolves but the account can't push to it -> Die (explicit false only; None fails open)
-    sc = {"repo_list": lambda: _repo_list_json("TauCetiProject", "TauCeti"), "can_push": "false"}
+    sc = {"repo_list": lambda: _repo_list_json("eic", "EpsilonEridani"), "can_push": "false"}
     try:
         run_ensure_fork(sc)
         check("ensure_fork: unpushable fork -> Die", False)
@@ -131,7 +131,7 @@ def test_fixlike():
     check("fixlike: deleted head -> skip (None, no bubble)", rc is None and not called)
 
     # valid fork head -> bubble gets allow_push=<head owner/repo>, target the PR
-    pr_ok = types.SimpleNamespace(number=7, head_owner="alice", head_repo="TauCeti", head_ref="roadmap/x", head="dead")
+    pr_ok = types.SimpleNamespace(number=7, head_owner="alice", head_repo="EpsilonEridani", head_ref="roadmap/x", head="dead")
     sv = types.SimpleNamespace(open_prs=[pr_ok])
     c = types.SimpleNamespace(pr=7, head="dead")
     cap = {}
@@ -141,7 +141,7 @@ def test_fixlike():
         rs=types.SimpleNamespace(bust=lambda *a: None),
     )
     tc.work_units._do_fixlike(w, sv, c, opts, True, prompt_file="fix.md", label="fix")
-    check("fixlike: fork head -> allow_push=owner/repo", cap.get("allow_push") == "alice/TauCeti")
+    check("fixlike: fork head -> allow_push=owner/repo", cap.get("allow_push") == "alice/EpsilonEridani")
     check("fixlike: target is the PR", cap.get("target") == f"{TAUCETI}/pull/7")
 
 

@@ -1,14 +1,14 @@
-name: tauceti-worker
+name: epsiloneridani-worker
 
 services:
-  tauceti:
+  epsiloneridani:
     build:
       context: .
-    image: tauceti-worker:local
+    image: epsiloneridani-worker:local
     init: true
     restart: unless-stopped
     stop_grace_period: 2m
-    command: ["./tauceti", "work", "--loop"]
+    command: ["./epsiloneridani", "work", "--loop"]
     environment:
       TAUCETI_WORKER_ID: docker
       TAUCETI_WORKER_ARGS: "${TAUCETI_WORKER_ARGS:-}"
@@ -25,14 +25,14 @@ services:
       # Lean toolchain remains image-owned so an image update cannot be hidden by a stale volume.
       - uv-cache:/root/.cache/uv
       # Checkouts, scheduler state, and durable per-round logs.
-      - checkouts:/opt/tauceti/checkouts
-      - state:/opt/tauceti/state
-      - logs:/opt/tauceti/logs
+      - checkouts:/opt/epsiloneridani/checkouts
+      - state:/opt/epsiloneridani/state
+      - logs:/opt/epsiloneridani/logs
 
   # Explicit setup runner: unlike the worker, this service mounts credentials read-write.
   # Run it only for the documented one-time login commands, never as a long-running service.
   auth:
-    image: tauceti-worker:local
+    image: epsiloneridani-worker:local
     profiles: [setup]
     stdin_open: true
     tty: true
@@ -46,15 +46,15 @@ services:
       - gh:/root/.config/gh
 
   # These are the only processes allowed to rotate each provider's shared refresh token.
-  # TauCeti's isolated worker home mirrors their access tokens, avoiding refresh-token races.
+  # EpsilonEridani's isolated worker home mirrors their access tokens, avoiding refresh-token races.
   claude-refresh:
-    image: tauceti-worker:local
+    image: epsiloneridani-worker:local
     init: true
     restart: unless-stopped
     # Exceed the refresher's 15-second HTTP timeout so Docker cannot kill it after
     # the server rotates a token but before the replacement is persisted.
     stop_grace_period: 60s
-    command: ["/usr/local/bin/tauceti-oauth-refresh", "claude"]
+    command: ["/usr/local/bin/epsiloneridani-oauth-refresh", "claude"]
     environment:
       TAUCETI_SKIP_GIT_IDENTITY: "1"
       TAUCETI_REFRESH_MIRROR: /worker-credentials/.credentials.json
@@ -63,11 +63,11 @@ services:
       - claude-worker:/worker-credentials
 
   codex-refresh:
-    image: tauceti-worker:local
+    image: epsiloneridani-worker:local
     init: true
     restart: unless-stopped
     stop_grace_period: 60s
-    command: ["/usr/local/bin/tauceti-oauth-refresh", "codex"]
+    command: ["/usr/local/bin/epsiloneridani-oauth-refresh", "codex"]
     environment:
       TAUCETI_SKIP_GIT_IDENTITY: "1"
       TAUCETI_REFRESH_MIRROR: /worker-credentials/auth.json

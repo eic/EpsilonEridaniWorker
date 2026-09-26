@@ -19,7 +19,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 HEAD = "a7952da7d6c21accf63db1163faa24a04c0c57e8"
 OLD = "0000000000000000000000000000000000000000"

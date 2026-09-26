@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Bootstrap control: WHEN TauCeti may spend a Claude request to open a reset-but-unopened window.
+"""Bootstrap control: WHEN EpsilonEridani may spend a Claude request to open a reset-but-unopened window.
 
 Four properties, none of which the parser alone can give you:
 
-  PURE OBSERVATION      Reading quota never spends. A dashboard refresh, `tauceti status`, and an
+  PURE OBSERVATION      Reading quota never spends. A dashboard refresh, `epsiloneridani status`, and an
                         `auto` selection that inspects Claude and then picks codex must all make zero
                         Claude requests.
   LAUNCH STAGE          The one controlled side effect happens only when there is real work to run,
@@ -12,7 +12,7 @@ Four properties, none of which the parser alone can give you:
                         active with positive headroom.
   PACE POLICY           A bootstrap is spending, so it obeys the operator's curve. Under a curve whose
                         budget stays 0 for the first τ₀% of a window, a fresh window may not be opened
-                        at all — and TauCeti cannot wait τ₀ out, because an unopened window has no
+                        at all — and EpsilonEridani cannot wait τ₀ out, because an unopened window has no
                         clock. It blocks and says so rather than manufacturing one.
   DURABLE RESERVATION   The claim is written, fsynced and locked BEFORE the request, shared by every
                         worker on the account. A crash between claim and request cannot license a
@@ -34,7 +34,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
-import tauceti_worker as tc
+import epsiloneridani_worker as tc
 
 fails = 0
 
@@ -512,9 +512,9 @@ tc.quota.CLAUDE_BOOTSTRAP_TIMEOUT_S = 1
 ok, detail = q._claude_bootstrap_request()
 check("a hanging claude is bounded by the timeout", (ok, detail.endswith("timed out after 1s")), (False, True))
 tc.quota.CLAUDE_CMD = stub_claude("count.sh", "exit 0")
-before = len(list(Path(tempfile.gettempdir()).glob("tauceti-quota-bootstrap-*")))
+before = len(list(Path(tempfile.gettempdir()).glob("epsiloneridani-quota-bootstrap-*")))
 q._claude_bootstrap_request()
-check("the temp cwd is cleaned up", len(list(Path(tempfile.gettempdir()).glob("tauceti-quota-bootstrap-*"))), before)
+check("the temp cwd is cleaned up", len(list(Path(tempfile.gettempdir()).glob("epsiloneridani-quota-bootstrap-*"))), before)
 
 print(f"\n{'PASS' if not fails else 'FAIL'}: {fails} mismatch(es)")
 sys.exit(1 if fails else 0)
