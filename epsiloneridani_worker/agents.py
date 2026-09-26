@@ -607,6 +607,11 @@ def host_agent_argv(prompt: str, profile: AuthoringProfile | str) -> tuple[list[
             argv += ["-c", f'model_reasoning_effort="{profile.effort}"']
         argv += ["-c", 'model_reasoning_summary="detailed"', "-c", "show_raw_agent_reasoning=false"]
         argv += ["--sandbox", "danger-full-access", "--skip-git-repo-check", prompt]
+    elif profile.provider == "gemini":
+        argv = ["gemini-cli", "--model", profile.model]
+        if profile.effort:
+            argv += ["--effort", profile.effort]
+        argv += ["--prompt", prompt]
     elif profile.provider == "kiro":
         # --model is mandatory: Kiro's Auto router is never allowed to choose on
         # the worker's behalf. Isolate its platform credential store for API-key
@@ -1266,6 +1271,13 @@ def agent_inner_cmd(profile: AuthoringProfile | str) -> str:
             f"pi --provider openrouter --model {shlex.quote(profile.model)} --print "
             '"$(cat /opt/round/prompt.txt)"'
         )
+    if profile.provider == "gemini":
+        effort = f" --effort {shlex.quote(profile.effort)}" if profile.effort else ""
+        return (
+            "env GEMINI_API_KEY=\"$(cat /opt/round/gemini.key)\" "
+            f"gemini-cli --model {shlex.quote(profile.model)}{effort} "
+            f"\"--prompt\" \"$(cat /opt/round/prompt.txt)\""
+        )
     if profile.provider == "kiro":
         effort = f" --effort {shlex.quote(profile.effort)}" if profile.effort else ""
         setup = (
@@ -1431,6 +1443,10 @@ def run_in_bubble(
     if wm in OPENROUTER_MODELS:  # OpenRouter key has no proxy — stage it 0600, mounted read-only
         keyf = rounddir / "openrouter.key"
         keyf.write_text(os.environ.get("OPENROUTER_API_KEY", ""))
+        os.chmod(keyf, 0o600)
+    if wm == "gemini":
+        keyf = rounddir / "gemini.key"
+        keyf.write_text(os.environ.get("GEMINI_API_KEY", ""))
         os.chmod(keyf, 0o600)
     if _uses_kiro_credentials(cred_model):
         # Prefer API-key authentication. Otherwise snapshot the browser login;
