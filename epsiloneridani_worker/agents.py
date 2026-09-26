@@ -608,7 +608,7 @@ def host_agent_argv(prompt: str, profile: AuthoringProfile | str) -> tuple[list[
         argv += ["-c", 'model_reasoning_summary="detailed"', "-c", "show_raw_agent_reasoning=false"]
         argv += ["--sandbox", "danger-full-access", "--skip-git-repo-check", prompt]
     elif profile.provider == "gemini":
-        argv = ["gemini-cli", "--model", profile.model]
+        argv = ["agy", "--model", profile.model]
         if profile.effort:
             argv += ["--effort", profile.effort]
         argv += ["--prompt", prompt]
@@ -1275,7 +1275,7 @@ def agent_inner_cmd(profile: AuthoringProfile | str) -> str:
         effort = f" --effort {shlex.quote(profile.effort)}" if profile.effort else ""
         return (
             "env GEMINI_API_KEY=\"$(cat /opt/round/gemini.key)\" "
-            f"gemini-cli --model {shlex.quote(profile.model)}{effort} "
+            f"agy --model {shlex.quote(profile.model)}{effort} "
             f"\"--prompt\" \"$(cat /opt/round/prompt.txt)\""
         )
     if profile.provider == "kiro":

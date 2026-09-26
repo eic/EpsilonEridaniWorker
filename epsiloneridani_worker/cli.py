@@ -984,7 +984,7 @@ def cmd_doctor(args) -> int:
     rows.append(("lake", _have("lake"), "host authoring (the default) builds with it"))
     rows.append(("pi", _have("pi"), "for --agent deepseek/minimax"))
     rows.append(("kiro-cli", _have("kiro-cli"), "for --agent kiro"))
-    rows.append(("gemini-cli", _have("gemini-cli"), "for --agent gemini"))
+    rows.append(("agy", _have("agy"), "for --agent gemini"))
     rows.append(("tmux", _have("tmux"), "optional `epsiloneridani workers tmux` log workspace"))
     codex_creds = codex_dir(cfg.home) / "auth.json"
     rows.append(("codex creds", _safe_exists(codex_creds), str(codex_creds)))
