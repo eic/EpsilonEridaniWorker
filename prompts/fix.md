@@ -27,7 +27,7 @@ For each finding, judge whether it is actually correct:
 
 ## Verify before pushing (all three MUST pass)
 ```
-lake exe cache get
+lake exe cache get Mathlib Physlib TauCeti
 lake build
 lake exe axioms
 ```

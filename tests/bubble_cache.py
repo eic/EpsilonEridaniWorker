@@ -30,7 +30,7 @@ def check(name, ok):
 
 inner = "env OPENAI_API_KEY= agent --do-work"
 bootstrap = tc.bubble_work_cmd(inner)
-mathlib_i = bootstrap.index("lake exe cache get")
+mathlib_i = bootstrap.index("lake exe cache get Mathlib Physlib TauCeti")
 epsiloneridani_i = bootstrap.index("lake cache get")
 build_i = bootstrap.index("lake build")
 agent_i = bootstrap.index("exec " + inner)
@@ -216,7 +216,7 @@ try:
     )
     check("work round grants the EpsilonEridani download cache", cache_grant in work_argv)
     check("work round does not expose the upstream domain directly", "--allow-domain" not in work_argv)
-    check("work round runs both cache commands", "lake exe cache get" in work_argv and "lake cache get" in work_argv)
+    check("work round runs both cache commands", "lake exe cache get Mathlib Physlib TauCeti" in work_argv and "lake cache get" in work_argv)
     check("work round stages no competing Lake config", not (cfg.state / "bubble-round" / "lake-cache.toml").exists())
 
     out = io.StringIO()
@@ -225,7 +225,7 @@ try:
     review_argv = out.getvalue()
     check("review/probe echo succeeds", rc == 0)
     check("review/probe does not add a cache capability", "--lake-cache-service" not in review_argv)
-    check("review/probe command is not wrapped in a build", "lake exe cache get" not in review_argv)
+    check("review/probe command is not wrapped in a build", "lake exe cache get Mathlib Physlib TauCeti" not in review_argv)
 finally:
     os.environ.pop("TAUCETI_AGENT_ECHO", None)
     tc.agents.ensure_bubble_home = saved_home

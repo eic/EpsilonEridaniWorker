@@ -15,7 +15,7 @@ normally lives under the toolchain directory, it is written during builds rather
 install, and nothing here has established that concurrent writers are safe.
 
 Mathlib's `.ltar` cache is NOT pooled by pointing workers at one directory, which was this module's
-first design and was wrong. `lake exe cache get` takes no lock, and until every checkout runs a
+first design and was wrong. `lake exe cache get Mathlib Physlib TauCeti` takes no lock, and until every checkout runs a
 Mathlib new enough to carry per-process temporary names (leanprover-community/mathlib4#42752), two
 concurrent runs in one directory share `curl.cfg` and share each `<hash>.ltar.part`. The bad outcome
 is not a failed round: it is a corrupt `.ltar` left under a name the cache trusts forever after, for
@@ -120,7 +120,7 @@ def mathlib_pool(host_home: Path, env: dict[str, str] | None = None) -> Path:
     """Where the machine keeps its shared `.ltar`s.
 
     Follows the same order Mathlib's own cache tool uses, so the pool is the directory the operator's
-    interactive `lake exe cache get` already fills: an explicit `MATHLIB_CACHE_DIR`, else
+    interactive `lake exe cache get Mathlib Physlib TauCeti` already fills: an explicit `MATHLIB_CACHE_DIR`, else
     `XDG_CACHE_HOME/mathlib`, else `~/.cache/mathlib` under the LOGIN user's home rather than the
     per-worker one."""
     env = os.environ if env is None else env

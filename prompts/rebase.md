@@ -23,7 +23,7 @@ Merging upstream workflow or pin changes as part of bringing in `main` is expect
 
 ## Verify before pushing (all three MUST pass, after the merge/rebase)
 ```
-lake exe cache get
+lake exe cache get Mathlib Physlib TauCeti
 lake build
 lake exe axioms
 ```

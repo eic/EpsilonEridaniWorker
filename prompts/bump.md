@@ -6,7 +6,7 @@ You are adapting eic/EpsilonEridani, an AIs-welcome Lean 4 library downstream of
 
 ## Reproduce and adapt
 ```
-lake exe cache get
+lake exe cache get Mathlib Physlib TauCeti
 git fetch -q origin main
 shim_args=(--fail-on-available); base_shims="$(mktemp)"; base_root="$(mktemp -d)"
 base_ref="$(git merge-base origin/main HEAD)"
@@ -29,7 +29,7 @@ lake exe axioms
 
 ## Verify before pushing (all three MUST pass)
 ```
-lake exe cache get
+lake exe cache get Mathlib Physlib TauCeti
 git fetch -q origin main
 shim_args=(--fail-on-available); base_shims="$(mktemp)"; base_root="$(mktemp -d)"
 base_ref="$(git merge-base origin/main HEAD)"

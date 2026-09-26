@@ -28,7 +28,7 @@ That isolation matters most for review, where the agent reads untrusted PRs.
 ## Lake caches
 
 Before the work agent starts, the worker fetches Mathlib's prebuilt outputs with
-`lake exe cache get`, fetches EpsilonEridani's own main-built outputs with
+`lake exe cache get Mathlib Physlib TauCeti`, fetches EpsilonEridani's own main-built outputs with
 `lake cache get`, and runs an advisory `lake build`. A red tree still reaches the
 repair agent.
 

@@ -7,7 +7,7 @@ the elan toolchain directory per-worker, so on a five-worker fleet half of one w
 covered 6 distinct toolchains. Two different fixes, because the two caches are written differently:
 
   * toolchains are shared outright (`ELAN_HOME`), since an install takes a lock and lands by rename;
-  * Mathlib's cache is NOT, because `lake exe cache get` takes no lock and older checkouts write
+  * Mathlib's cache is NOT, because `lake exe cache get Mathlib Physlib TauCeti` takes no lock and older checkouts write
     fixed-name temporaries, so two workers in one directory can leave a corrupt `.ltar` under a name
     every later run trusts. It is pooled by hardlinking COMPLETE files instead, before the agent runs.
   * Lake's own store stays per-worker: it is written throughout a build, not once at install.

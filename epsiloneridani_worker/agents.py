@@ -454,7 +454,7 @@ def sync_mathlib_pool(cfg: Config) -> None:
 
     This is how the Mathlib cache is shared without pointing two unlocked downloaders at one
     directory: the worker promotes what it fetched last round, then takes a link to everything the
-    pool has that it lacks, so `lake exe cache get` downloads only what nobody here has and still
+    pool has that it lacks, so `lake exe cache get Mathlib Physlib TauCeti` downloads only what nobody here has and still
     writes nowhere another process can see. Best effort — a worker that cannot reach the pool
     downloads more, which is slow rather than wrong. It must run before the agent starts, since the
     worker's own directory is only quiescent until then."""
@@ -671,7 +671,7 @@ _API_ERROR_RE = re.compile(r"API Error:\s*(\d{3})\b", re.I)
 # A refund asserts "the agent never ran", so only a log with nothing in it BUT the failure qualifies.
 # The log is a combined stdout+stderr transcript: agent prose, tool output, test output, and under
 # bubble the pre-agent build. Scanning that for a status number refunds a genuine task failure whose
-# transcript merely quotes one — a flaky `lake exe cache get` that the agent recovered from, a test
+# transcript merely quotes one — a flaky `lake exe cache get Mathlib Physlib TauCeti` that the agent recovered from, a test
 # asserting on an error string, the agent reading a log. Requiring the whole transcript to be this
 # short is what distinguishes "the call never happened" from "the call happened and something later
 # went wrong", and it is the claim the refund actually makes.
@@ -880,7 +880,7 @@ BUBBLE_MIN_VERSION = "0.7.30"
 KIRO_BUBBLE_MIN_VERSION = "0.7.31"
 
 # EpsilonEridani's public, anonymous Lake artifact cache. Mathlib's separate cache is fetched by
-# `lake exe cache get`; this one contains EpsilonEridani's own main-built outputs.
+# `lake exe cache get Mathlib Physlib TauCeti`; this one contains EpsilonEridani's own main-built outputs.
 #
 # The custom domain, NOT the bucket's `pub-<id>.r2.dev` development URL. That development URL is
 # disabled on this bucket and answers 401 for every path, root included, so every round's
@@ -1313,7 +1313,7 @@ def bubble_work_cmd(inner: str) -> str:
     fetch = f"lake cache get --service {TAUCETI_CACHE_SERVICE} --repo {TAUCETI}"
     return (
         "set -e; "
-        "lake exe cache get || lake exe cache get; "
+        "lake exe cache get Mathlib Physlib TauCeti || lake exe cache get Mathlib Physlib TauCeti; "
         'tc_log="$(mktemp)"; tc_hit=0; tc_cold=0; '
         # Two attempts, because a dropped connection is worth one retry, but stop immediately when
         # Lake reports the revision simply is not cached: retrying cannot change that answer.
@@ -1692,7 +1692,7 @@ def share_build_caches(wid: str, data_home: Path) -> dict[str, str]:
     the worker's own data root. That also keeps a per-worker experiment with `LAKE_ARTIFACT_CACHE`
     honest, since the store it fills is then that worker's alone.
 
-    Mathlib's `.ltar` cache also stays per-worker — as the download target. `lake exe cache get` takes
+    Mathlib's `.ltar` cache also stays per-worker — as the download target. `lake exe cache get Mathlib Physlib TauCeti` takes
     no lock and, in any checkout older than mathlib4#42752, writes fixed-name temporaries, so pointing
     two workers at one directory risks a corrupt `.ltar` under a name every later run trusts. It is
     pooled instead by hardlink, before the agent starts; see `epsiloneridani_worker.build_caches`.

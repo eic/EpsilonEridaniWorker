@@ -182,7 +182,7 @@ Flags win over these. Most are tuning knobs with sane defaults.
 | `TAUCETI_STREAM` | — | `1` is the same as `--stream`. |
 | `CLAUDE_CONFIG_DIR` | `~/.claude` | Claude config/credential source (account switching; Bubble uses a private transient handoff on macOS). |
 | `ELAN_HOME` | login user's `~/.elan` | Lean toolchains, shared by every worker: an install takes a lock and lands by rename. |
-| `MATHLIB_CACHE_DIR` | `<worker state>/.cache/mathlib` | Where this worker downloads Mathlib artifacts. Private, because `lake exe cache get` takes no lock; finished files are exchanged with the machine pool by hardlink before each round. |
+| `MATHLIB_CACHE_DIR` | `<worker state>/.cache/mathlib` | Where this worker downloads Mathlib artifacts. Private, because `lake exe cache get Mathlib Physlib TauCeti` takes no lock; finished files are exchanged with the machine pool by hardlink before each round. |
 | `TAUCETI_MATHLIB_POOL` | `$XDG_CACHE_HOME/mathlib`, else login user's `~/.cache/mathlib` | The pool those hardlinks go to and come from. |
 | `LAKE_CACHE_DIR` | `<worker state>/.cache/lake` | Lake's own build-output cache. Per-worker: unlike a toolchain install it is written throughout a build. |
 | `LAKE_ARTIFACT_CACHE` | `1` | Keep local build outputs in Lake's artifact store so later rounds can reuse them. |

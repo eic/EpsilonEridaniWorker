@@ -29,7 +29,7 @@ The PR body and its comments list the violations the daily lint found, but alway
 
 ## Verify before pushing (ALL of these MUST pass — they are what the `build` check runs)
 ```
-lake exe cache get
+lake exe cache get Mathlib Physlib TauCeti
 git fetch -q origin main
 shim_args=(--fail-on-available); base_shims="$(mktemp)"; base_root="$(mktemp -d)"; have_base=0
 base_ref="$(git merge-base origin/main HEAD)"
