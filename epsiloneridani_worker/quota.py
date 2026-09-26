@@ -2136,6 +2136,25 @@ class Quota:
         return min(blocked) if blocked else None
 
     # --- selection ---------------------------------------------------------
+    def gemini(self, *, refresh: bool = False) -> Provider:
+        # Check if agy or gemini-cli is installed
+        import shutil
+        import os
+        from epsiloneridani_worker.constants import AUTHORING_DEFAULTS
+        
+        has_cli = shutil.which("agy") or shutil.which("gemini-cli")
+        if not has_cli:
+            return Provider("gemini", False, None, error="no agy or gemini-cli on PATH")
+        
+        has_key = bool(os.environ.get("GEMINI_API_KEY"))
+        has_agy_auth = os.path.isdir(os.path.expanduser("~/.gemini/antigravity-cli"))
+        
+        if not has_key and not has_agy_auth:
+            return Provider("gemini", False, None, error="no GEMINI_API_KEY or ~/.gemini/antigravity-cli")
+            
+        model = AUTHORING_DEFAULTS.get("gemini", ("gemini-1.5-pro", "high"))[0]
+        return Provider("gemini", True, model)
+
     def choose(self, forced: str | None, *, refresh: bool = False, renew: bool = False) -> tuple[str | None, dict]:
         """Return (agent_to_run_now or None, {codex: Provider, claude: Provider}).
 
@@ -2150,16 +2169,23 @@ class Quota:
             snap["codex"] = self.codex(refresh=refresh)
         if forced in (None, "auto", "claude"):
             snap["claude"] = self.claude(refresh=refresh, renew=renew)
+        if forced in (None, "auto", "gemini"):
+            snap["gemini"] = self.gemini(refresh=refresh)
         codex_ok = snap.get("codex") and snap["codex"].available
         opus_ok = snap.get("claude") and snap["claude"].available
+        gemini_ok = snap.get("gemini") and snap["gemini"].available
         if forced == "codex":
             return ("codex" if codex_ok else None), snap
         if forced == "claude":
             return ("claude" if opus_ok else None), snap
+        if forced == "gemini":
+            return ("gemini" if gemini_ok else None), snap
         if codex_ok:
             return "codex", snap
         if opus_ok:
             return "claude", snap
+        if gemini_ok:
+            return "gemini", snap
         return None, snap
 
 
@@ -2240,7 +2266,7 @@ def quota_line(snap: dict, *, markup: bool = True) -> str:
     """One-line quota summary from a {provider: Provider} snapshot. `markup=False` for any destination
     that is not a Rich console: log(), an on-disk log, a runtime-status detail."""
     parts = []
-    for name in ("codex", "claude"):
+    for name in ("codex", "claude", "gemini"):
         prov = snap.get(name)
         if prov is None:
             continue
