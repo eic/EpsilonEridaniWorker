@@ -233,6 +233,7 @@ REVIEW_INPROGRESS_RE = re.compile(r"<!--epsiloneridani-review-in-progress (.*?)-
 OPENROUTER_MODELS = {
     "deepseek": os.environ.get("DEEPSEEK_MODEL", "deepseek/deepseek-v4-pro"),
     "minimax": os.environ.get("MINIMAX_MODEL", "minimax/minimax-m3"),
+    "gemini": os.environ.get("GEMINI_MODEL", "google/gemini-1.5-pro"),
 }
 
 AGENT_NAMES = {
@@ -241,6 +242,7 @@ AGENT_NAMES = {
     "kiro": "Kiro",
     "deepseek": "DeepSeek",
     "minimax": "MiniMax",
+    "gemini": "Gemini",
 }
 
 # Reproducible authoring defaults. Provider selection remains quota-driven; once
@@ -307,4 +309,4 @@ SANDBOX_DEFAULT = {t: True for t in WORK_TASKS}
 SANDBOX_DEFAULT["progress"] = False
 
 
-AGENTS = ["auto", "codex", "claude", "kiro", "deepseek", "minimax"]
+AGENTS = ["auto", "codex", "claude", "kiro", "deepseek", "minimax", "gemini"]

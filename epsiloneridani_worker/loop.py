@@ -285,7 +285,7 @@ def choose_model(
     """Decide which model to run now. With --quota-cmd / TAUCETI_QUOTA_CMD set, consult that external
     command instead of the built-in pacer (the escape hatch for e.g. a multi-account scheme): run
     `<quota_cmd> <agent>`; its first stdout token is the model to run
-    (codex/claude/kiro/deepseek/minimax)
+    (codex/claude/kiro/deepseek/minimax/gemini)
     or empty = none available. Otherwise use the self-contained pacer.
 
     This is a pure READ: choosing a model never spends quota. In particular an `auto` selection that

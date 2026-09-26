@@ -184,7 +184,7 @@ def add_work_flags(p: argparse.ArgumentParser) -> None:
         choices=AGENTS,
         default=None,
         help="which agent to run: auto (Codex preferred, Opus fallback), codex, claude, "
-        "kiro (exact model, subscription credits), or deepseek/minimax (pay-per-token "
+        "kiro (exact model, subscription credits), or deepseek/minimax/gemini (pay-per-token "
         "OpenRouter). Kiro/OpenRouter are explicit-only and unpaced "
         "(default: $TAUCETI_AGENT or auto)",
     )
@@ -982,7 +982,7 @@ def cmd_doctor(args) -> int:
     rows.append(("bubble", _have("bubble"), "stable install required for real --bubble rounds"))
     rows.append(("incus", _have("incus"), "bubble's container runtime — only needed for --bubble"))
     rows.append(("lake", _have("lake"), "host authoring (the default) builds with it"))
-    rows.append(("pi", _have("pi"), "for --agent deepseek/minimax"))
+    rows.append(("pi", _have("pi"), "for --agent deepseek/minimax/gemini"))
     rows.append(("kiro-cli", _have("kiro-cli"), "for --agent kiro"))
     rows.append(("tmux", _have("tmux"), "optional `epsiloneridani workers tmux` log workspace"))
     codex_creds = codex_dir(cfg.home) / "auth.json"

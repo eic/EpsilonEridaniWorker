@@ -109,7 +109,7 @@ def want(only: list[str], task: str) -> bool:
 @dataclass
 class RoundOpts:
     only: list[str]
-    agent: str  # auto|codex|claude|kiro|deepseek|minimax (the requested dial)
+    agent: str  # auto|codex|claude|kiro|deepseek|minimax|gemini (the requested dial)
     work_model: str  # the concrete model to run, or 'auto' for dry-run
     sandbox_host: bool  # True = run on the host (the default); False = --bubble (use the sandbox)
     dry_run: bool
