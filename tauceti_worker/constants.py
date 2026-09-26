@@ -6,19 +6,19 @@ from __future__ import annotations
 import os
 import re
 
-TAUCETI = "TauCetiProject/TauCeti"
+TAUCETI = "eic/EpsilonEridani"
 
 TAUCETI_OWNER = TAUCETI.split("/", 1)[0]  # base-repo owner: a bot PR is first-party iff its head lives here
 
-ROADMAP = "TauCetiProject/TauCetiRoadmap"
+ROADMAP = "eic/EpsilonEridaniRoadmap"
 
-REVIEW = "TauCetiProject/TauCetiReview"
+REVIEW = "eic/EpsilonEridaniReview"
 
 # The shared cooperative-claim namespace: a repository that holds nothing but `refs/tauceti-claims/*`
 # leases, so operators can coordinate without anyone holding write access to canonical. Push access is
 # granted automatically to the author of any merged TauCeti PR (canonical's `claims-access` workflow);
 # until then a worker claims in its own fork instead. See github.claims_repo.
-CLAIMS = "TauCetiProject/tauceti-claims"
+CLAIMS = "eic/epsiloneridani-claims"
 
 
 # Per-PR budgets (a PR can never churn forever).
@@ -46,7 +46,7 @@ REVIEW_PROVIDER_DOWN_EXIT = 3
 # merge gate in TauCetiRoadmap must run the SAME version, or the worker can emit headers the gate does
 # not recognise and every report wedges. Bump this together with the two pins in
 # TauCetiRoadmap/.github/workflows/progress-*.yml.
-PROGRESS = os.environ.get("TAUCETI_PROGRESS_REPO", "TauCetiProject/TauCetiProgress")
+PROGRESS = os.environ.get("TAUCETI_PROGRESS_REPO", "eic/EpsilonEridaniProgress")
 PROGRESS_REF = os.environ.get("TAUCETI_PROGRESS_REF", "6d26dd3ebcee77d49c10355cce9daf632cc03325")
 PROGRESS_TTL = int(os.environ.get("TAUCETI_PROGRESS_TTL", "600"))  # seconds a `due` verdict stays fresh
 MAX_PROGRESS_ERRORS = 3  # consecutive failed progress rounds before backing off
