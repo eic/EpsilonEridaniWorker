@@ -76,7 +76,7 @@ def main():
         home = iso_home_base("a-sixteen-char-id", long_base)
         socklen = len(str(home / LIMA_SOCK))
         check(f"darwin long-root home fits ({socklen})", socklen < UNIX_PATH_MAX)
-        check("darwin long-root anchored under .epsiloneridani", home.parent.name == ".epsiloneridani")
+        check("darwin long-root anchored under .eic", home.parent.name == ".eic")
         check(
             "darwin long-root deterministic",
             iso_home_base("a-sixteen-char-id", long_base) == iso_home_base("a-sixteen-char-id", long_base),

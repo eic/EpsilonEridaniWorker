@@ -1664,7 +1664,7 @@ def _worker_iso_home(wid: str, _base: Path | None = None) -> Path:
             base = Path(pwd.getpwuid(os.getuid()).pw_dir)
         except (ImportError, KeyError, OSError):
             base = Path(os.path.expanduser("~"))
-    root = base / ".epsiloneridani"
+    root = base / ".eic"
     # colima binds <home>/.colima/_lima/<profile>/ssh.sock.<16-digit id>; keep that whole path strictly
     # under UNIX_PATH_MAX (104) by bounding the per-worker component.
     sock_suffix = len("/.colima/_lima/colima-bubble-colima/ssh.sock.") + 16

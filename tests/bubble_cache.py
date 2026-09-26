@@ -60,7 +60,7 @@ lake.write_text(
     "#!/bin/sh\n"
     'printf "%s\\n" "$*" >> "$LAKE_CALLS"\n'
     'case "$*" in\n'
-    '  "exe cache get") exit "${MATHLIB_RC:-0}" ;;\n'
+    '  "exe cache get"*) exit "${MATHLIB_RC:-0}" ;;\n'
     '  cache\\ get*) [ -n "$TAUCETI_MSG" ] && printf "%s\\n" "$TAUCETI_MSG"; exit "${TAUCETI_RC:-0}" ;;\n'
     '  build) exit "${BUILD_RC:-0}" ;;\n'
     "esac\n"
@@ -89,7 +89,7 @@ def run_bootstrap(*, mathlib=0, epsiloneridani=0, build=0, epsiloneridani_msg=""
 
 result, lake_calls = run_bootstrap(mathlib=1)
 check("Mathlib cache failure blocks the agent", result.returncode != 0 and not marker.exists())
-check("Mathlib cache gets one retry", lake_calls == ["exe cache get", "exe cache get"])
+check("Mathlib cache gets one retry", lake_calls == ["exe cache get Mathlib Physlib TauCeti", "exe cache get Mathlib Physlib TauCeti"])
 
 result, _ = run_bootstrap(epsiloneridani=1)
 check("EpsilonEridani cache miss still launches the agent", result.returncode == 0 and marker.exists())
