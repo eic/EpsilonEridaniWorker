@@ -50,7 +50,9 @@ def run(sub, stdout="", stderr="", logdir=None, logger=None):
     """Drive the helper, capturing what it sends to the main log. Returns (reason, lines)."""
     lines = []
     w = SimpleNamespace(cfg=SimpleNamespace(logdir=logdir))
-    proc = subprocess.CompletedProcess(args=["epsiloneridani-progress", sub], returncode=1, stdout=stdout, stderr=stderr)
+    proc = subprocess.CompletedProcess(
+        args=["epsiloneridani-progress", sub], returncode=1, stdout=stdout, stderr=stderr
+    )
     saved = tc.work_units.log
     tc.work_units.log = logger or (lambda msg="": lines.append(str(msg)))
     try:

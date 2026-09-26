@@ -137,7 +137,9 @@ def kiro_process_env(
         root = private_root
         if root is None:
             state = env.get("TAUCETI_DATA_HOME")
-            root = Path(state) / "kiro-api-profile" if state else Path(env.get("HOME", ".")) / ".epsiloneridani-kiro-api"
+            root = (
+                Path(state) / "kiro-api-profile" if state else Path(env.get("HOME", ".")) / ".epsiloneridani-kiro-api"
+            )
         env["KIRO_HOME"] = str(root / "home")
         if sys.platform == "darwin":
             env["HOME"] = str(root / "profile")

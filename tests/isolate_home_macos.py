@@ -109,7 +109,11 @@ with tempfile.TemporaryDirectory() as root:
     check("macOS redirects HOME only for Kiro", env["TAUCETI_KIRO_PROCESS_HOME"], str(iso))
     check("data root is exported", env["TAUCETI_DATA_HOME"], str(iso))
     check("codex credential is copied in", (iso / ".codex" / "auth.json").exists(), True)
-    check("codex source marker recorded", (iso / ".codex" / ".epsiloneridani-creds-source").read_text(), str(real / ".codex"))
+    check(
+        "codex source marker recorded",
+        (iso / ".codex" / ".epsiloneridani-creds-source").read_text(),
+        str(real / ".codex"),
+    )
     check(
         "Kiro credential database is snapshotted",
         (iso / "Library" / "Application Support" / "kiro-cli" / "data.sqlite3").exists(),

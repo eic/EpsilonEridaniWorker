@@ -58,7 +58,9 @@ try:
     check("claude_dir agrees with the spawned claude", tc.claude_dir(iso_home), iso_claude)
     creds = json.loads((tc.claude_dir(iso_home) / ".credentials.json").read_text())
     check("isolated creds are the operator's", creds["claudeAiOauth"]["accessToken"], "T")
-    check("isolation records the source", (iso_claude / ".epsiloneridani-creds-source").read_text().strip(), str(cfgdir))
+    check(
+        "isolation records the source", (iso_claude / ".epsiloneridani-creds-source").read_text().strip(), str(cfgdir)
+    )
 finally:
     shutil.rmtree(tc.HERE / "state" / wid, ignore_errors=True)
     shutil.rmtree(tmp, ignore_errors=True)

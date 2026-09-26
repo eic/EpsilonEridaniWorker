@@ -133,7 +133,10 @@ out = event(
         },
     },
 )
-check("Codex file changes list actions and paths", "- update EpsilonEridani/A.lean" in out and "- add EpsilonEridani/B.lean" in out)
+check(
+    "Codex file changes list actions and paths",
+    "- update EpsilonEridani/A.lean" in out and "- add EpsilonEridani/B.lean" in out,
+)
 check("Codex file changes contain no diff", "diff --git" not in out and "@@" not in out)
 
 out = event(

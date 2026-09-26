@@ -514,7 +514,11 @@ check("a hanging claude is bounded by the timeout", (ok, detail.endswith("timed 
 tc.quota.CLAUDE_CMD = stub_claude("count.sh", "exit 0")
 before = len(list(Path(tempfile.gettempdir()).glob("epsiloneridani-quota-bootstrap-*")))
 q._claude_bootstrap_request()
-check("the temp cwd is cleaned up", len(list(Path(tempfile.gettempdir()).glob("epsiloneridani-quota-bootstrap-*"))), before)
+check(
+    "the temp cwd is cleaned up",
+    len(list(Path(tempfile.gettempdir()).glob("epsiloneridani-quota-bootstrap-*"))),
+    before,
+)
 
 print(f"\n{'PASS' if not fails else 'FAIL'}: {fails} mismatch(es)")
 sys.exit(1 if fails else 0)

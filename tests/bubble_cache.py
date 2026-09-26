@@ -89,7 +89,10 @@ def run_bootstrap(*, mathlib=0, epsiloneridani=0, build=0, epsiloneridani_msg=""
 
 result, lake_calls = run_bootstrap(mathlib=1)
 check("Mathlib cache failure blocks the agent", result.returncode != 0 and not marker.exists())
-check("Mathlib cache gets one retry", lake_calls == ["exe cache get Mathlib Physlib TauCeti", "exe cache get Mathlib Physlib TauCeti"])
+check(
+    "Mathlib cache gets one retry",
+    lake_calls == ["exe cache get Mathlib Physlib TauCeti", "exe cache get Mathlib Physlib TauCeti"],
+)
 
 result, _ = run_bootstrap(epsiloneridani=1)
 check("EpsilonEridani cache miss still launches the agent", result.returncode == 0 and marker.exists())
@@ -107,7 +110,8 @@ check("a cold revision still launches the agent", result.returncode == 0 and mar
 check("a cold revision is reported as cold", "holds no outputs for this revision" in result.stderr)
 check("a cold revision is not reported as an endpoint failure", "did not answer" not in result.stderr)
 check(
-    "a cold revision is not retried", lake_calls.count("cache get --service epsiloneridani-public --repo " + tc.TAUCETI) == 1
+    "a cold revision is not retried",
+    lake_calls.count("cache get --service epsiloneridani-public --repo " + tc.TAUCETI) == 1,
 )
 
 result, lake_calls = run_bootstrap(epsiloneridani=1, epsiloneridani_msg="curl: (22) The requested URL returned 401")
@@ -216,7 +220,10 @@ try:
     )
     check("work round grants the EpsilonEridani download cache", cache_grant in work_argv)
     check("work round does not expose the upstream domain directly", "--allow-domain" not in work_argv)
-    check("work round runs both cache commands", "lake exe cache get Mathlib Physlib TauCeti" in work_argv and "lake cache get" in work_argv)
+    check(
+        "work round runs both cache commands",
+        "lake exe cache get Mathlib Physlib TauCeti" in work_argv and "lake cache get" in work_argv,
+    )
     check("work round stages no competing Lake config", not (cfg.state / "bubble-round" / "lake-cache.toml").exists())
 
     out = io.StringIO()
@@ -225,7 +232,10 @@ try:
     review_argv = out.getvalue()
     check("review/probe echo succeeds", rc == 0)
     check("review/probe does not add a cache capability", "--lake-cache-service" not in review_argv)
-    check("review/probe command is not wrapped in a build", "lake exe cache get Mathlib Physlib TauCeti" not in review_argv)
+    check(
+        "review/probe command is not wrapped in a build",
+        "lake exe cache get Mathlib Physlib TauCeti" not in review_argv,
+    )
 finally:
     os.environ.pop("TAUCETI_AGENT_ECHO", None)
     tc.agents.ensure_bubble_home = saved_home

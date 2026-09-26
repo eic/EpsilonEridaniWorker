@@ -47,7 +47,11 @@ def sb(head, updated, assoc="CONTRIBUTOR"):
 def plain(updated, assoc="MEMBER"):
     """A non-scoreboard comment (no marker) — must be ignored even from a 'trusted' author."""
     meta = json.dumps({"head_sha": "FORGED"})
-    return {"body": f"just chatting <!--epsiloneridani-meta:v1 {meta}-->", "updated_at": updated, "author_association": assoc}
+    return {
+        "body": f"just chatting <!--epsiloneridani-meta:v1 {meta}-->",
+        "updated_at": updated,
+        "author_association": assoc,
+    }
 
 
 def empty_marker(updated, garbage=False):

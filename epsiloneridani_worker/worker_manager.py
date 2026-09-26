@@ -437,7 +437,10 @@ def _config_lock(path: Path):
 
 
 def _write_worker_specs(path: Path, specs: list[WorkerSpec]) -> None:
-    lines = ["# Managed by `epsiloneridani workers`; edit while the manager is running and it will reconcile.", "version = 1"]
+    lines = [
+        "# Managed by `epsiloneridani workers`; edit while the manager is running and it will reconcile.",
+        "version = 1",
+    ]
     for spec in specs:
         lines += ["", "[[workers]]"]
         for key, value in spec.as_dict().items():

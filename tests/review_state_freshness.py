@@ -38,7 +38,9 @@ def check(name, got, want):
 
 def board(head="abc123"):
     """A scoreboard comment shaped exactly like the engine's: the marker, then the meta blob."""
-    return {"body": "<!--epsiloneridani-scoreboard--><!--epsiloneridani-meta:v1 " + json.dumps({"head_sha": head}) + "-->"}
+    return {
+        "body": "<!--epsiloneridani-scoreboard--><!--epsiloneridani-meta:v1 " + json.dumps({"head_sha": head}) + "-->"
+    }
 
 
 def marker(head, provider, expires_at):
