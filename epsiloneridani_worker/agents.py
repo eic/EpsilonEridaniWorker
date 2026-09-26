@@ -611,7 +611,7 @@ def host_agent_argv(prompt: str, profile: AuthoringProfile | str) -> tuple[list[
         argv = ["agy", "--model", profile.model]
         if profile.effort:
             argv += ["--effort", profile.effort]
-        argv += ["--prompt", prompt]
+        argv += ["--dangerously-skip-permissions", "--prompt", prompt]
     elif profile.provider == "kiro":
         # --model is mandatory: Kiro's Auto router is never allowed to choose on
         # the worker's behalf. Isolate its platform credential store for API-key
@@ -1276,6 +1276,7 @@ def agent_inner_cmd(profile: AuthoringProfile | str) -> str:
         return (
             "env GEMINI_API_KEY=\"$(cat /opt/round/gemini.key)\" "
             f"agy --model {shlex.quote(profile.model)}{effort} "
+            f"--dangerously-skip-permissions "
             f"\"--prompt\" \"$(cat /opt/round/prompt.txt)\""
         )
     if profile.provider == "kiro":
