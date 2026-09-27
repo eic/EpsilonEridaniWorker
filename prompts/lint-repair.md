@@ -24,7 +24,7 @@ The PR body and its comments list the violations the daily lint found, but alway
 - Fix code under `EpsilonEridani/` only. Do NOT edit `scripts/` (including `scripts/lint-baseline.txt` and `scripts/lint-nolints-allowlist.txt`), `.github/`, the lakefile, or the Lake pins. Do NOT add `@[nolint ...]`: every nolint must be allowlisted in a human-owned file, so CI rejects it. If a violation genuinely should be an exception, stop and say so in your report instead of silencing it.
 - Do NOT edit the root `EpsilonEridani.lean`: it is intentionally empty.
 - Everything under `namespace EpsilonEridani`. Tau Ceti does not preserve backwards compatibility: if you rename or restate a lemma, update every use in the repository in the same change.
-- **Never write to the roadmaps.** Do not open a PR or an issue in `eic/EpsilonEridaniRoadmap`.
+- **Never write to the roadmaps.** Do not open a PR or an issue in `eic/EpsilonEridaniRoadmaps`.
 - Must end green AND axiom-clean: no `sorry`, no `native_decide`, no new axioms (allowlist: `propext`, `Classical.choice`, `Quot.sound`), and no `set_option` in `EpsilonEridani/` at all (CI rejects it; it is how `maxHeartbeats` overrides and linter silencing happen).
 
 ## Verify before pushing (ALL of these MUST pass — they are what the `build` check runs)

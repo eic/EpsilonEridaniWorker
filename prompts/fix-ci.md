@@ -32,7 +32,7 @@ You are fixing FAILING CI on pull request #__PR__ of eic/EpsilonEridani, an AIs-
 ## Rules of the repo (hard constraints)
 - Code goes under `EpsilonEridani/`. Do NOT edit the root `EpsilonEridani.lean`: it is intentionally empty, and the lakefile's glob (`EpsilonEridani.*`) builds every module under `EpsilonEridani/`, so there is no need to touch it. Do NOT touch `Scripts/`, `.github/`, the lakefile (`lakefile.toml`/`lakefile.lean`), or the Lake pins (`lake-manifest.json`/`lean-toolchain`) — the lakefile is human-owned, and forward Mathlib/toolchain bumps are a separate dedicated flow; keep this PR to `EpsilonEridani/`.
 - Everything under `namespace EpsilonEridani`.
-- **Never write to the roadmaps.** Do not open a PR or an issue in `eic/EpsilonEridaniRoadmap`; creating or changing a roadmap needs human attention. If your work needs one, say so in your report and stop.
+- **Never write to the roadmaps.** Do not open a PR or an issue in `eic/EpsilonEridaniRoadmaps`; creating or changing a roadmap needs human attention. If your work needs one, say so in your report and stop.
 - Must end green AND axiom-clean: no `sorry`, no `native_decide`, no new axioms (allowlist: `propext`, `Classical.choice`, `Quot.sound`), no `maxHeartbeats` overrides, and **never silence a linter** (e.g. with `set_option ... false`) to force the build green — that defeats the point.
 
 ## Verify before pushing (ALL of these MUST pass — they are exactly what the `build` check runs)

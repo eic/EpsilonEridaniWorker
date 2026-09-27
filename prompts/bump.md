@@ -24,7 +24,7 @@ lake exe axioms
 ## Rules of the repo (hard constraints)
 - Adapt code under `EpsilonEridani/`. Do NOT edit the root `EpsilonEridani.lean`: it is intentionally empty, and the lakefile's glob (`EpsilonEridani.*`) builds every module under `EpsilonEridani/` without it. The only files outside `EpsilonEridani/` you may leave changed are the pins the bot already bumped. Do NOT touch `Scripts/`, `.github/`, or the lakefile (`lakefile.toml`/`lakefile.lean`).
 - Everything under `namespace EpsilonEridani`.
-- **Never write to the roadmaps.** Do not open a PR or an issue in `eic/EpsilonEridaniRoadmap`; creating or changing a roadmap needs human attention. If your work needs one, say so in your report and stop.
+- **Never write to the roadmaps.** Do not open a PR or an issue in `eic/EpsilonEridaniRoadmaps`; creating or changing a roadmap needs human attention. If your work needs one, say so in your report and stop.
 - Must end green AND axiom-clean: no `sorry`, no `native_decide`, no new axioms (allowlist: `propext`, `Classical.choice`, `Quot.sound`), no `maxHeartbeats` overrides, and never silence a linter (e.g. with `set_option ... false`) to force the build green.
 
 ## Verify before pushing (all three MUST pass)

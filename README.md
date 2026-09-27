@@ -102,7 +102,7 @@ A round does exactly one unit of work: the first of these that applies.
 | **Fix CI** | Repair one of our PRs whose `build` check is red. It cannot be reviewed until it builds, so this comes before Fix. |
 | **Fix** | Address the review findings on one of our PRs: fix the code, or contest a wrong finding on its thread. |
 | **Review** | Review an open PR whose head is green but not yet reviewed, with the `epsiloneridani-review` engine. Maintenance on our own PRs takes priority so author-action work (`ci-failed` or `awaiting-author`) cannot be starved by unrelated reviews. |
-| **Roadmap** | Otherwise, open a new PR advancing a [roadmap](https://github.com/eic/EpsilonEridaniRoadmap) target. |
+| **Roadmap** | Otherwise, open a new PR advancing a [roadmap](https://github.com/eic/EpsilonEridaniRoadmaps) target. |
 
 Review selection is cooperative across community workers. The worker named by
 the latest scoreboard gets a 20-minute first-refusal window on that PR's next
@@ -138,7 +138,7 @@ epsiloneridani work --loop --skip roadmap    # everything except authoring new P
 ```
 
 Roadmap rounds steer toward one area, a subdirectory of the
-[roadmap](https://github.com/eic/EpsilonEridaniRoadmap):
+[roadmap](https://github.com/eic/EpsilonEridaniRoadmaps):
 
 - `--roadmap-only <area>` pins it. An empty value means all areas. With nothing
   set, each round picks a fresh random area, so an unpinned `--loop` roams the

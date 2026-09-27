@@ -16,7 +16,7 @@ If the branch already includes current `main` and no concrete repair is needed, 
 ## Rules of the repo (hard constraints)
 - Code goes under `EpsilonEridani/`. Do NOT hand-edit the root `EpsilonEridani.lean` — it stays intentionally empty (see above). Do NOT touch `Scripts/`, `.github/`, the lakefile (`lakefile.toml`/`lakefile.lean`), or the Lake pins (`lake-manifest.json`/`lean-toolchain`) — the lakefile is human-owned, and forward Mathlib/toolchain bumps are a separate dedicated flow; keep this PR to `EpsilonEridani/`.
 - Everything under `namespace EpsilonEridani`.
-- **Never write to the roadmaps.** Do not open a PR or an issue in `eic/EpsilonEridaniRoadmap`; creating or changing a roadmap needs human attention. If your work needs one, say so in your report and stop.
+- **Never write to the roadmaps.** Do not open a PR or an issue in `eic/EpsilonEridaniRoadmaps`; creating or changing a roadmap needs human attention. If your work needs one, say so in your report and stop.
 - Must end green AND axiom-clean: no `sorry`, no `native_decide`, no new axioms (allowlist: `propext`, `Classical.choice`, `Quot.sound`), no `maxHeartbeats` overrides, and never silence a linter.
 
 Merging upstream workflow or pin changes as part of bringing in `main` is expected. Do not author independent changes to those human-owned files. The sweep request is bound to the old head; after a successful push it no longer schedules rebase work. Do not remove the request label yourself or reset any attempt counter.
