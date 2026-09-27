@@ -57,7 +57,6 @@ from .constants import (
     MAX_OPEN_PRS,
     OPENROUTER_MODELS,
     PR_TASKS,
-    PROGRESS_REF,
     PROGRESS_TOOL_LINE,
     PROGRESS_TOOL_TAIL,
     REVIEW,
@@ -1407,8 +1406,6 @@ def _do_progress_inner(w, opts) -> int | None:
         str(section_body),
         "--roadmap-dir",
         str(roadmap_dir),
-        "--version",
-        PROGRESS_REF,
         capture=True,
     )
     out = ((proc.stdout or "") + (proc.stderr or "")).strip()

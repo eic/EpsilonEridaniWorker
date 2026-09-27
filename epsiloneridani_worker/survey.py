@@ -33,9 +33,7 @@ from .constants import (
     MAX_REVIEW_CONTESTS,
     MAX_REVIEW_CONTESTS_PER_RUBRIC,
     MAX_REVIEW_ERRORS,
-    PROGRESS,
     PROGRESS_ATTEMPT_GAP,
-    PROGRESS_REF,
     PROGRESS_TTL,
     REVIEW_AFFINITY_GRACE_S,
     REVIEW_AGE_CAP_S,
@@ -475,23 +473,8 @@ def fix_disposition(
 
 
 def progress_argv(state: Path, *args: str) -> list[str]:
-    """The EpsilonEridaniProgress CLI, cached separately for each immutable source revision.
-
-    uv's shared ``uvx`` tool environment is keyed by the unchanged package name/version rather than
-    reliably by the Git revision passed through ``--from``. Reusing it after a pin bump can therefore
-    execute an older checkout. A per-ref cache preserves normal reuse within a release while making
-    the revision part of the cache identity.
-    """
-    cache = state / "cache" / "uvx" / "epsiloneridani-progress" / PROGRESS_REF
-    return [
-        "uvx",
-        "--cache-dir",
-        str(cache),
-        "--from",
-        f"git+https://github.com/{PROGRESS}@{PROGRESS_REF}",
-        "epsiloneridani-progress",
-        *args,
-    ]
+    """The epsiloneridani-progress CLI."""
+    return ["epsiloneridani-progress", *args]
 
 
 def progress_due(cfg: Config, counters: Counters) -> tuple[bool, str]:
