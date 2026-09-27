@@ -1,4 +1,4 @@
-# Tau Ceti Worker
+# EpsilonEridani Worker
 
 `epsiloneridani` keeps the [EpsilonEridani](https://github.com/eic/EpsilonEridani) Lean
 library moving, using a "bring your own agent" approach. Run it with no command
