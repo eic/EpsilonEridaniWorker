@@ -37,9 +37,9 @@ if "EPSILONERIDANI_PROGRESS_GAP" not in os.environ:
 progress_cmd = tc.progress_argv(Path("/worker-state"), "due")
 checks.append(
     check(
-        "progress tool cache is keyed by its immutable ref",
-        progress_cmd[1:3],
-        ["--cache-dir", f"/worker-state/cache/uvx/epsiloneridani-progress/{tc.PROGRESS_REF}"],
+        "progress tool runs epsiloneridani-progress directly",
+        progress_cmd[0],
+        "epsiloneridani-progress",
     )
 )
 checks.append(check("progress tool still receives its command", progress_cmd[-1], "due"))
