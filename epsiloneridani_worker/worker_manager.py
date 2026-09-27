@@ -198,7 +198,13 @@ def _pace(value, where: str) -> str | None:
 # isolate_home() reads it as an "isolation completed" sentinel, so presetting it would silently skip
 # credential isolation and run the worker on the operator's own account.
 _RESERVED_ENV = frozenset(
-    {STATUS_ENV, "EPSILONERIDANI_MANAGED", "EPSILONERIDANI_LOG_FILE", "EPSILONERIDANI_PARENT_PIPE_FD", "EPSILONERIDANI_DATA_HOME"}
+    {
+        STATUS_ENV,
+        "EPSILONERIDANI_MANAGED",
+        "EPSILONERIDANI_LOG_FILE",
+        "EPSILONERIDANI_PARENT_PIPE_FD",
+        "EPSILONERIDANI_DATA_HOME",
+    }
 )
 
 # A POSIX-portable variable name, which is also what a shell can refer to. `execve` accepts more, but

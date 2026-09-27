@@ -19,13 +19,13 @@ from .constants import (
     _GQL_MUTATION_RE,
     CLAIMS,
     CONTEST_CLAIM_EMOJI,
+    EPSILONERIDANI,
     GH_INROUND_WAIT,
     GH_SECONDARY_BASE,
     GH_TRANSIENT_BASE,
     GH_TRANSIENT_TRIES,
     OPEN_PR_MAX_PAGES,
     OPEN_PR_PAGE,
-    EPSILONERIDANI,
 )
 from .review_diagnostics import public_diagnostic_quality
 

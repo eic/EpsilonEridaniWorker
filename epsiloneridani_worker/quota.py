@@ -2138,20 +2138,21 @@ class Quota:
     # --- selection ---------------------------------------------------------
     def gemini(self, *, refresh: bool = False) -> Provider:
         # Check if agy or gemini-cli is installed
-        import shutil
         import os
+        import shutil
+
         from epsiloneridani_worker.constants import AUTHORING_DEFAULTS
-        
+
         has_cli = shutil.which("agy") or shutil.which("gemini-cli")
         if not has_cli:
             return Provider("gemini", False, None, error="no agy or gemini-cli on PATH")
-        
+
         has_key = bool(os.environ.get("GEMINI_API_KEY"))
         has_agy_auth = os.path.isdir(os.path.expanduser("~/.gemini/antigravity-cli"))
-        
+
         if not has_key and not has_agy_auth:
             return Provider("gemini", False, None, error="no GEMINI_API_KEY or ~/.gemini/antigravity-cli")
-            
+
         model = AUTHORING_DEFAULTS.get("gemini", ("gemini-1.5-pro", "high"))[0]
         return Provider("gemini", True, model)
 

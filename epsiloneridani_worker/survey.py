@@ -18,6 +18,8 @@ from .constants import (
     AUTO_STAGES,
     BUMP_HEAD_PREFIX,
     CONTEST_CLAIM_TTL,
+    EPSILONERIDANI,
+    EPSILONERIDANI_OWNER,
     EX_NOPROGRESS,
     LINT_REPAIR_HEAD_PREFIX,
     MAX_BUMP_ATTEMPTS,
@@ -40,8 +42,6 @@ from .constants import (
     REVIEW_AGE_SCALE_S,
     REVIEW_DAILY_CAP,
     STATUS_LABELS,
-    EPSILONERIDANI,
-    EPSILONERIDANI_OWNER,
 )
 from .github import GitHub, GitHubError, _parse_iso8601, can_push, me
 from .review_state import Meta, ReviewState
@@ -586,7 +586,9 @@ def survey(cfg: Config, gh: GitHub, rs: ReviewState, counters: Counters, *, deep
     bot_on_canonical = any(p.author_is_bot and p.head_owner == EPSILONERIDANI_OWNER for p in nondraft)
     tend_bot = bot_on_canonical and can_push(EPSILONERIDANI) is True
     tended = [
-        p for p in nondraft if p.author == me_login or (tend_bot and p.author_is_bot and p.head_owner == EPSILONERIDANI_OWNER)
+        p
+        for p in nondraft
+        if p.author == me_login or (tend_bot and p.author_is_bot and p.head_owner == EPSILONERIDANI_OWNER)
     ]
     sv.n_open_nondraft = len(nondraft)
     sv.n_reviewable = sum(1 for p in nondraft if p.build_success)

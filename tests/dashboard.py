@@ -409,7 +409,9 @@ def test_dashboard_uses_saved_pref():
             cfg, {"model": "auto", "bubble": False, "roadmap_only": "topology", "roadmap_skip": "algebra"}
         )
         tc._dashboard_app(cfg, loader=loader)  # runs the saved-pref restore
-        check("dashboard applied the saved only to the env", os.environ.get("EPSILONERIDANI_ROADMAP_ONLY") == "topology")
+        check(
+            "dashboard applied the saved only to the env", os.environ.get("EPSILONERIDANI_ROADMAP_ONLY") == "topology"
+        )
         check("dashboard applied the saved skip to the env", os.environ.get("EPSILONERIDANI_ROADMAP_SKIP") == "algebra")
     finally:
         os.environ.pop("EPSILONERIDANI_ROADMAP_ONLY", None)
@@ -435,7 +437,9 @@ async def test_skip_dashboard():
             await await_survey(app, pilot)
             app._apply_skip("topology, algebra,, topology")  # exercise the apply path directly
             await pilot.pause(0.05)
-        check("skip env normalized (deduped, sorted)", os.environ.get("EPSILONERIDANI_ROADMAP_SKIP") == "algebra,topology")
+        check(
+            "skip env normalized (deduped, sorted)", os.environ.get("EPSILONERIDANI_ROADMAP_SKIP") == "algebra,topology"
+        )
         check("roadmap row skip updated immediately", app.sv.roadmap_skip == ["algebra", "topology"])
         saved = json.loads(tc._prefs_path(cfg).read_text())
         check("prefs persisted user-chosen skip", saved.get("roadmap_skip") == "algebra,topology")

@@ -108,7 +108,9 @@ check(
     True,
 )
 os.environ["EPSILONERIDANI_PR"] = "nope"
-check("a bad environment value names itself", "$EPSILONERIDANI_PR" in (raises_exit(tc.resolve_pr_targets, []) or ""), True)
+check(
+    "a bad environment value names itself", "$EPSILONERIDANI_PR" in (raises_exit(tc.resolve_pr_targets, []) or ""), True
+)
 os.environ["EPSILONERIDANI_PR"] = ",,"
 check(
     "an environment value that names nothing is refused",

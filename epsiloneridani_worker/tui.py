@@ -10,7 +10,7 @@ from pathlib import Path
 
 from .agents import _shq
 from .config import Config, _only_label, _skip_label, roadmap_areas, roadmap_only, roadmap_skip
-from .constants import ALLOWED_TASKS, KIND_BY_NAME, KIND_KEYS, MAX_OPEN_PRS, EPSILONERIDANI
+from .constants import ALLOWED_TASKS, EPSILONERIDANI, KIND_BY_NAME, KIND_KEYS, MAX_OPEN_PRS
 from .github import GitHub
 from .paths import entry_cmd
 from .quota import Quota, _read_json_file, quota_line

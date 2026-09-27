@@ -52,6 +52,7 @@ from .constants import (
     AUTO_STAGES,
     CLAIM_TTL_S,
     CONTEST_CLAIM_TTL,
+    EPSILONERIDANI,
     EX_NOPROGRESS,
     MAX_INFRA_REFUNDS,
     MAX_OPEN_PRS,
@@ -65,7 +66,6 @@ from .constants import (
     REVIEW_PROVIDER_DOWN_EXIT,
     ROADMAP,
     SANDBOX_DEFAULT,
-    EPSILONERIDANI,
 )
 from .github import GitHub, GitHubError, claims_repo, ensure_fork, gh_run, me
 from .intentions import administrative_hold_avoid_list, claimed_avoid_list

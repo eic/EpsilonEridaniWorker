@@ -27,12 +27,12 @@ from .constants import (
     CLAUDE_CMD,
     CODEX_AUTHORING_FALLBACK_MODEL,
     CODEX_MODEL_ACCESS_TTL,
+    EPSILONERIDANI,
     OPENROUTER_MODELS,
     PI_RUN,
     REVIEW,
     REVIEW_DAILY_CAP,
     ROADMAP,
-    EPSILONERIDANI,
 )
 from .github import me
 from .paths import HERE
@@ -1274,10 +1274,10 @@ def agent_inner_cmd(profile: AuthoringProfile | str) -> str:
     if profile.provider == "gemini":
         effort = f" --effort {shlex.quote(profile.effort)}" if profile.effort else ""
         return (
-            "env GEMINI_API_KEY=\"$(cat /opt/round/gemini.key)\" "
+            'env GEMINI_API_KEY="$(cat /opt/round/gemini.key)" '
             f"agy --model {shlex.quote(profile.model)}{effort} "
             f"--dangerously-skip-permissions "
-            f"\"--prompt\" \"$(cat /opt/round/prompt.txt)\""
+            f'"--prompt" "$(cat /opt/round/prompt.txt)"'
         )
     if profile.provider == "kiro":
         effort = f" --effort {shlex.quote(profile.effort)}" if profile.effort else ""
@@ -1652,7 +1652,9 @@ def review_in_bubble(w: Worker, pr: int, head: str, reviewers: str, opts: RoundO
         )
         inner = "sh -c " + shlex.quote(setup)
     # target is the PR so bubble checks it out; prompt unused by the engine.
-    return run_in_bubble(w, f"{EPSILONERIDANI}/pull/{pr}", "", opts, mounts=mounts, inner_cmd=inner, cred_model=reviewers)
+    return run_in_bubble(
+        w, f"{EPSILONERIDANI}/pull/{pr}", "", opts, mounts=mounts, inner_cmd=inner, cred_model=reviewers
+    )
 
 
 def _worker_iso_home(wid: str, _base: Path | None = None) -> Path:

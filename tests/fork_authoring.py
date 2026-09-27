@@ -195,7 +195,10 @@ def test_roadmap():
 
     check("roadmap: bubble target stays canonical", cap.get("target") == EPSILONERIDANI)
     check("roadmap: --allow-push is the fork", cap.get("allow_push") == FORK)
-    check("roadmap: push remote is the fork URL", os.environ.get("EPSILONERIDANI_PUSH_REMOTE") == f"https://github.com/{FORK}")
+    check(
+        "roadmap: push remote is the fork URL",
+        os.environ.get("EPSILONERIDANI_PUSH_REMOTE") == f"https://github.com/{FORK}",
+    )
     check("roadmap: PUSH_EXPECT popped (create-only)", "EPSILONERIDANI_PUSH_EXPECT" not in os.environ)
     prompt = cap.get("prompt", "")
     check("roadmap: prompt has --head <forkowner>:", "--head alice:roadmap/" in prompt)

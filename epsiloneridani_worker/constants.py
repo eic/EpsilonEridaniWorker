@@ -8,7 +8,9 @@ import re
 
 EPSILONERIDANI = "eic/EpsilonEridani"
 
-EPSILONERIDANI_OWNER = EPSILONERIDANI.split("/", 1)[0]  # base-repo owner: a bot PR is first-party iff its head lives here
+EPSILONERIDANI_OWNER = EPSILONERIDANI.split("/", 1)[
+    0
+]  # base-repo owner: a bot PR is first-party iff its head lives here
 
 ROADMAP = "eic/EpsilonEridaniRoadmaps"
 

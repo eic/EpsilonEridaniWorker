@@ -60,10 +60,10 @@ from .constants import (
     AGENTS,
     ALLOWED_TASKS,
     CLAIMS,
+    EPSILONERIDANI,
     EX_NOPROGRESS,
     OPENROUTER_MODELS,
     PR_TASKS,
-    EPSILONERIDANI,
     WORK_TASKS,
 )
 from .github import GitHub, shared_claims_granted
@@ -595,7 +595,11 @@ def resolve_pace(cmd: str | None, args) -> None:
     Validation and installation live together, one step before dispatch, so no code can run against a
     curve that has been checked but not applied — or applied but not checked."""
     override = getattr(args, "pace", None) if cmd in ("work", "_round") else None
-    spec, source = (override, "--pace") if override is not None else (os.environ.get("EPSILONERIDANI_PACE"), "$EPSILONERIDANI_PACE")
+    spec, source = (
+        (override, "--pace")
+        if override is not None
+        else (os.environ.get("EPSILONERIDANI_PACE"), "$EPSILONERIDANI_PACE")
+    )
     if spec is not None:
         try:
             parse_pace_curve(spec)

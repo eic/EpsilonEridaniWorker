@@ -43,7 +43,13 @@ def check(name, cond):
 
 
 def clear(env):
-    for var in (*CACHE_VARS, *ARTIFACT_VARS, "EPSILONERIDANI_DATA_HOME", "EPSILONERIDANI_MATHLIB_POOL", "XDG_CACHE_HOME"):
+    for var in (
+        *CACHE_VARS,
+        *ARTIFACT_VARS,
+        "EPSILONERIDANI_DATA_HOME",
+        "EPSILONERIDANI_MATHLIB_POOL",
+        "XDG_CACHE_HOME",
+    ):
         env.pop(var, None)
 
 
