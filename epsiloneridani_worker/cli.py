@@ -240,7 +240,7 @@ def add_work_flags(p: argparse.ArgumentParser) -> None:
         metavar="AREA",
         help="for roadmap rounds, the single roadmap area to steer toward: a subdirectory of "
         "the EpsilonEridaniRoadmap repo. List them by opening the dashboard (bare `epsiloneridani`) and "
-        "expanding the roadmap row, or browse github.com/eic/EpsilonEridaniRoadmap. "
+        "expanding the roadmap row, or browse github.com/eic/EpsilonEridaniRoadmaps. "
         "Empty string = all areas; omit entirely (and leave $TAUCETI_ROADMAP_ONLY "
         "unset) to pick a fresh random area each round. Overrides "
         "$TAUCETI_ROADMAP_ONLY for this run",

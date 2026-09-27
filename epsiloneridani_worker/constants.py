@@ -10,7 +10,7 @@ TAUCETI = "eic/EpsilonEridani"
 
 TAUCETI_OWNER = TAUCETI.split("/", 1)[0]  # base-repo owner: a bot PR is first-party iff its head lives here
 
-ROADMAP = "eic/EpsilonEridaniRoadmap"
+ROADMAP = "eic/EpsilonEridaniRoadmaps"
 
 REVIEW = "eic/EpsilonEridaniReview"
 
