@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Prefer the authenticated GitHub identity for commits. The image-level fallback still lets
 # setup and CI run before `gh auth login` has populated the persistent credential volume.
-if [[ "${TAUCETI_SKIP_GIT_IDENTITY:-0}" != 1 ]]; then
+if [[ "${EPSILONERIDANI_SKIP_GIT_IDENTITY:-0}" != 1 ]]; then
   if gh auth status >/dev/null 2>&1; then
     login="$(gh api user --jq .login 2>/dev/null || true)"
     account_id="$(gh api user --jq .id 2>/dev/null || true)"
@@ -24,16 +24,16 @@ fi
 # Append operator options from .env using Python's shell-like parser; never evaluate them
 # as shell code. Restrict this to the worker command so setup and diagnostic overrides are
 # unaffected.
-if [[ -n "${TAUCETI_WORKER_ARGS:-}" && "${1:-}" == "./epsiloneridani" && "${2:-}" == "work" && "${3:-}" == "--loop" ]]; then
+if [[ -n "${EPSILONERIDANI_WORKER_ARGS:-}" && "${1:-}" == "./epsiloneridani" && "${2:-}" == "work" && "${3:-}" == "--loop" ]]; then
   exec python3 -c '
 import os
 import shlex
 import sys
 
 try:
-    extra = shlex.split(os.environ["TAUCETI_WORKER_ARGS"])
+    extra = shlex.split(os.environ["EPSILONERIDANI_WORKER_ARGS"])
 except ValueError as error:
-    sys.exit(f"epsiloneridani-entrypoint: TAUCETI_WORKER_ARGS has invalid quoting: {error}")
+    sys.exit(f"epsiloneridani-entrypoint: EPSILONERIDANI_WORKER_ARGS has invalid quoting: {error}")
 argv = sys.argv[1:] + extra
 os.execvp(argv[0], argv)
 ' "$@"

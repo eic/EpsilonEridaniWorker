@@ -30,38 +30,38 @@ def is_git_url(value: str) -> bool:
 def roadmap_only() -> str | None:
     """The single roadmap area the worker steers toward, as the operator set it — read live from the
     env each call so the TUI's [o] key can change it and have both the survey display and any launched
-    round pick it up (children inherit TAUCETI_ROADMAP_ONLY). Tri-state: None = unset, so a fresh
+    round pick it up (children inherit EPSILONERIDANI_ROADMAP_ONLY). Tri-state: None = unset, so a fresh
     random area is picked per round (see do_roadmap); "" = all areas; else the area name. There is
     deliberately no baked-in default, and nothing here consults the dashboard prefs — a bare CLI run
     resolves only from the env + the live area list, never from a saved dashboard preference."""
-    return os.environ.get("TAUCETI_ROADMAP_ONLY")
+    return os.environ.get("EPSILONERIDANI_ROADMAP_ONLY")
 
 
 def roadmap_skip() -> list[str]:
     """Roadmap areas to exclude from selection (so concurrent workers can divide the roadmap), read
     live from the env each call — the TUI's [x] key and any launched round both see changes (children
-    inherit TAUCETI_ROADMAP_SKIP). Comma-separated; whitespace and empty entries are dropped; the
+    inherit EPSILONERIDANI_ROADMAP_SKIP). Comma-separated; whitespace and empty entries are dropped; the
     result is deduped and sorted. Returns [] when unset/blank. Shapes the auto-random pick and the
     "all areas" (any) case; an explicit --roadmap-only area takes precedence over it (see do_roadmap)."""
-    raw = os.environ.get("TAUCETI_ROADMAP_SKIP", "")
+    raw = os.environ.get("EPSILONERIDANI_ROADMAP_SKIP", "")
     return sorted({tok for tok in (t.strip() for t in raw.split(",")) if tok})
 
 
 def roadmap_extra_identities() -> list[str]:
     """Additional GitHub logins, beyond the worker's own `gh auth` identity, whose registered
     intentions this worker should treat as its own (so it won't avoid targets they've claimed).
-    Comma-separated, read live from TAUCETI_ROADMAP_EXTRA_IDENTITIES; deduped and lowercased.
+    Comma-separated, read live from EPSILONERIDANI_ROADMAP_EXTRA_IDENTITIES; deduped and lowercased.
     Returns [] when unset/blank. Never hardcodes an account: who the worker is is whoever ran
     `gh auth`; this only widens that set when the operator opts in."""
-    raw = os.environ.get("TAUCETI_ROADMAP_EXTRA_IDENTITIES", "")
+    raw = os.environ.get("EPSILONERIDANI_ROADMAP_EXTRA_IDENTITIES", "")
     return sorted({tok.lower() for tok in (t.strip() for t in raw.split(",")) if tok})
 
 
 def respect_claims() -> bool:
     """Whether roadmap workers avoid targets claimed by other contributors on the intentions
-    board. On by default; read live from TAUCETI_RESPECT_CLAIMS so --ignore-claims (which sets it
+    board. On by default; read live from EPSILONERIDANI_RESPECT_CLAIMS so --ignore-claims (which sets it
     false) is inherited by loop children."""
-    return os.environ.get("TAUCETI_RESPECT_CLAIMS", "true").strip().lower() not in ("0", "false", "no", "off")
+    return os.environ.get("EPSILONERIDANI_RESPECT_CLAIMS", "true").strip().lower() not in ("0", "false", "no", "off")
 
 
 def _only_label(sv=None) -> str:
@@ -146,12 +146,12 @@ class Config:
 
     @staticmethod
     def resolve(worker_id: str | None = None, home: Path | None = None) -> Config:
-        wid = sanitize_wid(worker_id or os.environ.get("TAUCETI_WORKER_ID", "default") or "default")
+        wid = sanitize_wid(worker_id or os.environ.get("EPSILONERIDANI_WORKER_ID", "default") or "default")
         # Export the resolved id so claim.sh (acquire / heartbeat-renew / git-safe-push's lease check)
         # all share ONE stable owner identity. Without this it falls back to `hostname-$$`, a different
         # owner per claim.sh invocation, so in host mode a worker can't renew or recognise its own
         # branch/<pr> lease and git-safe-push fails closed with "lease lost (another agent took over)".
-        os.environ["TAUCETI_WORKER_ID"] = wid
+        os.environ["EPSILONERIDANI_WORKER_ID"] = wid
         # Lake may otherwise leave a cache hit only in its local store, where EpsilonEridani's later
         # `lake exe axioms` and `lake exe module-system` audits cannot resolve it. Enable the store
         # and restore its artifacts into the build directory as one default policy. A manager's
@@ -167,11 +167,11 @@ class Config:
         # records and the scoreboard/thread ids: point it somewhere new and a worker silently
         # abandons reviews it never sent and re-posts scoreboards it already posted.
         #
-        # isolate_home() exports $TAUCETI_DATA_HOME (children inherit it); an unisolated worker has
+        # isolate_home() exports $EPSILONERIDANI_DATA_HOME (children inherit it); an unisolated worker has
         # none and its data lives under the login home exactly as before. Every isolated worker's
         # data path is therefore the same one it had when isolation moved $HOME, on both platforms,
         # so nothing migrates.
-        dh = Path(os.environ.get("TAUCETI_DATA_HOME") or h)
+        dh = Path(os.environ.get("EPSILONERIDANI_DATA_HOME") or h)
         state = HERE / "state" / wid
         # Per-worker, per-repository claim scratch. claim.sh defaults this under $HOME, which was
         # per-worker only while $HOME moved; use the worker data root while letting a dynamic
@@ -204,12 +204,12 @@ def set_log_file(logdir: Path) -> None:
     global _LOG_FH
     if _LOG_FH is not None:
         return
-    path = os.environ.get("TAUCETI_LOG_FILE")
+    path = os.environ.get("EPSILONERIDANI_LOG_FILE")
     try:
         logdir.mkdir(parents=True, exist_ok=True)
         if not path:
             path = str(logdir / f"work-{time.strftime('%Y%m%d-%H%M%S')}.log")
-            os.environ["TAUCETI_LOG_FILE"] = path  # children inherit and append to the same file
+            os.environ["EPSILONERIDANI_LOG_FILE"] = path  # children inherit and append to the same file
         _LOG_FH = open(path, "a", buffering=1)  # line-buffered: each log line flushes on its newline
     except OSError:
         _LOG_FH = None

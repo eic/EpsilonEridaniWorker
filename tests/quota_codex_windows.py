@@ -112,14 +112,14 @@ p = q._codex_from_payload(
 check("elapsed-0 window sits AT budget, not under it", [w.status for w in p.windows], ["at-budget"])
 check("at budget ⇒ not available", p.available, False)
 check("at budget is a SOFT block", tc._unavail_reason(p)[0], True)
-os.environ["TAUCETI_PACE"] = "0:10,100:100"  # 10% allowed immediately ⇒ real headroom at elapsed 0
+os.environ["EPSILONERIDANI_PACE"] = "0:10,100:100"  # 10% allowed immediately ⇒ real headroom at elapsed 0
 p = q._codex_from_payload(
     {"rate_limit": {"limit_reached": False, "primary_window": win(0, WEEK, WEEK), "secondary_window": None}}
 )
 check(
     "a curve with budget up front gives that window headroom", (p.windows[0].status, p.available), ("under-pace", True)
 )
-os.environ.pop("TAUCETI_PACE", None)
+os.environ.pop("EPSILONERIDANI_PACE", None)
 
 # --- a cached payload describes the moment it was fetched, not the present --------------------------
 # Codex states every clock as seconds REMAINING, so a payload re-read later would restate itself about

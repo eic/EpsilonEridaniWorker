@@ -40,8 +40,8 @@ from .constants import (
     REVIEW_AGE_SCALE_S,
     REVIEW_DAILY_CAP,
     STATUS_LABELS,
-    TAUCETI,
-    TAUCETI_OWNER,
+    EPSILONERIDANI,
+    EPSILONERIDANI_OWNER,
 )
 from .github import GitHub, GitHubError, _parse_iso8601, can_push, me
 from .review_state import Meta, ReviewState
@@ -583,10 +583,10 @@ def survey(cfg: Config, gh: GitHub, rs: ReviewState, counters: Counters, *, deep
     mine = [p for p in nondraft if p.author == me_login]
     # Tend our own PRs, plus bot PRs hosted on canonical when this identity can push there. Only query
     # that permission while such a bot PR is open; an unknown result skips optional bot work this round.
-    bot_on_canonical = any(p.author_is_bot and p.head_owner == TAUCETI_OWNER for p in nondraft)
-    tend_bot = bot_on_canonical and can_push(TAUCETI) is True
+    bot_on_canonical = any(p.author_is_bot and p.head_owner == EPSILONERIDANI_OWNER for p in nondraft)
+    tend_bot = bot_on_canonical and can_push(EPSILONERIDANI) is True
     tended = [
-        p for p in nondraft if p.author == me_login or (tend_bot and p.author_is_bot and p.head_owner == TAUCETI_OWNER)
+        p for p in nondraft if p.author == me_login or (tend_bot and p.author_is_bot and p.head_owner == EPSILONERIDANI_OWNER)
     ]
     sv.n_open_nondraft = len(nondraft)
     sv.n_reviewable = sum(1 for p in nondraft if p.build_success)

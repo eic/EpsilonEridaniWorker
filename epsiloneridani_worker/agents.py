@@ -32,7 +32,7 @@ from .constants import (
     REVIEW,
     REVIEW_DAILY_CAP,
     ROADMAP,
-    TAUCETI,
+    EPSILONERIDANI,
 )
 from .github import me
 from .paths import HERE
@@ -92,16 +92,16 @@ def resolve_authoring_profile(
 ) -> AuthoringProfile:
     """Resolve CLI > provider environment > committed default, without user CLI config.
 
-    `TAUCETI_CODEX_MODEL` remains a deprecated authoring-only fallback. Reviews
-    deliberately use `TAUCETI_REVIEW_CODEX_MODEL` instead.
+    `EPSILONERIDANI_CODEX_MODEL` remains a deprecated authoring-only fallback. Reviews
+    deliberately use `EPSILONERIDANI_REVIEW_CODEX_MODEL` instead.
     """
 
     cli_model = cli_model.strip() if cli_model else None
     cli_effort = cli_effort.strip() if cli_effort else None
     resolved_fallback_model = resolved_fallback_model.strip() if resolved_fallback_model else None
     key = provider.upper()
-    model_env = f"TAUCETI_AUTHORING_{key}_MODEL"
-    effort_env = f"TAUCETI_AUTHORING_{key}_EFFORT"
+    model_env = f"EPSILONERIDANI_AUTHORING_{key}_MODEL"
+    effort_env = f"EPSILONERIDANI_AUTHORING_{key}_EFFORT"
 
     if provider in AUTHORING_DEFAULTS:
         default_model, default_effort = AUTHORING_DEFAULTS[provider]
@@ -110,14 +110,14 @@ def resolve_authoring_profile(
     else:
         raise Die(f"no authoring profile for provider {provider!r}")
 
-    legacy = ((os.environ.get("TAUCETI_CODEX_MODEL") or "").strip() or None) if provider == "codex" else None
+    legacy = ((os.environ.get("EPSILONERIDANI_CODEX_MODEL") or "").strip() or None) if provider == "codex" else None
     env_model = (os.environ.get(model_env) or "").strip() or None
     if cli_model:
         model, model_source = cli_model, "--author-model"
     elif env_model:
         model, model_source = env_model, f"${model_env}"
     elif legacy:
-        model, model_source = legacy, "$TAUCETI_CODEX_MODEL (deprecated; authoring only)"
+        model, model_source = legacy, "$EPSILONERIDANI_CODEX_MODEL (deprecated; authoring only)"
     else:
         model, model_source = default_model, "repository default"
 
@@ -541,8 +541,8 @@ def prepare_checkout(cfg: Config) -> bool:
     co = cfg.checkout
     if not (co / ".git").is_dir():
         co.parent.mkdir(parents=True, exist_ok=True)
-        log(f"cloning {TAUCETI} → {co} (first run)")
-        if subprocess.run(["git", "clone", "-q", f"https://github.com/{TAUCETI}", str(co)]).returncode:
+        log(f"cloning {EPSILONERIDANI} → {co} (first run)")
+        if subprocess.run(["git", "clone", "-q", f"https://github.com/{EPSILONERIDANI}", str(co)]).returncode:
             return False
 
     def g(*a) -> int:
@@ -643,7 +643,7 @@ def host_agent_argv(prompt: str, profile: AuthoringProfile | str) -> tuple[list[
 def run_agent_host(cwd: Path, prompt: str, profile: AuthoringProfile | str, logdir: Path) -> int:
     profile = _authoring_profile(profile)
     argv, env = host_agent_argv(prompt, profile)
-    if os.environ.get("TAUCETI_AGENT_ECHO"):
+    if os.environ.get("EPSILONERIDANI_AGENT_ECHO"):
         print(f"HOST cwd={cwd}\n  " + " ".join(_shq(a) for a in argv))
         return 0
     return run_agent_proc(
@@ -815,7 +815,7 @@ def run_agent_proc(
             classification_text = renderer.terminal_failure_text
         return classify_agent_failure(classification_text)
 
-    if os.environ.get("TAUCETI_STREAM"):
+    if os.environ.get("EPSILONERIDANI_STREAM"):
         rc = run_rendered(sys.stdout)
         if rc != 0:
             _LAST_AGENT_FAILURE = classify_rendered_failure()
@@ -842,10 +842,10 @@ def run_agent_proc(
 def run_to_logfile(argv: list[str], logf: Path, label: str) -> int:
     """Run a subprocess with stdout+stderr redirected to logf, keeping the worker's MAIN log clean. Used
     for the review engine, which prints a lot (git clones, the full scoreboard dump, per-rubric lines) —
-    detail that belongs in a subsidiary per-review log, not the orchestration stream. TAUCETI_STREAM=1
+    detail that belongs in a subsidiary per-review log, not the orchestration stream. EPSILONERIDANI_STREAM=1
     streams to the terminal instead. Tails logf to the main log on a non-zero exit so failures aren't
     silent. The caller logs a one-line pointer to logf so the detail is discoverable."""
-    if os.environ.get("TAUCETI_STREAM"):
+    if os.environ.get("EPSILONERIDANI_STREAM"):
         return subprocess.run(argv).returncode
     logf.parent.mkdir(parents=True, exist_ok=True)
     log(f"  {label}: engine output → {logf}  (run with --stream to watch live)")
@@ -892,10 +892,10 @@ KIRO_BUBBLE_MIN_VERSION = "0.7.31"
 # `lake cache get` failed and fell through to a from-scratch `lake build` -- silently, because a
 # cache miss is non-fatal here. The custom domain is also what EpsilonEridani's own CI publishes and reads
 # through (the LAKE_CACHE_*_PUBLIC repo variables). Keep the two in step.
-TAUCETI_CACHE_DOMAIN = "cache.epsiloneridaniproject.org"
-TAUCETI_CACHE_SERVICE = "epsiloneridani-public"
-TAUCETI_CACHE_ARTIFACT_URL = f"https://{TAUCETI_CACHE_DOMAIN}/artifacts"
-TAUCETI_CACHE_REVISION_URL = f"https://{TAUCETI_CACHE_DOMAIN}/revisions"
+EPSILONERIDANI_CACHE_DOMAIN = "cache.epsiloneridaniproject.org"
+EPSILONERIDANI_CACHE_SERVICE = "epsiloneridani-public"
+EPSILONERIDANI_CACHE_ARTIFACT_URL = f"https://{EPSILONERIDANI_CACHE_DOMAIN}/artifacts"
+EPSILONERIDANI_CACHE_REVISION_URL = f"https://{EPSILONERIDANI_CACHE_DOMAIN}/revisions"
 
 
 def bubble_cmd() -> list[str]:
@@ -903,7 +903,7 @@ def bubble_cmd() -> list[str]:
     real sandbox rounds require an installed executable because Bubble owns host-global services."""
     import shutil
 
-    override = os.environ.get("TAUCETI_BUBBLE")
+    override = os.environ.get("EPSILONERIDANI_BUBBLE")
     if override:
         return shlex_split(override)
     if shutil.which("bubble"):
@@ -950,7 +950,7 @@ def epsiloneridani_cache_unreachable_reason() -> str | None:
     import urllib.error
     import urllib.request
 
-    url = f"{TAUCETI_CACHE_REVISION_URL}/"
+    url = f"{EPSILONERIDANI_CACHE_REVISION_URL}/"
     try:
         with urllib.request.urlopen(url, timeout=30):
             return None
@@ -1106,7 +1106,7 @@ def ensure_fork_proxy_current() -> None:
             raise Die(
                 "preflight: fork authoring needs Bubble installed at a stable path; the uvx fallback "
                 "cannot safely own a host-global launchd/systemd daemon. Install dev-bubble or set "
-                "$TAUCETI_BUBBLE to a stable Bubble executable, then re-run."
+                "$EPSILONERIDANI_BUBBLE to a stable Bubble executable, then re-run."
             )
         version = _bubble_version(cmd)
         if _bubble_proxy_endpoint_healthy(expected_version=version or None):
@@ -1153,7 +1153,7 @@ def bubble_name(cfg: Config) -> str:
 
 
 def bubble_home(cfg: Config) -> Path:
-    env = os.environ.get("TAUCETI_BUBBLE_HOME")
+    env = os.environ.get("EPSILONERIDANI_BUBBLE_HOME")
     return Path(env) if env else (cfg.data_home / ".cache" / "epsiloneridani-worker" / cfg.wid / "bubble")
 
 
@@ -1323,7 +1323,7 @@ def bubble_work_cmd(inner: str) -> str:
     log to the ordinary case. It printed one `warning: EpsilonEridani Lake cache miss` line and rebuilt the
     library from source, every round, for as long as the endpoint stayed down.
     """
-    fetch = f"lake cache get --service {TAUCETI_CACHE_SERVICE} --repo {TAUCETI}"
+    fetch = f"lake cache get --service {EPSILONERIDANI_CACHE_SERVICE} --repo {EPSILONERIDANI}"
     return (
         "set -e; "
         "lake exe cache get Mathlib Physlib TauCeti || lake exe cache get Mathlib Physlib TauCeti; "
@@ -1469,15 +1469,15 @@ def run_in_bubble(
 
     # Push-arbiter env crossing into the container: /opt/round on PATH + the branch-CAS inputs the
     # agent's git-safe-push / gh-safe-pr-create need. \$PATH stays literal so it expands to the
-    # CONTAINER PATH inside bubble's bash -lc. We do NOT forward TAUCETI_CLAIM_* (the claim+heartbeat
+    # CONTAINER PATH inside bubble's bash -lc. We do NOT forward EPSILONERIDANI_CLAIM_* (the claim+heartbeat
     # are host-side; the branch CAS is the [HARD] guarantee and needs no in-container claim).
     tcenv = "env PATH=/opt/round:$PATH"
     for var in (
-        "TAUCETI_PUSH_REF",
-        "TAUCETI_PUSH_EXPECT",
-        "TAUCETI_PUSH_REMOTE",
-        "TAUCETI_TARGET_MARKER",
-        "TAUCETI_REQUIRE_TARGET_MARKER",
+        "EPSILONERIDANI_PUSH_REF",
+        "EPSILONERIDANI_PUSH_EXPECT",
+        "EPSILONERIDANI_PUSH_REMOTE",
+        "EPSILONERIDANI_TARGET_MARKER",
+        "EPSILONERIDANI_REQUIRE_TARGET_MARKER",
     ):
         val = os.environ.get(var)
         if val:
@@ -1493,9 +1493,9 @@ def run_in_bubble(
     cache_flags = (
         [
             "--lake-cache-service",
-            TAUCETI_CACHE_SERVICE,
-            TAUCETI_CACHE_ARTIFACT_URL,
-            TAUCETI_CACHE_REVISION_URL,
+            EPSILONERIDANI_CACHE_SERVICE,
+            EPSILONERIDANI_CACHE_ARTIFACT_URL,
+            EPSILONERIDANI_CACHE_REVISION_URL,
         ]
         if inner_cmd is None
         else []
@@ -1520,7 +1520,7 @@ def run_in_bubble(
         command,
     ]
 
-    if os.environ.get("TAUCETI_AGENT_ECHO"):
+    if os.environ.get("EPSILONERIDANI_AGENT_ECHO"):
         print("BUBBLE " + " ".join(_shq(a) for a in argv))
         return 0
 
@@ -1575,7 +1575,7 @@ def run_in_bubble(
 
 def _codex_review_model_override(reviewers: str) -> str | None:
     """Independent review-model override, or None for the engine's own policy."""
-    m = os.environ.get("TAUCETI_REVIEW_CODEX_MODEL")
+    m = os.environ.get("EPSILONERIDANI_REVIEW_CODEX_MODEL")
     return m if (m and "codex" in [r.strip() for r in reviewers.split(",")]) else None
 
 
@@ -1583,9 +1583,9 @@ def _kiro_review_model(reviewers: str) -> str | None:
     """Exact Kiro review model, independent of authoring model policy."""
     if "kiro" not in [r.strip() for r in reviewers.split(",")]:
         return None
-    configured = (os.environ.get("TAUCETI_REVIEW_KIRO_MODEL") or "").strip()
+    configured = (os.environ.get("EPSILONERIDANI_REVIEW_KIRO_MODEL") or "").strip()
     model = configured or AUTHORING_DEFAULTS["kiro"][0]
-    return _validate_kiro_model_pin(model, "$TAUCETI_REVIEW_KIRO_MODEL" if configured else "repository default")
+    return _validate_kiro_model_pin(model, "$EPSILONERIDANI_REVIEW_KIRO_MODEL" if configured else "repository default")
 
 
 def review_in_bubble(w: Worker, pr: int, head: str, reviewers: str, opts: RoundOpts) -> int:
@@ -1603,10 +1603,10 @@ def review_in_bubble(w: Worker, pr: int, head: str, reviewers: str, opts: RoundO
     The store is mounted READ-WRITE from the worker's persistent store_dir (not /tmp): it holds the
     scoreboard/thread comment ids the next round edits in place — an ephemeral store would post a
     duplicate scoreboard. The engine mount keeps its `.git` so the engine never falls back to a
-    cross-repo `gh api` for its own rev. TAUCETI_REVIEW_ENGINE_DIR pins a local engine checkout
+    cross-repo `gh api` for its own rev. EPSILONERIDANI_REVIEW_ENGINE_DIR pins a local engine checkout
     (operator override / pre-merge testing); otherwise a shallow REVIEW clone is staged."""
     cfg = w.cfg
-    eng = os.environ.get("TAUCETI_REVIEW_ENGINE_DIR")
+    eng = os.environ.get("EPSILONERIDANI_REVIEW_ENGINE_DIR")
     engine_dir = Path(eng) if eng else (cfg.state / "refs" / "review-engine")
     if not eng and not fetch_ref(REVIEW, engine_dir):  # keeps .git (no cross-repo rev fallback)
         raise Die(f"fetch {REVIEW} failed")
@@ -1629,7 +1629,7 @@ def review_in_bubble(w: Worker, pr: int, head: str, reviewers: str, opts: RoundO
     kiro_flag = f" --kiro-model {shlex.quote(km)}" if km else ""
     inner = (
         "env PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/opt/engine python3 -m runner.cli "
-        f"{pr} --repo {TAUCETI} --repo-dir /opt/engine --roadmap-dir /opt/roadmap "
+        f"{pr} --repo {EPSILONERIDANI} --repo-dir /opt/engine --roadmap-dir /opt/roadmap "
         f"--no-mathlib --no-sync --store /opt/review-store --post "
         f"--max-rounds-per-day {REVIEW_DAILY_CAP} "  # one value drives the survey prefilter + engine
         f"--reviewer {reviewers} --expect-head {head} --submitted-by {me()}{codex_flag}{kiro_flag}"
@@ -1652,7 +1652,7 @@ def review_in_bubble(w: Worker, pr: int, head: str, reviewers: str, opts: RoundO
         )
         inner = "sh -c " + shlex.quote(setup)
     # target is the PR so bubble checks it out; prompt unused by the engine.
-    return run_in_bubble(w, f"{TAUCETI}/pull/{pr}", "", opts, mounts=mounts, inner_cmd=inner, cred_model=reviewers)
+    return run_in_bubble(w, f"{EPSILONERIDANI}/pull/{pr}", "", opts, mounts=mounts, inner_cmd=inner, cred_model=reviewers)
 
 
 def _worker_iso_home(wid: str, _base: Path | None = None) -> Path:
@@ -1808,7 +1808,7 @@ def seed_worker_claude_config(real_claude: Path | None, iso_claude: Path) -> Non
     What we created, we may replace: a symlink into any config dir this home was seeded from
     (_config_sources), and a `settings.json` still byte-identical to the one we generated. Anything
     the operator put there by hand — a real file, a symlink somewhere else, an edited settings.json —
-    is left exactly as found, in both directions. `$TAUCETI_INHERIT_CLAUDE_CONFIG=1` goes back to
+    is left exactly as found, in both directions. `$EPSILONERIDANI_INHERIT_CLAUDE_CONFIG=1` goes back to
     mirroring the operator's config, including from a home already seeded the clean way."""
     sources = _config_sources(real_claude, iso_claude)
     src_dir = sources[0] if sources else None
@@ -1821,7 +1821,7 @@ def seed_worker_claude_config(real_claude: Path | None, iso_claude: Path) -> Non
             except OSError:
                 pass
 
-    if os.environ.get("TAUCETI_INHERIT_CLAUDE_CONFIG") == "1":
+    if os.environ.get("EPSILONERIDANI_INHERIT_CLAUDE_CONFIG") == "1":
         # Undo our own generated surface first, or the escape hatch silently does nothing on a home
         # that has already run once the clean way: the entries exist, so a plain "link if absent"
         # never replaces them.
@@ -1923,7 +1923,7 @@ def isolate_home(wid: str) -> Path:
     # leaving codex unisolated and the directories uncreated, and keying on $HOME alone cannot work
     # on macOS where $HOME deliberately does not move. The sentinel is written last, so it means
     # "isolation completed", and a partially built environment re-runs the whole setup.
-    if os.environ.get("TAUCETI_DATA_HOME") == str(home):
+    if os.environ.get("EPSILONERIDANI_DATA_HOME") == str(home):
         # Reassert the redirects rather than trusting them: they are what every credential read
         # resolves through, and a child that lost one would silently use the operator's account.
         # The build caches are asserted here too, so a round child running this code under a loop
@@ -1937,12 +1937,12 @@ def isolate_home(wid: str) -> Path:
         )  # $CLAUDE_CONFIG_DIR already repoints here; the marker knows the source
         os.environ["CLAUDE_CONFIG_DIR"] = str(iso_claude)
         os.environ["CODEX_HOME"] = str(iso_codex)
-        os.environ["TAUCETI_KIRO_HOME"] = str(iso_kiro_home)
-        os.environ["TAUCETI_KIRO_DATA_DIR"] = str(iso_kiro_data)
+        os.environ["EPSILONERIDANI_KIRO_HOME"] = str(iso_kiro_home)
+        os.environ["EPSILONERIDANI_KIRO_DATA_DIR"] = str(iso_kiro_data)
         if sys.platform == "darwin":
-            os.environ["TAUCETI_KIRO_PROCESS_HOME"] = str(home)
+            os.environ["EPSILONERIDANI_KIRO_PROCESS_HOME"] = str(home)
         else:
-            os.environ["TAUCETI_KIRO_XDG_DATA_HOME"] = str(iso_kiro_data.parent)
+            os.environ["EPSILONERIDANI_KIRO_XDG_DATA_HOME"] = str(iso_kiro_data.parent)
         return home
     real = Path(os.environ.get("HOME", os.path.expanduser("~")))
     real_claude = claude_dir(real)  # honors the operator's $CLAUDE_CONFIG_DIR before we repoint it
@@ -2010,14 +2010,14 @@ def isolate_home(wid: str) -> Path:
     # are the WHOLE isolation on macOS, and they ride alongside the $HOME move elsewhere.
     os.environ["CLAUDE_CONFIG_DIR"] = str(iso_claude)
     os.environ["CODEX_HOME"] = str(iso_codex)
-    os.environ["TAUCETI_KIRO_HOME"] = str(iso_kiro_home)
-    os.environ["TAUCETI_KIRO_DATA_DIR"] = str(iso_kiro_data)
+    os.environ["EPSILONERIDANI_KIRO_HOME"] = str(iso_kiro_home)
+    os.environ["EPSILONERIDANI_KIRO_DATA_DIR"] = str(iso_kiro_data)
     if sys.platform == "darwin":
         # Change HOME only in Kiro subprocesses so that its native macOS data
         # path resolves to the private profile without disrupting Keychain/gh.
-        os.environ["TAUCETI_KIRO_PROCESS_HOME"] = str(home)
+        os.environ["EPSILONERIDANI_KIRO_PROCESS_HOME"] = str(home)
     else:
-        os.environ["TAUCETI_KIRO_XDG_DATA_HOME"] = str(iso_kiro_data.parent)
+        os.environ["EPSILONERIDANI_KIRO_XDG_DATA_HOME"] = str(iso_kiro_data.parent)
     # Which build caches this worker shares with the machine and which stay its own; see
     # share_build_caches(). Set on both platforms, and before the sentinel below.
     caches = share_build_caches(wid, home)
@@ -2025,7 +2025,7 @@ def isolate_home(wid: str) -> Path:
     # The worker's data root, wherever $HOME ends up pointing. Config.resolve hangs the review store,
     # the bubble home and the claim scratch off this, so those stay per-worker and stay put on macOS
     # even though $HOME no longer moves. Written last: it doubles as the completion sentinel above.
-    os.environ["TAUCETI_DATA_HOME"] = str(home)
+    os.environ["EPSILONERIDANI_DATA_HOME"] = str(home)
     if sys.platform == "darwin":
         # Leave $HOME at the operator's, so `security` keeps resolving the login Keychain for the pacer,
         # for the spawned claude, and for gh. See the docstring for why moving it cost three separate

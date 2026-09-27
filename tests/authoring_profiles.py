@@ -21,14 +21,14 @@ def check(name, got, want):
 
 
 keys = [
-    "TAUCETI_AUTHORING_CODEX_MODEL",
-    "TAUCETI_AUTHORING_CODEX_EFFORT",
-    "TAUCETI_AUTHORING_CLAUDE_MODEL",
-    "TAUCETI_AUTHORING_CLAUDE_EFFORT",
-    "TAUCETI_AUTHORING_KIRO_MODEL",
-    "TAUCETI_AUTHORING_KIRO_EFFORT",
-    "TAUCETI_CODEX_MODEL",
-    "TAUCETI_AUTHORING_DEEPSEEK_EFFORT",
+    "EPSILONERIDANI_AUTHORING_CODEX_MODEL",
+    "EPSILONERIDANI_AUTHORING_CODEX_EFFORT",
+    "EPSILONERIDANI_AUTHORING_CLAUDE_MODEL",
+    "EPSILONERIDANI_AUTHORING_CLAUDE_EFFORT",
+    "EPSILONERIDANI_AUTHORING_KIRO_MODEL",
+    "EPSILONERIDANI_AUTHORING_KIRO_EFFORT",
+    "EPSILONERIDANI_CODEX_MODEL",
+    "EPSILONERIDANI_AUTHORING_DEEPSEEK_EFFORT",
 ]
 saved_env = {k: os.environ.get(k) for k in keys}
 for key in keys:
@@ -77,8 +77,8 @@ try:
     check("Kiro bubble pins model", "--model gpt-5.6-sol" in kiro_bubble, True)
     check("Kiro bubble never invokes Auto", "--model auto" in kiro_bubble.lower(), False)
 
-    os.environ["TAUCETI_AUTHORING_KIRO_MODEL"] = "claude-opus-5"
-    os.environ["TAUCETI_AUTHORING_KIRO_EFFORT"] = "high"
+    os.environ["EPSILONERIDANI_AUTHORING_KIRO_MODEL"] = "claude-opus-5"
+    os.environ["EPSILONERIDANI_AUTHORING_KIRO_EFFORT"] = "high"
     kiro_opus = tc.resolve_authoring_profile("kiro")
     check("Kiro can explicitly select Opus", kiro_opus.model, "claude-opus-5")
     check("Kiro Opus selection reaches host", "claude-opus-5" in tc.host_agent_argv("P", kiro_opus)[0], True)
@@ -91,45 +91,45 @@ try:
             check(f"{provider}: retired Opus is rejected", "claude-opus-5" in str(exc), True)
         else:
             check(f"{provider}: retired Opus is rejected", False, True)
-    os.environ.pop("TAUCETI_AUTHORING_KIRO_MODEL")
-    os.environ.pop("TAUCETI_AUTHORING_KIRO_EFFORT")
+    os.environ.pop("EPSILONERIDANI_AUTHORING_KIRO_MODEL")
+    os.environ.pop("EPSILONERIDANI_AUTHORING_KIRO_EFFORT")
 
     for source, kwargs in (
         ("CLI", {"cli_model": "Auto"}),
         ("environment", {}),
     ):
         if source == "environment":
-            os.environ["TAUCETI_AUTHORING_KIRO_MODEL"] = "auto-premium"
+            os.environ["EPSILONERIDANI_AUTHORING_KIRO_MODEL"] = "auto-premium"
         try:
             tc.resolve_authoring_profile("kiro", **kwargs)
             kiro_auto_rejected = False
         except tc.Die:
             kiro_auto_rejected = True
         check(f"Kiro {source} cannot select Auto", kiro_auto_rejected, True)
-        os.environ.pop("TAUCETI_AUTHORING_KIRO_MODEL", None)
+        os.environ.pop("EPSILONERIDANI_AUTHORING_KIRO_MODEL", None)
 
-    os.environ["TAUCETI_AUTHORING_CODEX_MODEL"] = "env-model"
-    os.environ["TAUCETI_AUTHORING_CODEX_EFFORT"] = "medium"
+    os.environ["EPSILONERIDANI_AUTHORING_CODEX_MODEL"] = "env-model"
+    os.environ["EPSILONERIDANI_AUTHORING_CODEX_EFFORT"] = "medium"
     env_profile = tc.resolve_authoring_profile("codex")
     check("provider environment overrides defaults", (env_profile.model, env_profile.effort), ("env-model", "medium"))
     check(
         "environment sources are visible",
         (env_profile.model_source, env_profile.effort_source),
-        ("$TAUCETI_AUTHORING_CODEX_MODEL", "$TAUCETI_AUTHORING_CODEX_EFFORT"),
+        ("$EPSILONERIDANI_AUTHORING_CODEX_MODEL", "$EPSILONERIDANI_AUTHORING_CODEX_EFFORT"),
     )
 
     cli_profile = tc.resolve_authoring_profile("codex", cli_model="cli-model", cli_effort="xhigh")
     check("CLI overrides environment", (cli_profile.model, cli_profile.effort), ("cli-model", "xhigh"))
     check("explicit model disables automatic fallback", cli_profile.fallback_model, None)
 
-    os.environ.pop("TAUCETI_AUTHORING_CODEX_MODEL")
-    os.environ["TAUCETI_CODEX_MODEL"] = "legacy-author"
+    os.environ.pop("EPSILONERIDANI_AUTHORING_CODEX_MODEL")
+    os.environ["EPSILONERIDANI_CODEX_MODEL"] = "legacy-author"
     legacy = tc.resolve_authoring_profile("codex")
     check("legacy variable remains authoring fallback", legacy.model, "legacy-author")
     check("legacy variable does not pin review", tc._codex_review_model_override("codex"), None)
     check("legacy authoring model disables automatic fallback", legacy.fallback_model, None)
-    os.environ.pop("TAUCETI_CODEX_MODEL")
-    os.environ.pop("TAUCETI_AUTHORING_CODEX_EFFORT")
+    os.environ.pop("EPSILONERIDANI_CODEX_MODEL")
+    os.environ.pop("EPSILONERIDANI_AUTHORING_CODEX_EFFORT")
 
     try:
         tc.resolve_authoring_profile("codex", cli_effort='high"\nmodel="surprise')
@@ -138,7 +138,7 @@ try:
         unsafe_rejected = True
     check("effort is safe to forward as a Codex config value", unsafe_rejected, True)
 
-    os.environ["TAUCETI_AUTHORING_DEEPSEEK_EFFORT"] = "high"
+    os.environ["EPSILONERIDANI_AUTHORING_DEEPSEEK_EFFORT"] = "high"
     try:
         tc.resolve_authoring_profile("deepseek")
         openrouter_effort_rejected = False

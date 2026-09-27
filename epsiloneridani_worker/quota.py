@@ -99,7 +99,7 @@ CLAUDE_BOOTSTRAP_DROP_ENV = frozenset(
 # --- pacing curve --------------------------------------------------------------------------------
 # The pacer decides a window is "under pace" while used% stays under a BUDGET that grows with elapsed
 # time. The operator supplies that budget as piecewise-linear "time%:budget%" control points via
-# $TAUCETI_PACE / --pace, e.g. "0:10,50:70,90:90": allow 10% immediately, ramp to 70% by the halfway
+# $EPSILONERIDANI_PACE / --pace, e.g. "0:10,50:70,90:90": allow 10% immediately, ramp to 70% by the halfway
 # mark and 90% by 90% of the window, then (unspecified time 100 defaults to budget 100) ramp to the full
 # quota by the deadline. Budget is a % of quota and MAY exceed 100 (a value >=100 means "no cap" — used%
 # can't exceed 100 anyway). This shapes only the soft PACE; a window at 100% used is still 'exhausted',
@@ -153,16 +153,16 @@ def parse_pace_curve(spec: str | None) -> list[tuple[float, float]]:
 
 
 def pace_curve() -> list[tuple[float, float]]:
-    """The active pacing curve from $TAUCETI_PACE (read live so --pace / the TUI and loop children all
+    """The active pacing curve from $EPSILONERIDANI_PACE (read live so --pace / the TUI and loop children all
     see it; parse cached per raw spec).
 
-    A malformed spec cannot reach here through a sanctioned path: the CLI rejects $TAUCETI_PACE for every
+    A malformed spec cannot reach here through a sanctioned path: the CLI rejects $EPSILONERIDANI_PACE for every
     subcommand and --pace in cmd_work, and a worker's `pace` from workers.toml arrives as --pace. This
     fallback is the last-resort guard for a path that outlives or bypasses that validation, and it
     substitutes the DEFAULT curve — stricter than the identity line the pacer used to fall back on, but
     not provably stricter than whatever the operator was reaching for. That is the trade: pace on a known
     curve rather than crash the pacer, and let validation stay the thing that catches typos."""
-    raw = os.environ.get("TAUCETI_PACE", "") or ""
+    raw = os.environ.get("EPSILONERIDANI_PACE", "") or ""
     if raw not in _PACE_CACHE:
         try:
             _PACE_CACHE[raw] = parse_pace_curve(raw)
@@ -1598,7 +1598,7 @@ class Quota:
         An unattended `epsiloneridani work --loop` has nobody to re-run `claude` for it, so without this a token
         expiry ends the run: every poll reads HTTP 401 and sleeps.
 
-        OFF unless the operator sets --auto-refresh / $TAUCETI_AUTO_REFRESH=1, and that is a deliberate
+        OFF unless the operator sets --auto-refresh / $EPSILONERIDANI_AUTO_REFRESH=1, and that is a deliberate
         default. Both providers issue single-use refresh tokens: exchanging one retires it. EpsilonEridani can
         serialize its OWN processes on this host (the flock below), but it cannot serialize an
         interactive `claude` sharing the file, a second refresher, or a copy of the credential on another
@@ -1619,7 +1619,7 @@ class Quota:
         rather than once per poll, and a rotation another process just performed is not immediately
         spent again. A failure is reported and swallowed: an unrefreshable credential still reads as an
         unavailable provider, which is the honest answer."""
-        if sys.platform == "darwin" or os.environ.get("TAUCETI_AUTO_REFRESH") != "1":
+        if sys.platform == "darwin" or os.environ.get("EPSILONERIDANI_AUTO_REFRESH") != "1":
             return False
         # The ORIGINAL, never the mirror the pacer reads: mirror_creds overwrites the mirror from the
         # original every cycle, so rotating the mirror would be undone and leave the real credential

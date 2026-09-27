@@ -48,14 +48,14 @@ sandboxing or the DeepSeek and MiniMax agents.
 Pass options to the long-running worker when starting it:
 
 ```bash
-TAUCETI_WORKER_ARGS="--only roadmap --roadmap-only Topology" docker compose up -d
+EPSILONERIDANI_WORKER_ARGS="--only roadmap --roadmap-only Topology" docker compose up -d
 ```
 
 To keep those options for future `docker compose up` commands, put the setting in
 `.env` at the repository root instead:
 
 ```dotenv
-TAUCETI_WORKER_ARGS=--only roadmap --roadmap-only Topology
+EPSILONERIDANI_WORKER_ARGS=--only roadmap --roadmap-only Topology
 ```
 
 Then apply it normally:
@@ -131,10 +131,10 @@ The refreshers check once a minute, renew within 90 minutes of expiry, avoid rot
 more than once per 10 minutes, and back off to 15 minutes after errors. Advanced
 deployments can override these service environment variables:
 
-- `TAUCETI_REFRESH_POLL_SECONDS`
-- `TAUCETI_REFRESH_SKEW_SECONDS`
-- `TAUCETI_REFRESH_MIN_INTERVAL_SECONDS`
-- `TAUCETI_REFRESH_MAX_BACKOFF_SECONDS`
+- `EPSILONERIDANI_REFRESH_POLL_SECONDS`
+- `EPSILONERIDANI_REFRESH_SKEW_SECONDS`
+- `EPSILONERIDANI_REFRESH_MIN_INTERVAL_SECONDS`
+- `EPSILONERIDANI_REFRESH_MAX_BACKOFF_SECONDS`
 
 ## Security
 

@@ -22,7 +22,7 @@ is fine at a keyboard and fatal unattended: `work --loop` will sit at
 `claude usage HTTP 401 (access token expired or rejected; log in again)` until
 someone intervenes.
 
-`epsiloneridani work --loop --auto-refresh` (or `$TAUCETI_AUTO_REFRESH=1`) lets the
+`epsiloneridani work --loop --auto-refresh` (or `$EPSILONERIDANI_AUTO_REFRESH=1`) lets the
 worker renew the token itself once it is within 90 minutes of expiry.
 
 **Only turn it on when nothing else uses that credential file.** Claude and Codex

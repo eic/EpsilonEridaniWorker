@@ -190,7 +190,7 @@ check(
 )
 
 # The docs must not mention them: an undocumented flag is one we can retire without a deprecation.
-names = ("review-min-queue", "review-min-age", "TAUCETI_REVIEW_MIN")
+names = ("review-min-queue", "review-min-age", "EPSILONERIDANI_REVIEW_MIN")
 docs = [REPO / "README.md", *sorted((REPO / "docs").glob("*.md")), REPO / "workers.toml.example"]
 mentioned = sorted(p.name for p in docs if p.exists() and any(n in p.read_text() for n in names))
 check("no user-facing doc mentions them", mentioned, [])

@@ -3,7 +3,7 @@
 FROM node:22-bookworm
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-ARG TAUCETI_LEAN_TOOLCHAIN=leanprover/lean4:v4.32.0
+ARG EPSILONERIDANI_LEAN_TOOLCHAIN=leanprover/lean4:v4.32.0
 
 # Runtime tools for epsiloneridani and its agents, plus a native toolchain for Lean builds. Debian
 # package revisions deliberately track Bookworm's security repository instead of being frozen.
@@ -29,8 +29,8 @@ RUN apt-get update \
 
 # Lean (elan/lake) and uv/uvx. Both installers select binaries for the build architecture.
 RUN curl -fsSL https://elan.lean-lang.org/elan-init.sh | sh -s -- -y \
-    && /root/.elan/bin/elan toolchain install "$TAUCETI_LEAN_TOOLCHAIN" \
-    && /root/.elan/bin/elan default "$TAUCETI_LEAN_TOOLCHAIN" \
+    && /root/.elan/bin/elan toolchain install "$EPSILONERIDANI_LEAN_TOOLCHAIN" \
+    && /root/.elan/bin/elan default "$EPSILONERIDANI_LEAN_TOOLCHAIN" \
     && curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Subscription authentication is performed at runtime and persisted by compose.yaml. Pin the

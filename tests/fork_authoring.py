@@ -5,7 +5,7 @@ The worker authors and fixes from the contributor's OWN fork: the branch is push
 is opened from it, so no canonical write access is needed (Bryan's report — a read-only account could
 not land roadmap work). This harness pins three pure-ish decisions without touching GitHub or bubble:
 
-  1. `ensure_fork()` resolves the fork BY PARENT (not by name), honors `$TAUCETI_FORK`, creates one
+  1. `ensure_fork()` resolves the fork BY PARENT (not by name), honors `$EPSILONERIDANI_FORK`, creates one
      when absent, and fails closed if a same-named NON-fork squats the name.
   2. `_do_fixlike` skips a tended PR whose head repo was deleted (empty head fields) instead of
      building a `https://github.com//` remote, and otherwise hands bubble the PR's head repo as the
@@ -28,7 +28,7 @@ REPO = HERE.parent
 sys.path.insert(0, str(REPO))
 import epsiloneridani_worker as tc
 
-TAUCETI = tc.constants.TAUCETI  # "eic/EpsilonEridani"
+EPSILONERIDANI = tc.constants.EPSILONERIDANI  # "eic/EpsilonEridani"
 FORK = "alice/EpsilonEridani"
 fails = 0
 
@@ -70,15 +70,15 @@ def run_ensure_fork(scenario, env_fork=None):
     tc.github.ensure_fork.cache_clear()
     tc.github.gh_run = fake_gh(scenario)
     tc.github.me = lambda: "alice"
-    old = os.environ.pop("TAUCETI_FORK", None)
+    old = os.environ.pop("EPSILONERIDANI_FORK", None)
     if env_fork is not None:
-        os.environ["TAUCETI_FORK"] = env_fork
+        os.environ["EPSILONERIDANI_FORK"] = env_fork
     try:
         return tc.github.ensure_fork()
     finally:
-        os.environ.pop("TAUCETI_FORK", None)
+        os.environ.pop("EPSILONERIDANI_FORK", None)
         if old is not None:
-            os.environ["TAUCETI_FORK"] = old
+            os.environ["EPSILONERIDANI_FORK"] = old
 
 
 def test_ensure_fork():
@@ -107,10 +107,10 @@ def test_ensure_fork():
     except tc.Die:
         check("ensure_fork: same-named non-fork -> Die", True)
 
-    # $TAUCETI_FORK override wins with no repo-list call
+    # $EPSILONERIDANI_FORK override wins with no repo-list call
     sc = {"repo_list": lambda: (_ for _ in ()).throw(AssertionError("should not list"))}
     check(
-        "ensure_fork: $TAUCETI_FORK override",
+        "ensure_fork: $EPSILONERIDANI_FORK override",
         run_ensure_fork(sc, env_fork="bob/MyEpsilonEridani") == "bob/MyEpsilonEridani",
     )
 
@@ -149,7 +149,7 @@ def test_fixlike():
     )
     tc.work_units._do_fixlike(w, sv, c, opts, True, prompt_file="fix.md", label="fix")
     check("fixlike: fork head -> allow_push=owner/repo", cap.get("allow_push") == "alice/EpsilonEridani")
-    check("fixlike: target is the PR", cap.get("target") == f"{TAUCETI}/pull/7")
+    check("fixlike: target is the PR", cap.get("target") == f"{EPSILONERIDANI}/pull/7")
 
 
 # ---- 3. do_roadmap: fork push remote + --allow-push + prompt --head --------------------------
@@ -157,10 +157,10 @@ def test_roadmap():
     tmp = Path(tempfile.mkdtemp(prefix="fork-test-"))
     source = tmp / "source-material"
     source.mkdir()
-    os.environ["TAUCETI_RESPECT_CLAIMS"] = "false"  # avoid an intentions-board network call
-    os.environ.pop("TAUCETI_ROADMAP_SKIP", None)
-    os.environ.pop("TAUCETI_PUSH_EXPECT", None)
-    os.environ["TAUCETI_PUSH_EXPECT"] = "stale"  # must be popped by do_roadmap (create-only on the fork)
+    os.environ["EPSILONERIDANI_RESPECT_CLAIMS"] = "false"  # avoid an intentions-board network call
+    os.environ.pop("EPSILONERIDANI_ROADMAP_SKIP", None)
+    os.environ.pop("EPSILONERIDANI_PUSH_EXPECT", None)
+    os.environ["EPSILONERIDANI_PUSH_EXPECT"] = "stale"  # must be popped by do_roadmap (create-only on the fork)
     tc.work_units.ensure_fork = lambda: FORK
     tc.work_units.administrative_hold_avoid_list = lambda *_args: "none"
 
@@ -193,10 +193,10 @@ def test_roadmap():
     opts = types.SimpleNamespace(agent_name="Claude Code", work_model="claude", source=str(source))
     tc.work_units.do_roadmap(w, None, c, opts, bubble=True)
 
-    check("roadmap: bubble target stays canonical", cap.get("target") == TAUCETI)
+    check("roadmap: bubble target stays canonical", cap.get("target") == EPSILONERIDANI)
     check("roadmap: --allow-push is the fork", cap.get("allow_push") == FORK)
-    check("roadmap: push remote is the fork URL", os.environ.get("TAUCETI_PUSH_REMOTE") == f"https://github.com/{FORK}")
-    check("roadmap: PUSH_EXPECT popped (create-only)", "TAUCETI_PUSH_EXPECT" not in os.environ)
+    check("roadmap: push remote is the fork URL", os.environ.get("EPSILONERIDANI_PUSH_REMOTE") == f"https://github.com/{FORK}")
+    check("roadmap: PUSH_EXPECT popped (create-only)", "EPSILONERIDANI_PUSH_EXPECT" not in os.environ)
     prompt = cap.get("prompt", "")
     check("roadmap: prompt has --head <forkowner>:", "--head alice:roadmap/" in prompt)
     check("roadmap: prompt carries the worker id", "worker3" in prompt)

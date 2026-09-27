@@ -10,7 +10,7 @@ import tempfile
 import time
 from pathlib import Path
 
-STATUS_ENV = "TAUCETI_RUNTIME_STATUS"
+STATUS_ENV = "EPSILONERIDANI_RUNTIME_STATUS"
 _RICH_STYLE_RE = re.compile(r"\[(?:/?(?:bold|red|yellow|green|dim)(?: [^]]+)?|/)\]")
 
 
@@ -56,7 +56,7 @@ def update_status(path: Path, **changes) -> dict:
 def report_runtime(state: str | None = None, **changes) -> None:
     """Best-effort status update from a worker or round child.
 
-    Unmanaged workers have no ``TAUCETI_RUNTIME_STATUS`` and pay only the environment lookup.
+    Unmanaged workers have no ``EPSILONERIDANI_RUNTIME_STATUS`` and pay only the environment lookup.
     Status reporting must never turn useful work into a failed round.
     """
     raw = os.environ.get(STATUS_ENV)

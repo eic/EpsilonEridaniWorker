@@ -6,9 +6,9 @@ from __future__ import annotations
 import os
 import re
 
-TAUCETI = "eic/EpsilonEridani"
+EPSILONERIDANI = "eic/EpsilonEridani"
 
-TAUCETI_OWNER = TAUCETI.split("/", 1)[0]  # base-repo owner: a bot PR is first-party iff its head lives here
+EPSILONERIDANI_OWNER = EPSILONERIDANI.split("/", 1)[0]  # base-repo owner: a bot PR is first-party iff its head lives here
 
 ROADMAP = "eic/EpsilonEridaniRoadmaps"
 
@@ -46,9 +46,9 @@ REVIEW_PROVIDER_DOWN_EXIT = 3
 # merge gate in EpsilonEridaniRoadmap must run the SAME version, or the worker can emit headers the gate does
 # not recognise and every report wedges. Bump this together with the two pins in
 # EpsilonEridaniRoadmap/.github/workflows/progress-*.yml.
-PROGRESS_TTL = int(os.environ.get("TAUCETI_PROGRESS_TTL", "600"))  # seconds a `due` verdict stays fresh
+PROGRESS_TTL = int(os.environ.get("EPSILONERIDANI_PROGRESS_TTL", "600"))  # seconds a `due` verdict stays fresh
 MAX_PROGRESS_ERRORS = 3  # consecutive failed progress rounds before backing off
-PROGRESS_ATTEMPT_GAP = int(os.environ.get("TAUCETI_PROGRESS_GAP", "28800"))  # min seconds between attempts
+PROGRESS_ATTEMPT_GAP = int(os.environ.get("EPSILONERIDANI_PROGRESS_GAP", "28800"))  # min seconds between attempts
 # Lines of a failing `epsiloneridani-progress` subcommand echoed into the main log. The whole output is
 # saved to a file regardless; this is only how much of it a reader sees without opening that file.
 # Matches the 20 lines `agents.run_to_logfile` tails for the review engine.
@@ -70,7 +70,7 @@ MAX_REVIEW_CONTESTS_PER_RUBRIC = 3  # per-rubric cap so one noisy thread can't s
 # refuses to review but still exits 0 after re-posting the scoreboard. The worker mirrors that number so it
 # can SKIP a capped PR during the survey — before launching the engine (and its expensive clones) — instead
 # of re-selecting it every round and tight-looping. MUST stay in sync with the engine default (review.py).
-REVIEW_DAILY_CAP = int(os.environ.get("TAUCETI_REVIEW_DAILY_CAP", "12"))
+REVIEW_DAILY_CAP = int(os.environ.get("EPSILONERIDANI_REVIEW_DAILY_CAP", "12"))
 
 # Soft reviewer affinity: the publisher of the latest scoreboard gets first refusal on a new
 # reviewable head (or an author contest) for twenty minutes. After that the unit returns to the shared
@@ -132,17 +132,17 @@ STATUS_LABELS = (
 
 
 # Loop timing. Env-overridable for tuning and tests.
-POLL = int(os.environ.get("TAUCETI_POLL", "300"))  # seconds between quota checks while waiting
+POLL = int(os.environ.get("EPSILONERIDANI_POLL", "300"))  # seconds between quota checks while waiting
 
-ROUND_TIMEOUT = int(os.environ.get("TAUCETI_ROUND_TIMEOUT", "5400"))  # 90 min hard cap per round
+ROUND_TIMEOUT = int(os.environ.get("EPSILONERIDANI_ROUND_TIMEOUT", "5400"))  # 90 min hard cap per round
 
-INTERROUND = int(os.environ.get("TAUCETI_INTERROUND", "20"))  # min gap after a PRODUCTIVE round
+INTERROUND = int(os.environ.get("EPSILONERIDANI_INTERROUND", "20"))  # min gap after a PRODUCTIVE round
 
 EX_NOPROGRESS = 75  # round did NO productive work (distinct from error=1 / success=0)
 
-BACKOFF_BASE = int(os.environ.get("TAUCETI_BACKOFF_BASE", "30"))  # first no-progress sleep (doubles each round)
+BACKOFF_BASE = int(os.environ.get("EPSILONERIDANI_BACKOFF_BASE", "30"))  # first no-progress sleep (doubles each round)
 
-BACKOFF_MAX = int(os.environ.get("TAUCETI_BACKOFF_MAX", "900"))  # cap on the escalating sleep (15 min)
+BACKOFF_MAX = int(os.environ.get("EPSILONERIDANI_BACKOFF_MAX", "900"))  # cap on the escalating sleep (15 min)
 
 # The escalating back-off exists because a no-op round must NOT re-cycle every INTERROUND seconds and
 # re-hammer the API — the failure that ran ~700 no-op rounds against a rate-limited GitHub.
@@ -154,9 +154,9 @@ BACKOFF_MAX = int(os.environ.get("TAUCETI_BACKOFF_MAX", "900"))  # cap on the es
 #  - cmd_loop preflights core budget BEFORE launching a round (no hard cap there) — the right place to
 #    wait out an hourly primary reset, and what keeps us from launching the review engine (whose own
 #    diff fetch would 403) without enough budget to finish.
-GH_MIN_BUDGET = int(os.environ.get("TAUCETI_GH_MIN_BUDGET", "200"))  # core requests a round needs to finish
+GH_MIN_BUDGET = int(os.environ.get("EPSILONERIDANI_GH_MIN_BUDGET", "200"))  # core requests a round needs to finish
 
-GH_INROUND_WAIT = int(os.environ.get("TAUCETI_GH_INROUND_WAIT", "900"))  # cap on gh_run's in-place wait (15 min)
+GH_INROUND_WAIT = int(os.environ.get("EPSILONERIDANI_GH_INROUND_WAIT", "900"))  # cap on gh_run's in-place wait (15 min)
 
 GH_SECONDARY_BASE = 60  # first secondary-limit sleep when no Retry-After is given (then exponential)
 
@@ -170,9 +170,9 @@ GH_SECONDARY_BASE = 60  # first secondary-limit sleep when no Retry-After is giv
 # against a GraphQL gateway that gives up around 11, and past 200 PRs it would have started silently
 # dropping the rest. The survey pages instead, so the cost of any ONE request is fixed by the page size
 # no matter how large the project grows, and no page is anywhere near the gateway's patience.
-OPEN_PR_PAGE = int(os.environ.get("TAUCETI_OPEN_PR_PAGE", "100"))  # PRs per request (GitHub's maximum)
+OPEN_PR_PAGE = int(os.environ.get("EPSILONERIDANI_OPEN_PR_PAGE", "100"))  # PRs per request (GitHub's maximum)
 
-OPEN_PR_MAX_PAGES = int(os.environ.get("TAUCETI_OPEN_PR_MAX_PAGES", "100"))  # refuse to loop forever
+OPEN_PR_MAX_PAGES = int(os.environ.get("EPSILONERIDANI_OPEN_PR_MAX_PAGES", "100"))  # refuse to loop forever
 
 GH_TRANSIENT_TRIES = 3  # retries after a transient failure, then surface it
 
@@ -201,7 +201,7 @@ CLAIM_TTL_S = int(os.environ.get("CLAIM_TTL", "1500"))  # 25 min lease; expires 
 
 CLAIM_HEARTBEAT_S = int(os.environ.get("CLAIM_HEARTBEAT", "300"))  # renew every 5 min while the agent runs
 
-SBCACHE_TTL = int(os.environ.get("TAUCETI_META_TTL", "120"))  # seconds a cached scoreboard meta stays fresh
+SBCACHE_TTL = int(os.environ.get("EPSILONERIDANI_META_TTL", "120"))  # seconds a cached scoreboard meta stays fresh
 
 # How long a cached comment read may be served on the strength of the PR's `updatedAt` alone (see
 # ReviewState.observe). Nothing about a PR's comments can change without GitHub bumping that clock —
@@ -211,7 +211,7 @@ SBCACHE_TTL = int(os.environ.get("TAUCETI_META_TTL", "120"))  # seconds a cached
 # though nothing announced it. Deliberately not "until the next reset": a heuristic we cannot verify
 # gets a ceiling. A read served under this rule is `assumed`, never `fresh`, and cannot authorize a
 # mutation; see dispatch()'s revalidation of the one PR a round acts on.
-SBCACHE_BACKSTOP_S = int(os.environ.get("TAUCETI_META_BACKSTOP", "1800"))
+SBCACHE_BACKSTOP_S = int(os.environ.get("EPSILONERIDANI_META_BACKSTOP", "1800"))
 
 COMMENTS_MEMO_S = 5  # in-memory window over which one survey pass coalesces its issue-comment fetches
 
@@ -264,11 +264,11 @@ AUTHORING_DEFAULTS = {
 
 PI_RUN = os.environ.get("PI_RUN", os.path.expanduser("~/.claude/skills/pi/scripts/run.sh"))
 
-# $TAUCETI_CLAUDE_CMD overrides the `claude` executable for host rounds (a sandbox wrapper, a
+# $EPSILONERIDANI_CLAUDE_CMD overrides the `claude` executable for host rounds (a sandbox wrapper, a
 # differently-named build, ...); it's split as a shell word list and the standard
-# -p/--model/--permission flags are still appended. Matches PI_RUN / $TAUCETI_BUBBLE /
-# $TAUCETI_CODEX_MODEL. (Bubble rounds run claude inside the container, so this is host-mode only.)
-CLAUDE_CMD = os.environ.get("TAUCETI_CLAUDE_CMD", "claude")
+# -p/--model/--permission flags are still appended. Matches PI_RUN / $EPSILONERIDANI_BUBBLE /
+# $EPSILONERIDANI_CODEX_MODEL. (Bubble rounds run claude inside the container, so this is host-mode only.)
+CLAUDE_CMD = os.environ.get("EPSILONERIDANI_CLAUDE_CMD", "claude")
 
 
 # Task taxonomy. Every task drives a model; merge/abandon/dedup housekeeping lives in the repo's CI now.

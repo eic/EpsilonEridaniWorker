@@ -122,11 +122,11 @@ with tempfile.TemporaryDirectory() as root:
         else:
             os.environ["KIRO_API_KEY"] = saved_key
 
-saved_review_model = os.environ.get("TAUCETI_REVIEW_KIRO_MODEL")
+saved_review_model = os.environ.get("EPSILONERIDANI_REVIEW_KIRO_MODEL")
 try:
-    os.environ["TAUCETI_REVIEW_KIRO_MODEL"] = "   "
+    os.environ["EPSILONERIDANI_REVIEW_KIRO_MODEL"] = "   "
     check("blank review override retains exact Sol default", agents._kiro_review_model("kiro"), "gpt-5.6-sol")
-    os.environ["TAUCETI_REVIEW_KIRO_MODEL"] = "auto"
+    os.environ["EPSILONERIDANI_REVIEW_KIRO_MODEL"] = "auto"
     try:
         agents._kiro_review_model("kiro")
         review_auto_rejected = False
@@ -135,9 +135,9 @@ try:
     check("Kiro review cannot select Auto", review_auto_rejected, True)
 finally:
     if saved_review_model is None:
-        os.environ.pop("TAUCETI_REVIEW_KIRO_MODEL", None)
+        os.environ.pop("EPSILONERIDANI_REVIEW_KIRO_MODEL", None)
     else:
-        os.environ["TAUCETI_REVIEW_KIRO_MODEL"] = saved_review_model
+        os.environ["EPSILONERIDANI_REVIEW_KIRO_MODEL"] = saved_review_model
 
 print(f"\n{'PASS' if not fails else 'FAIL'}: {fails} mismatch(es)")
 sys.exit(1 if fails else 0)

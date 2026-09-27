@@ -43,7 +43,7 @@ def check(name, cond):
 
 
 def clear(env):
-    for var in (*CACHE_VARS, *ARTIFACT_VARS, "TAUCETI_DATA_HOME", "TAUCETI_MATHLIB_POOL", "XDG_CACHE_HOME"):
+    for var in (*CACHE_VARS, *ARTIFACT_VARS, "EPSILONERIDANI_DATA_HOME", "EPSILONERIDANI_MATHLIB_POOL", "XDG_CACHE_HOME"):
         env.pop(var, None)
 
 
@@ -54,10 +54,10 @@ def main():
         for k in (
             *CACHE_VARS,
             *ARTIFACT_VARS,
-            "TAUCETI_DATA_HOME",
-            "TAUCETI_MATHLIB_POOL",
+            "EPSILONERIDANI_DATA_HOME",
+            "EPSILONERIDANI_MATHLIB_POOL",
             "XDG_CACHE_HOME",
-            "TAUCETI_WORKER_ID",
+            "EPSILONERIDANI_WORKER_ID",
             "CLAIM_GITDIR_BASE",
             "HOME",
         )
@@ -107,14 +107,14 @@ def main():
         )
         check(
             "an explicit pool override wins",
-            build_caches.mathlib_pool(LOGIN_HOME, {"TAUCETI_MATHLIB_POOL": "/p"}) == Path("/p"),
+            build_caches.mathlib_pool(LOGIN_HOME, {"EPSILONERIDANI_MATHLIB_POOL": "/p"}) == Path("/p"),
         )
 
         # --- the already-isolated path, which is what a round child runs ---------------------------
         clear(env)
         tc.agents.sys.platform = "linux"
         home = tc.agents._worker_iso_home("worker1")
-        env["TAUCETI_DATA_HOME"] = str(home)
+        env["EPSILONERIDANI_DATA_HOME"] = str(home)
         env["HOME"] = str(home)
         check("already-isolated path returns the same home", tc.agents.isolate_home("worker1") == home)
         check("already-isolated path pools the toolchains", env.get("ELAN_HOME") == str(LOGIN_HOME / ".elan"))

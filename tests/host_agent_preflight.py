@@ -35,7 +35,7 @@ check("review deepseek -> pi", wu._host_agent_binary("review", "deepseek"), "pi"
 check("review minimax -> pi", wu._host_agent_binary("review", "minimax"), "pi")
 check("review auto -> None (nothing to gate)", wu._host_agent_binary("review", "auto"), None)
 
-# --- non-review stages: the EXACT executable host_agent_argv will exec, so a custom TAUCETI_CLAUDE_CMD
+# --- non-review stages: the EXACT executable host_agent_argv will exec, so a custom EPSILONERIDANI_CLAUDE_CMD
 #     wrapper or PI_RUN path is preflighted faithfully (no false block, no missed gap). Cross-check the
 #     preflight target against the real launcher argv[0] for every model.
 for model in ("codex", "claude", "kiro", "deepseek", "minimax"):
@@ -48,7 +48,7 @@ check("default fix codex preflights underlying CLI", wu._host_agent_binary("fix"
 # false-block a working launcher (or miss a broken one).
 _saved_cmd = tc.agents.CLAUDE_CMD
 tc.agents.CLAUDE_CMD = "my-wrapper --flag claude"
-check("fix claude honours TAUCETI_CLAUDE_CMD wrapper", wu._host_agent_binary("fix", "claude"), "my-wrapper")
+check("fix claude honours EPSILONERIDANI_CLAUDE_CMD wrapper", wu._host_agent_binary("fix", "claude"), "my-wrapper")
 check(
     "review claude ignores the wrapper (engine uses literal claude)",
     wu._host_agent_binary("review", "claude"),

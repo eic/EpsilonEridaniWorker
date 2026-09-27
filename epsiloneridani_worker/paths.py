@@ -19,7 +19,7 @@ _pkg = Path(__file__).resolve().parent  # …/epsiloneridani_worker
 HERE = _pkg if (_pkg / "prompts").is_dir() else _pkg.parent
 
 # The branch-lease helper the agents run on PATH inside a round. Overridable for tests.
-CLAIM_SH = os.environ.get("TAUCETI_CLAIM_SH") or str(HERE / "scripts" / "claim.sh")
+CLAIM_SH = os.environ.get("EPSILONERIDANI_CLAIM_SH") or str(HERE / "scripts" / "claim.sh")
 
 # CPython builds do not agree on the default CA-bundle path. In particular, uv's standalone
 # CPython uses OpenSSL's /etc/ssl/cert.pem default on NixOS, while NixOS exposes the system bundle

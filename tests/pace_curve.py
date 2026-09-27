@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The pacer's under/over-pace threshold is a piecewise-linear budget curve from $TAUCETI_PACE
+"""The pacer's under/over-pace threshold is a piecewise-linear budget curve from $EPSILONERIDANI_PACE
 (--pace), defaulting to `60:40`. Verify parsing (incl. endpoint fill and rejection of bad specs),
 interpolation, that _classify_window actually honours the curve, and that a window the curve blocks
 reports when the curve frees it. Dependency-free; no network."""
@@ -87,9 +87,9 @@ check("default is below identity everywhere between", all(tc.pace_budget(d, e) <
 # resolve to the default rather than raising inside the pacer or unlocking spend.
 def live(spec):
     if spec is None:
-        os.environ.pop("TAUCETI_PACE", None)
+        os.environ.pop("EPSILONERIDANI_PACE", None)
     else:
-        os.environ["TAUCETI_PACE"] = spec
+        os.environ["EPSILONERIDANI_PACE"] = spec
     return tc.pace_curve()
 
 
@@ -97,11 +97,11 @@ check("unset env -> default curve", live(None) == DEFAULT)
 check("empty env -> default curve", live("") == DEFAULT)
 check("malformed env -> default curve, not a raise", live("0:0,90:0,100:oops") == DEFAULT)
 check("valid env is honoured", live("50:70") == [(0.0, 0.0), (50.0, 70.0), (100.0, 100.0)])
-os.environ.pop("TAUCETI_PACE", None)
+os.environ.pop("EPSILONERIDANI_PACE", None)
 
 
 # --- the CLI validates the spec that will be USED ----------------------------------------------------
-# $TAUCETI_PACE is linted for every subcommand. `work`/`_round` are the ones that REPLACE it, so a
+# $EPSILONERIDANI_PACE is linted for every subcommand. `work`/`_round` are the ones that REPLACE it, so a
 # --pace they were given is what gets validated: a stale `export` in the operator's shell must not veto
 # the flag documented to override it. Nothing else may claim that exemption.
 _dispatched = []
@@ -110,11 +110,11 @@ _dispatched = []
 def cli(argv, env):
     """Run `epsiloneridani <argv>` as far as the pacing validation, with the commands it can dispatch to stubbed
     out so nothing after it runs. Returns None when it got through, or the message it died with."""
-    was = os.environ.get("TAUCETI_PACE")
+    was = os.environ.get("EPSILONERIDANI_PACE")
     if env is None:
-        os.environ.pop("TAUCETI_PACE", None)
+        os.environ.pop("EPSILONERIDANI_PACE", None)
     else:
-        os.environ["TAUCETI_PACE"] = env
+        os.environ["EPSILONERIDANI_PACE"] = env
     _dispatched.clear()
     saved_work, saved_workers = tc.cli.cmd_work, tc.cli.cmd_workers
     # `workers add` writes the operator's real workers.toml, so stub it too: a regression here must not
@@ -128,31 +128,31 @@ def cli(argv, env):
         return str(e)
     finally:
         tc.cli.cmd_work, tc.cli.cmd_workers = saved_work, saved_workers
-        os.environ.pop("TAUCETI_PACE", None)
+        os.environ.pop("EPSILONERIDANI_PACE", None)
         if was is not None:
-            os.environ["TAUCETI_PACE"] = was
+            os.environ["EPSILONERIDANI_PACE"] = was
 
 
 def resolved(cmd, pace, env):
     """What resolve_pace leaves in the environment for the pacer to read live, or the message it died
     with. Validation and installation are one step, so this covers both."""
-    was = os.environ.get("TAUCETI_PACE")
+    was = os.environ.get("EPSILONERIDANI_PACE")
     if env is None:
-        os.environ.pop("TAUCETI_PACE", None)
+        os.environ.pop("EPSILONERIDANI_PACE", None)
     else:
-        os.environ["TAUCETI_PACE"] = env
+        os.environ["EPSILONERIDANI_PACE"] = env
     try:
         tc.cli.resolve_pace(cmd, SimpleNamespace(pace=pace))
-        return os.environ.get("TAUCETI_PACE")
+        return os.environ.get("EPSILONERIDANI_PACE")
     except tc.Die as e:
         return str(e)
     finally:
-        os.environ.pop("TAUCETI_PACE", None)
+        os.environ.pop("EPSILONERIDANI_PACE", None)
         if was is not None:
-            os.environ["TAUCETI_PACE"] = was
+            os.environ["EPSILONERIDANI_PACE"] = was
 
 
-# The flag is not merely validated, it REPLACES the environment — the pacer reads $TAUCETI_PACE live, so
+# The flag is not merely validated, it REPLACES the environment — the pacer reads $EPSILONERIDANI_PACE live, so
 # a validated flag that never lands there would leave the run on the stale curve it was meant to override.
 check("the flag is installed for the pacer to read", resolved("work", "50:70", None) == "50:70")
 check("...over a malformed env", resolved("work", "50:70", "50:") == "50:70")
@@ -160,7 +160,7 @@ check("...and over a valid one", resolved("work", "50:70", "0:0,100:100") == "50
 check("no flag leaves the env alone", resolved("work", None, "0:0,100:100") == "0:0,100:100")
 check("a command that cannot override does not install", resolved("workers", "50:70", None) is None)
 
-check("a malformed env is rejected, naming itself", "$TAUCETI_PACE" in (cli(["work"], "50:") or ""))
+check("a malformed env is rejected, naming itself", "$EPSILONERIDANI_PACE" in (cli(["work"], "50:") or ""))
 check("a malformed flag is rejected, naming itself", "--pace" in (cli(["work", "--pace", "50:"], None) or ""))
 check("a valid flag overrides a malformed env", cli(["work", "--pace", "0:0,100:100"], "50:") is None)
 check("...and reaches the command that installs it", _dispatched == [("work", "0:0,100:100")])
@@ -173,11 +173,11 @@ check("_round overrides too", cli(["_round", "--pace", "0:0,100:100"], "50:") is
 # alone, so it cannot excuse a malformed one that a manager spawned here would inherit.
 check(
     "workers add does not excuse the env it leaves in place",
-    "$TAUCETI_PACE" in (cli(["workers", "add", "--pace", "0:0,100:100"], "50:") or ""),
+    "$EPSILONERIDANI_PACE" in (cli(["workers", "add", "--pace", "0:0,100:100"], "50:") or ""),
 )
 check("...and nothing was dispatched", _dispatched == [])
 # A subcommand with no --pace at all still gets the lint.
-check("a parser without --pace still checks the env", "$TAUCETI_PACE" in (cli(["usage"], "50:") or ""))
+check("a parser without --pace still checks the env", "$EPSILONERIDANI_PACE" in (cli(["usage"], "50:") or ""))
 
 # A worker's stored curve is validated where it is configured, so a typo is a config error rather than a
 # worker that starts, rejects its own --pace, and crash-loops.
@@ -192,9 +192,9 @@ check("...and a valid one is kept", tc.WorkerSpec.from_dict({"id": "w1", "pace":
 # --- _classify_window honours the live curve --------------------------------------------------------
 def status(used, elapsed, pace):
     if pace is None:
-        os.environ.pop("TAUCETI_PACE", None)
+        os.environ.pop("EPSILONERIDANI_PACE", None)
     else:
-        os.environ["TAUCETI_PACE"] = pace
+        os.environ["EPSILONERIDANI_PACE"] = pace
     return tc._classify_window("session", used, elapsed, None, False).status
 
 
@@ -206,13 +206,13 @@ check("curve 50:70: used 60 @ elapsed 50 -> under-pace", status(60, 50, "50:70")
 check("curve 50:70: used 80 @ elapsed 50 -> over-pace", status(80, 50, "50:70") == "over-pace")
 check("curve tail uncapped: used 95 @ elapsed 100 -> under-pace", status(95, 100, "90:90") == "under-pace")
 check("exhausted beats the curve: used 100 @ elapsed 5 -> exhausted", status(100, 5, "0:100") == "exhausted")
-os.environ["TAUCETI_PACE"] = "50:70"
+os.environ["EPSILONERIDANI_PACE"] = "50:70"
 w = tc._classify_window("session", 80, 50, None, False)
 check("over-pace window records the budget it exceeded", w.status == "over-pace" and w.budget == 70.0)
-os.environ.pop("TAUCETI_PACE", None)
+os.environ.pop("EPSILONERIDANI_PACE", None)
 
 # Garbage telemetry fails CLOSED (unknown), never fresh/under-pace — even under a permissive curve.
-os.environ.pop("TAUCETI_PACE", None)
+os.environ.pop("EPSILONERIDANI_PACE", None)
 
 # --- positive headroom: under-pace means room for the NEXT request, not merely "not over" -----------
 check("used < budget -> under-pace", status(49, 50, "0:50,100:50") == "under-pace")
@@ -284,7 +284,7 @@ def free_at(w):
     return tc._pace_free_at(w, NOW)
 
 
-os.environ.pop("TAUCETI_PACE", None)
+os.environ.pop("EPSILONERIDANI_PACE", None)
 # 5h window, 20% elapsed (4h left), used 30% under the default: the budget reaches 30% at 45% elapsed,
 # i.e. 25% of a 5-hour window = 1h15m away, plus the ease.
 check(
@@ -304,7 +304,7 @@ check("nor one already rolling over", free_at(win("over-pace", 30, 20, -1)) is N
 
 # The ease must not step OVER a brief stretch of budget: half of a narrow one, the full ease of a wide
 # one. Here the budget is above 49.9% for a tenth of a percent of the window — about 18 seconds.
-os.environ["TAUCETI_PACE"] = "0:0,50:50,50.2:0,100:0"
+os.environ["EPSILONERIDANI_PACE"] = "0:0,50:50,50.2:0,100:0"
 brief = free_at(win("over-pace", 49.9, 49.8, 2.5 * HOUR))
 start, end = tc.pace_recovery(tc.pace_curve(), 49.9, 49.8)
 per_pct = 2.5 * HOUR / (100 - 49.8)
@@ -314,12 +314,12 @@ check(
     tc.pace_budget(tc.pace_curve(), 49.8 + (brief - NOW) / per_pct) > 49.9,
 )
 
-os.environ["TAUCETI_PACE"] = "0:50,100:50"
+os.environ["EPSILONERIDANI_PACE"] = "0:50,100:50"
 check(
     "a curve that never catches up falls back to the reset",
     tc.Quota._next_eligible([win("over-pace", 60, 20, 4 * HOUR)]) == NOW + 4 * HOUR,
 )
-os.environ.pop("TAUCETI_PACE", None)
+os.environ.pop("EPSILONERIDANI_PACE", None)
 
 
 # _next_eligible reads the same as _pace_free_at, over whichever windows are actually blocking. It calls
@@ -351,7 +351,7 @@ check(
 check("under-pace windows are not blocking at all", eligible_in([win("under-pace", 5, 50, HOUR)]) is None)
 check("no windows -> None", tc.Quota._next_eligible([]) is None)
 
-os.environ["TAUCETI_PACE"] = "0:100"
+os.environ["EPSILONERIDANI_PACE"] = "0:100"
 check("NaN elapsed -> unknown", tc._classify_window("session", 50, float("nan"), None, False).status == "unknown")
 check("inf used -> unknown", tc._classify_window("session", float("inf"), 50, None, False).status == "unknown")
 check("bool used -> unknown", tc._classify_window("session", True, 50, None, False).status == "unknown")
@@ -359,6 +359,6 @@ check(
     "limit_reached still exhausts despite NaN elapsed",
     tc._classify_window("session", 5, float("nan"), None, True).status == "exhausted",
 )
-os.environ.pop("TAUCETI_PACE", None)
+os.environ.pop("EPSILONERIDANI_PACE", None)
 print(f"\n{'PASS' if not fails else 'FAIL'}: {fails} failure(s)")
 sys.exit(1 if fails else 0)

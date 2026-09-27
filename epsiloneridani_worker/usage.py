@@ -30,14 +30,14 @@ class UsageError(RuntimeError):
 def kiro_data_dir(home: Path, env: dict[str, str] | None = None) -> Path:
     """Directory containing Kiro's browser-auth SQLite store."""
     env = os.environ if env is None else env
-    exact = env.get("TAUCETI_KIRO_DATA_DIR")
+    exact = env.get("EPSILONERIDANI_KIRO_DATA_DIR")
     if exact:
         return Path(exact)
     if sys.platform == "darwin":
         # Kiro follows macOS's native application-data location; XDG_DATA_HOME
         # is not a reliable redirect for the proprietary CLI on this platform.
         base = home / "Library" / "Application Support"
-    elif xdg := env.get("TAUCETI_KIRO_XDG_DATA_HOME") or env.get("XDG_DATA_HOME"):
+    elif xdg := env.get("EPSILONERIDANI_KIRO_XDG_DATA_HOME") or env.get("XDG_DATA_HOME"):
         base = Path(xdg)
     else:
         base = home / ".local" / "share"
@@ -125,18 +125,18 @@ def kiro_process_env(
         env.pop("KIRO_API_KEY", None)
     for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY", "OPENROUTER_MANAGEMENT_KEY"):
         env.pop(key, None)
-    if env.get("TAUCETI_KIRO_HOME"):
-        env["KIRO_HOME"] = env["TAUCETI_KIRO_HOME"]
-    if env.get("TAUCETI_KIRO_PROCESS_HOME"):
-        env["HOME"] = env["TAUCETI_KIRO_PROCESS_HOME"]
-    if sys.platform != "darwin" and env.get("TAUCETI_KIRO_DATA_DIR"):
-        env["XDG_DATA_HOME"] = str(Path(env["TAUCETI_KIRO_DATA_DIR"]).parent)
-    elif sys.platform != "darwin" and env.get("TAUCETI_KIRO_XDG_DATA_HOME"):
-        env["XDG_DATA_HOME"] = env["TAUCETI_KIRO_XDG_DATA_HOME"]
+    if env.get("EPSILONERIDANI_KIRO_HOME"):
+        env["KIRO_HOME"] = env["EPSILONERIDANI_KIRO_HOME"]
+    if env.get("EPSILONERIDANI_KIRO_PROCESS_HOME"):
+        env["HOME"] = env["EPSILONERIDANI_KIRO_PROCESS_HOME"]
+    if sys.platform != "darwin" and env.get("EPSILONERIDANI_KIRO_DATA_DIR"):
+        env["XDG_DATA_HOME"] = str(Path(env["EPSILONERIDANI_KIRO_DATA_DIR"]).parent)
+    elif sys.platform != "darwin" and env.get("EPSILONERIDANI_KIRO_XDG_DATA_HOME"):
+        env["XDG_DATA_HOME"] = env["EPSILONERIDANI_KIRO_XDG_DATA_HOME"]
     if force_private or kiro_key:
         root = private_root
         if root is None:
-            state = env.get("TAUCETI_DATA_HOME")
+            state = env.get("EPSILONERIDANI_DATA_HOME")
             root = (
                 Path(state) / "kiro-api-profile" if state else Path(env.get("HOME", ".")) / ".epsiloneridani-kiro-api"
             )
@@ -146,8 +146,8 @@ def kiro_process_env(
             env.pop("XDG_DATA_HOME", None)
         else:
             env["XDG_DATA_HOME"] = str(root / "data")
-        env["TAUCETI_KIRO_DATA_DIR"] = str(
-            kiro_data_dir(Path(env["HOME"]), {k: v for k, v in env.items() if k != "TAUCETI_KIRO_DATA_DIR"})
+        env["EPSILONERIDANI_KIRO_DATA_DIR"] = str(
+            kiro_data_dir(Path(env["HOME"]), {k: v for k, v in env.items() if k != "EPSILONERIDANI_KIRO_DATA_DIR"})
         )
     return env
 

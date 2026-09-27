@@ -65,7 +65,7 @@ from .constants import (
     REVIEW_PROVIDER_DOWN_EXIT,
     ROADMAP,
     SANDBOX_DEFAULT,
-    TAUCETI,
+    EPSILONERIDANI,
 )
 from .github import GitHub, GitHubError, claims_repo, ensure_fork, gh_run, me
 from .intentions import administrative_hold_avoid_list, claimed_avoid_list
@@ -162,7 +162,7 @@ def throttle_review(sv: Survey, opts, *, now: float | None = None) -> None:
     """Apply the two review throttles to this round's review queue, in place.
 
     UNDOCUMENTED — expert use only. `--review-min-queue N` / `--review-min-age M` (and their
-    `$TAUCETI_REVIEW_MIN_QUEUE` / `$TAUCETI_REVIEW_MIN_AGE` equivalents, which is how a managed
+    `$EPSILONERIDANI_REVIEW_MIN_QUEUE` / `$EPSILONERIDANI_REVIEW_MIN_AGE` equivalents, which is how a managed
     worker gets them, through its `env` table) are deliberately absent from `--help`, the README and
     docs/reference.md. They exist for an operator hand-tuning how a fleet spends its review budget —
     batching reviews until a queue has piled up, or leaving a freshly-green PR alone for a while so a
@@ -257,7 +257,7 @@ def pr_focus_reason(sv: Survey, opts, pr: int) -> str:
         return "; ".join(notes)
     info = next((p for p in sv.open_prs if p.number == pr), None)
     if info is None:
-        return f"not an open PR in {TAUCETI} (merged, closed, or never opened)"
+        return f"not an open PR in {EPSILONERIDANI} (merged, closed, or never opened)"
     if info.is_draft:
         return "a draft — the worker acts only on ready-for-review PRs"
     return "open, but the survey found no work unit actionable for it this round"
@@ -367,7 +367,7 @@ def run_round(w: Worker, opts: RoundOpts) -> int:
         n_err = w.counters.read(f"review-err-{pr}")
         warn_red(
             f"PR #{pr}: review has ERRORED {n_err}x without posting a verdict — the worker cannot "
-            f"review it. Needs infrastructure repair. https://github.com/{TAUCETI}/pull/{pr}"
+            f"review it. Needs infrastructure repair. https://github.com/{EPSILONERIDANI}/pull/{pr}"
         )
         if opts.dry_run:
             log(f"[dry-run] would open/refresh the tracking issue for #{pr}")
@@ -465,7 +465,7 @@ def run_round(w: Worker, opts: RoundOpts) -> int:
 # Authoring/fixing stages whose success MUST leave a mark on GitHub (a push, a new PR, or — for a
 # contested fix — a comment). `review` is excluded: it posts a scoreboard and its rc is the engine's.
 # `progress` is excluded too, and for a sharper reason: _progress_snapshot looks for a mark in
-# TAUCETI, and a progress round's PR lands in EpsilonEridaniRoadmap, so the guard would report "nothing
+# EPSILONERIDANI, and a progress round's PR lands in EpsilonEridaniRoadmap, so the guard would report "nothing
 # landed" on every successful report. Its postcondition is `epsiloneridani-progress apply`'s own exit code,
 # which already distinguishes opened / already-in-flight / already-merged.
 PROGRESS_GUARDED = {"rebase", "fix", "fix-ci", "bump", "lint-repair", "roadmap"}
@@ -584,9 +584,9 @@ def _host_agent_binary(stage: str, model: str) -> str | None:
     """The executable a HOST `stage` must resolve on PATH to run `model` (None ⇒ nothing to gate).
 
     A review round shells the review engine, which gates on a literal `codex`/`claude`/`pi` via its own
-    shutil.which (EpsilonEridaniReview runner/cli.py) and ignores TAUCETI_CLAUDE_CMD / PI_RUN. Every other model
+    shutil.which (EpsilonEridaniReview runner/cli.py) and ignores EPSILONERIDANI_CLAUDE_CMD / PI_RUN. Every other model
     stage launches via host_agent_argv, so preflight the EXACT argv[0] it will exec — which honours a
-    custom TAUCETI_CLAUDE_CMD wrapper or PI_RUN path, so we neither miss a real gap nor false-block a
+    custom EPSILONERIDANI_CLAUDE_CMD wrapper or PI_RUN path, so we neither miss a real gap nor false-block a
     working custom launcher."""
     if stage == "review":
         if model in OPENROUTER_MODELS:
@@ -787,7 +787,7 @@ def dispatch(stage: str, w: Worker, sv: Survey, c: Candidate, opts: RoundOpts) -
     # with which agent and sandbox — the same line for every stage.
     where = "bubble" if bubble else "host"
     if c.pr:
-        what = f"PR #{c.pr}  https://github.com/{TAUCETI}/pull/{c.pr}"
+        what = f"PR #{c.pr}  https://github.com/{EPSILONERIDANI}/pull/{c.pr}"
     elif stage == "roadmap":
         what = f"new PR (area: {c.reason or 'any'})"
     elif stage == "progress":
@@ -965,7 +965,7 @@ def _sync_review_outbox(w: Worker, pr: int) -> int:
             f"auto-merge; analytics/provenance records kept in {outbox}"
         )
         return 0
-    eng = os.environ.get("TAUCETI_REVIEW_ENGINE_DIR")  # a local engine checkout, for pre-merge tests
+    eng = os.environ.get("EPSILONERIDANI_REVIEW_ENGINE_DIR")  # a local engine checkout, for pre-merge tests
     if eng:
         argv = [
             sys.executable,
@@ -989,7 +989,7 @@ def _sync_review_outbox(w: Worker, pr: int) -> int:
     # The sync echoes a full `$ …python …/archive.py sync --store … --data-dir …` command line and a
     # "synced N file(s)" line. Capture it so that noise stays out of the main log, surfacing only a
     # one-line summary; keep the detail in a subsidiary file only when the sync FAILS (the diagnosable case).
-    if os.environ.get("TAUCETI_STREAM"):
+    if os.environ.get("EPSILONERIDANI_STREAM"):
         return subprocess.run(argv).returncode
     p = subprocess.run(argv, capture_output=True, text=True)
     if p.returncode == 0:
@@ -1080,7 +1080,7 @@ def _do_fixlike(
         # The PR's head repo (its own fork, for a fork-PR) gets git fetch/push in the bubble. bubble also
         # auto-derives this from a PR target, so it's explicit/testable belt-and-suspenders (kim-em/bubble#320).
         rc = run_in_bubble(
-            w, f"{TAUCETI}/pull/{pr}", prompt, opts, allow_push=f"{p.head_owner}/{p.head_repo}"
+            w, f"{EPSILONERIDANI}/pull/{pr}", prompt, opts, allow_push=f"{p.head_owner}/{p.head_repo}"
         )  # bubble checks out the PR inside
     else:
         if not prepare_checkout(w.cfg):
@@ -1098,7 +1098,7 @@ def _do_fixlike(
             return 1
         rev = subprocess.run(["git", "-C", str(co), "rev-parse", "HEAD"], capture_output=True, text=True)
         checked = rev.stdout.strip() or head
-        os.environ["TAUCETI_PUSH_EXPECT"] = checked  # CAS against what we actually checked out
+        os.environ["EPSILONERIDANI_PUSH_EXPECT"] = checked  # CAS against what we actually checked out
         log(f"  {label} #{pr}: checked out @ {checked[:12]}")
         rc = run_agent_host(co, prompt, _effective_authoring_profile(opts), w.cfg.logdir)
     if rc == 0:
@@ -1502,14 +1502,14 @@ def do_roadmap(w, sv, c, opts, bubble) -> int:
     if not fetch_ref(REVIEW, refs / "review"):
         raise Die(f"fetch {REVIEW} failed")
     bundle = stage_rubrics(refs / "review", refs / "rubrics")
-    os.environ["TAUCETI_REQUIRE_TARGET_MARKER"] = "1"
+    os.environ["EPSILONERIDANI_REQUIRE_TARGET_MARKER"] = "1"
     # Author from the contributor's OWN fork: push the new branch there and open the PR from it, so the
     # worker never needs write access to canonical (and canonical stays free of WIP branches). The agent
-    # builds against canonical main (the bubble/checkout still targets TAUCETI) — only the push redirects.
+    # builds against canonical main (the bubble/checkout still targets EPSILONERIDANI) — only the push redirects.
     fork = ensure_fork()
     fork_owner = fork.split("/", 1)[0]
-    os.environ["TAUCETI_PUSH_REMOTE"] = f"https://github.com/{fork}"
-    os.environ.pop("TAUCETI_PUSH_EXPECT", None)  # a fresh branch ⇒ create-only CAS on the fork
+    os.environ["EPSILONERIDANI_PUSH_REMOTE"] = f"https://github.com/{fork}"
+    os.environ.pop("EPSILONERIDANI_PUSH_EXPECT", None)  # a fresh branch ⇒ create-only CAS on the fork
     source = getattr(opts, "source", None)
     source_dir = None
     if source is not None:
@@ -1542,7 +1542,7 @@ def do_roadmap(w, sv, c, opts, bubble) -> int:
             mounts.append(f"{source_dir}:/opt/source:ro")
         return run_in_bubble(
             w,
-            TAUCETI,
+            EPSILONERIDANI,
             fill_prompt(
                 HERE / "prompts" / "roadmap.md",
                 ONLY=only,

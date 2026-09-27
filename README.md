@@ -15,7 +15,7 @@ project, not a general framework. You author through **your own fork**: the work
 forks `eic/EpsilonEridani` once, automatically, pushes authored branches and
 fixes there, and opens PRs from it, so you do **not** need write access to the
 canonical repo. (A fine-grained token scoped only to the canonical repo is not
-enough.) Set `TAUCETI_FORK=<owner>/<repo>` to use an existing fork instead.
+enough.) Set `EPSILONERIDANI_FORK=<owner>/<repo>` to use an existing fork instead.
 
 Run as many workers as you like: they take a lease on each job so two of them
 never write the same report or fix the same PR, and that needs no setup and no
@@ -84,7 +84,7 @@ desired state, Ctrl-R restarts it, and Enter follows its current logfile.
 Your agent, sandbox, and roadmap selections persist in `dashboard.json` under
 the EpsilonEridani config directory, so the dashboard reopens where you left it. They
 are dashboard-only: a bare `epsiloneridani work` never reads them, and an explicit
-`TAUCETI_ROADMAP_ONLY` or `TAUCETI_ROADMAP_SKIP` in the environment still wins.
+`EPSILONERIDANI_ROADMAP_ONLY` or `EPSILONERIDANI_ROADMAP_SKIP` in the environment still wins.
 Clone-based and installed invocations share this user-level file. Over a pipe or
 with no TTY the dashboard prints a one-shot snapshot instead. Use `epsiloneridani
 status` in scripts.
@@ -196,7 +196,7 @@ why, one line per PR you named, before it exits without progress:
   --pr #415: review: daily cap 3/3 reached
 ```
 
-`$TAUCETI_PR` is the environment equivalent, which is how a
+`$EPSILONERIDANI_PR` is the environment equivalent, which is how a
 [managed worker](docs/workers.md) gets one through its `env` table. Under
 `--loop` the targeting is re-applied every round, so a targeted loop backs off
 rather than wandering onto other work.
@@ -214,7 +214,7 @@ rather than wandering onto other work.
 | `deepseek` | `deepseek/deepseek-v4-pro` via OpenRouter + [`pi`](https://github.com/badlogic/pi-mono) | pay-per-token (`OPENROUTER_API_KEY`) |
 | `minimax` | `minimax/minimax-m3` via OpenRouter + `pi` | pay-per-token (`OPENROUTER_API_KEY`) |
 
-Set a default with `TAUCETI_AGENT`. Kiro and the OpenRouter agents are unpaced
+Set a default with `EPSILONERIDANI_AGENT`. Kiro and the OpenRouter agents are unpaced
 and never run on their own; you have to ask for them by name. Kiro always passes
 an exact model ID and first checks that the logged-in account advertises it—its
 Auto router is never used. For example:
@@ -362,7 +362,7 @@ current usage and why a provider is waiting.
 | `--ignore-quota` | Ignore soft pacing for an explicit `--agent codex` or `--agent claude`; hard limits still apply |
 | `--quota-cmd CMD` | Your own pacer, run as `<cmd> <agent>`: the first stdout token is the model to run; empty output means wait |
 
-`TAUCETI_PACE` and `TAUCETI_QUOTA_CMD` set the corresponding controls by
+`EPSILONERIDANI_PACE` and `EPSILONERIDANI_QUOTA_CMD` set the corresponding controls by
 default. After a Claude window resets, `epsiloneridani` may make one small request to
 start its usage clock, but only after it has found work and confirmed the other
 window has room.

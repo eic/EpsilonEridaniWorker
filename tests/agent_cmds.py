@@ -99,7 +99,7 @@ print("[OK ] PATH prepends repo dir for the safe-push/claim wrappers")
 # Agent prompts are always passed in argv. In Bubble, an inherited terminal crosses SSH as a non-TTY
 # stream; Codex then waits for more prompt text until EOF. Both output modes must close stdin.
 saved_popen = tc.agents.subprocess.Popen
-saved_stream = os.environ.get("TAUCETI_STREAM")
+saved_stream = os.environ.get("EPSILONERIDANI_STREAM")
 saved_runtime_status = os.environ.get(tc.runtime_status.STATUS_ENV)
 calls = []
 
@@ -119,10 +119,10 @@ class FakeProc:
 tc.agents.subprocess.Popen = lambda *a, **k: calls.append(k) or FakeProc()
 try:
     with tempfile.TemporaryDirectory() as td:
-        os.environ["TAUCETI_STREAM"] = "1"
+        os.environ["EPSILONERIDANI_STREAM"] = "1"
         tc.run_agent_proc(["agent"], env={}, logdir=Path(td), label="test", provider="deepseek")
         check("streamed agent stdin is closed", calls[-1].get("stdin"), tc.agents.subprocess.DEVNULL)
-        os.environ.pop("TAUCETI_STREAM")
+        os.environ.pop("EPSILONERIDANI_STREAM")
         tc.run_agent_proc(["agent"], env={}, logdir=Path(td), label="test", provider="deepseek")
         check("logged agent stdin is closed", calls[-1].get("stdin"), tc.agents.subprocess.DEVNULL)
 
@@ -164,11 +164,11 @@ try:
         parity_dir = Path(td) / "parity"
         tc.run_agent_proc(["claude"], env={}, logdir=parity_dir, label="agent-claude", provider="claude")
         logged_transcript = next(parity_dir.glob("agent-claude-*.log")).read_text()
-        os.environ["TAUCETI_STREAM"] = "1"
+        os.environ["EPSILONERIDANI_STREAM"] = "1"
         streamed = io.StringIO()
         with redirect_stdout(streamed):
             tc.run_agent_proc(["claude"], env={}, logdir=parity_dir, label="agent-claude", provider="claude")
-        os.environ.pop("TAUCETI_STREAM")
+        os.environ.pop("EPSILONERIDANI_STREAM")
         check("logfile and --stream transcripts match", streamed.getvalue(), logged_transcript)
         check(
             "Bubble prelude survives normalization", logged_transcript.startswith("bubble bootstrap complete\n"), True
@@ -247,10 +247,10 @@ try:
             return FakeProc("\n".join(tc.json.dumps(item) for item in events) + "\n", returncode=1)
 
         tc.agents.subprocess.Popen = recovered_retry_then_transport_failure
-        os.environ["TAUCETI_STREAM"] = "1"
+        os.environ["EPSILONERIDANI_STREAM"] = "1"
         with redirect_stdout(io.StringIO()):
             tc.run_agent_proc(["claude"], env={}, logdir=Path(td), label="agent-claude", provider="claude")
-        os.environ.pop("TAUCETI_STREAM")
+        os.environ.pop("EPSILONERIDANI_STREAM")
         check("a recovered retry is not the terminal failure", tc.take_last_agent_infra_failure(), None)
 
         def worked_then_provider_failure(*_args, **_kwargs):
@@ -279,9 +279,9 @@ try:
 finally:
     tc.agents.subprocess.Popen = saved_popen
     if saved_stream is None:
-        os.environ.pop("TAUCETI_STREAM", None)
+        os.environ.pop("EPSILONERIDANI_STREAM", None)
     else:
-        os.environ["TAUCETI_STREAM"] = saved_stream
+        os.environ["EPSILONERIDANI_STREAM"] = saved_stream
     if saved_runtime_status is None:
         os.environ.pop(tc.runtime_status.STATUS_ENV, None)
     else:
@@ -290,7 +290,7 @@ finally:
 # Host configuration must not change worker authoring. Both backends consume the
 # committed/provider-specific profile instead.
 saved_host_home = tc.agents._host_home
-saved_model = os.environ.pop("TAUCETI_CODEX_MODEL", None)
+saved_model = os.environ.pop("EPSILONERIDANI_CODEX_MODEL", None)
 try:
     with tempfile.TemporaryDirectory() as td:
         host_home = Path(td)
@@ -300,16 +300,16 @@ try:
         check("Codex default ignores host model selection", tc.agents._codex_model(), "gpt-6-sol")
         (host_home / ".codex" / "config.toml").write_text("not valid [")
         check("invalid host model config is irrelevant", tc.agents._codex_model(), "gpt-6-sol")
-        os.environ["TAUCETI_CODEX_MODEL"] = "operator-model"
+        os.environ["EPSILONERIDANI_CODEX_MODEL"] = "operator-model"
         check("bubble Codex model operator override", tc.agents._codex_model(), "operator-model")
 finally:
     tc.agents._host_home = saved_host_home
     if saved_model is None:
-        os.environ.pop("TAUCETI_CODEX_MODEL", None)
+        os.environ.pop("EPSILONERIDANI_CODEX_MODEL", None)
     else:
-        os.environ["TAUCETI_CODEX_MODEL"] = saved_model
+        os.environ["EPSILONERIDANI_CODEX_MODEL"] = saved_model
 
-# $TAUCETI_CLAUDE_CMD wraps/replaces the host claude executable; the standard flags are still appended,
+# $EPSILONERIDANI_CLAUDE_CMD wraps/replaces the host claude executable; the standard flags are still appended,
 # and an empty / whitespace-only value falls back to bare `claude` rather than a broken argv.
 _saved = tc.agents.CLAUDE_CMD
 tc.agents.CLAUDE_CMD = "my-wrapper --flag claude"

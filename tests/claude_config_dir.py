@@ -66,17 +66,17 @@ finally:
     shutil.rmtree(tmp, ignore_errors=True)
 
 # The env handed to the bubble subprocess must carry $CLAUDE_CONFIG_DIR (that's how bubble, which now
-# honors the var per kim-em/bubble#317, seeds the matching creds). Point TAUCETI_BUBBLE_HOME at a home
+# honors the var per kim-em/bubble#317, seeds the matching creds). Point EPSILONERIDANI_BUBBLE_HOME at a home
 # whose verified cache-isolation setting is already present, then check the env it returns.
 bhome = Path(tempfile.mkdtemp())
 try:
     (bhome / "config.toml").write_text('[security]\nshared_cache = "overlay"\n')
-    os.environ["TAUCETI_BUBBLE_HOME"] = str(bhome)
+    os.environ["EPSILONERIDANI_BUBBLE_HOME"] = str(bhome)
     os.environ["CLAUDE_CONFIG_DIR"] = "/custom/work-claude"
     benv = tc.ensure_bubble_home(types.SimpleNamespace(home=bhome, wid="w"))
     check("bubble subprocess env carries $CLAUDE_CONFIG_DIR", benv.get("CLAUDE_CONFIG_DIR"), "/custom/work-claude")
 finally:
-    os.environ.pop("TAUCETI_BUBBLE_HOME", None)
+    os.environ.pop("EPSILONERIDANI_BUBBLE_HOME", None)
     shutil.rmtree(bhome, ignore_errors=True)
 
 

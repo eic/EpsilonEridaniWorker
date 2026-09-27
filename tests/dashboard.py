@@ -22,17 +22,17 @@ from types import SimpleNamespace
 # Isolate the prefs file: persistence must land here, not in the operator's real ~/.config.
 _CFGDIR = tempfile.mkdtemp(prefix="epsiloneridani-prefs-")
 for _key in (
-    "TAUCETI_CONFIG_HOME",
-    "TAUCETI_WORKERS_CONFIG",
-    "TAUCETI_WORKERS_STATE_DIR",
-    "TAUCETI_RUNTIME_DIR",
+    "EPSILONERIDANI_CONFIG_HOME",
+    "EPSILONERIDANI_WORKERS_CONFIG",
+    "EPSILONERIDANI_WORKERS_STATE_DIR",
+    "EPSILONERIDANI_RUNTIME_DIR",
 ):
     os.environ.pop(_key, None)
 os.environ["XDG_CONFIG_HOME"] = _CFGDIR
 os.environ["XDG_STATE_HOME"] = str(Path(_CFGDIR) / "state-home")
-os.environ["TAUCETI_RUNTIME_DIR"] = str(Path(_CFGDIR) / "runtime")
-os.environ.pop("TAUCETI_ROADMAP_ONLY", None)  # start from a known (unset) area state
-os.environ.pop("TAUCETI_ROADMAP_SKIP", None)
+os.environ["EPSILONERIDANI_RUNTIME_DIR"] = str(Path(_CFGDIR) / "runtime")
+os.environ.pop("EPSILONERIDANI_ROADMAP_ONLY", None)  # start from a known (unset) area state
+os.environ.pop("EPSILONERIDANI_ROADMAP_SKIP", None)
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
@@ -155,7 +155,7 @@ async def test_dashboard():
         await pilot.press("down")  # algebra -> topology
         await pilot.press("enter")
         await pilot.pause(0.1)
-        check("only picker set env area to topology", os.environ.get("TAUCETI_ROADMAP_ONLY") == "topology")
+        check("only picker set env area to topology", os.environ.get("EPSILONERIDANI_ROADMAP_ONLY") == "topology")
         check("roadmap row area updated immediately (no stale redraw)", app.sv.roadmap_only == "topology")
         check("roadmap row count rescoped immediately", app.sv.n_mine_open == 1)
         check("roadmap row backpressure rescoped immediately", app.sv.roadmap_backpressure is False)
@@ -202,11 +202,11 @@ async def test_cursor_before_load():
 
 
 async def test_sticky_env_focus():
-    """#5: a transient TAUCETI_ROADMAP_ONLY override must NOT be written into prefs by an unrelated
+    """#5: a transient EPSILONERIDANI_ROADMAP_ONLY override must NOT be written into prefs by an unrelated
     dial change, or it becomes sticky on later runs that have no env override."""
     cfgdir = tempfile.mkdtemp(prefix="epsiloneridani-prefs-env-")
     os.environ["XDG_CONFIG_HOME"] = cfgdir
-    os.environ["TAUCETI_ROADMAP_ONLY"] = "EnvOnly"
+    os.environ["EPSILONERIDANI_ROADMAP_ONLY"] = "EnvOnly"
     try:
         cfg = SimpleNamespace(logdir=Path("/tmp/x"), home=Path(cfgdir), state=Path(cfgdir) / "state")
         app = tc._dashboard_app(cfg, loader=loader)
@@ -218,7 +218,7 @@ async def test_sticky_env_focus():
         check("model-only change saved the model", saved.get("model") == "codex")
         check("env-only area NOT persisted as sticky", saved.get("roadmap_only") != "EnvOnly")
     finally:
-        os.environ.pop("TAUCETI_ROADMAP_ONLY", None)
+        os.environ.pop("EPSILONERIDANI_ROADMAP_ONLY", None)
         os.environ["XDG_CONFIG_HOME"] = _CFGDIR
 
 
@@ -273,11 +273,11 @@ def test_random_default():
         check("no skip set → prompt says none", "`none`" in captured["prompt"])
         # --roadmap-skip excludes an area from the random pick (so only "topology" remains)
         captured.clear()
-        os.environ["TAUCETI_ROADMAP_SKIP"] = "algebra"
+        os.environ["EPSILONERIDANI_ROADMAP_SKIP"] = "algebra"
         tc.do_roadmap(w, None, tc.Candidate(0, "", "auto"), opts, False)
         check("auto skips the excluded area", "`topology`" in captured["prompt"])
         check("skipped area named in the prompt", "algebra" in captured["prompt"])
-        os.environ.pop("TAUCETI_ROADMAP_SKIP", None)
+        os.environ.pop("EPSILONERIDANI_ROADMAP_SKIP", None)
         # no areas (fetch failed) → fall back to all areas ("any")
         captured.clear()
         tc.work_units.roadmap_areas = lambda gh: []
@@ -287,8 +287,8 @@ def test_random_default():
         for k, v in orig.items():
             setattr(tc.work_units, k, v)
         tc.random.choice = orig_choice
-        os.environ.pop("TAUCETI_ROADMAP_SKIP", None)
-        os.environ.pop("TAUCETI_REQUIRE_TARGET_MARKER", None)
+        os.environ.pop("EPSILONERIDANI_ROADMAP_SKIP", None)
+        os.environ.pop("EPSILONERIDANI_REQUIRE_TARGET_MARKER", None)
 
 
 def test_skip_edge_cases():
@@ -323,7 +323,7 @@ def test_skip_edge_cases():
     opts = SimpleNamespace(agent_name="Claude Code", work_model="claude")
     try:
         # --roadmap-only algebra overlaps --roadmap-skip algebra → only wins, skip line drops algebra
-        os.environ["TAUCETI_ROADMAP_SKIP"] = "algebra,topology"
+        os.environ["EPSILONERIDANI_ROADMAP_SKIP"] = "algebra,topology"
         tc.do_roadmap(w, None, tc.Candidate(0, "", "algebra"), opts, False)
         check("pinned area still drives the prompt", "`algebra`" in captured["prompt"])
         check("pinned area not listed as skipped", "Never target `topology`" in captured["prompt"])
@@ -339,13 +339,13 @@ def test_skip_edge_cases():
     finally:
         for k, v in orig.items():
             setattr(tc.work_units, k, v)
-        os.environ.pop("TAUCETI_ROADMAP_SKIP", None)
-        os.environ.pop("TAUCETI_REQUIRE_TARGET_MARKER", None)
+        os.environ.pop("EPSILONERIDANI_ROADMAP_SKIP", None)
+        os.environ.pop("EPSILONERIDANI_REQUIRE_TARGET_MARKER", None)
 
 
 def test_launch_cmd_skip_tristate():
     """launch_cmd embeds the raw skip value verbatim: omitted when None, but an explicit empty string
-    is preserved so a copied command clears an inherited TAUCETI_ROADMAP_SKIP."""
+    is preserved so a copied command clears an inherited EPSILONERIDANI_ROADMAP_SKIP."""
     check("None skip omits the flag", "--roadmap-skip" not in tc.launch_cmd(None, "auto", False, False, None, None))
     check("empty skip is preserved", tc.launch_cmd(None, "auto", False, False, None, "")[-2:] == ["--roadmap-skip", ""])
     check(
@@ -356,19 +356,19 @@ def test_launch_cmd_skip_tristate():
 
 def test_roadmap_skip_parse():
     """roadmap_skip() parses the comma-separated env into a deduped, sorted list (empties dropped)."""
-    old = os.environ.get("TAUCETI_ROADMAP_SKIP")
+    old = os.environ.get("EPSILONERIDANI_ROADMAP_SKIP")
     try:
-        os.environ["TAUCETI_ROADMAP_SKIP"] = " topology , algebra ,, topology "
+        os.environ["EPSILONERIDANI_ROADMAP_SKIP"] = " topology , algebra ,, topology "
         check("skip parsed, deduped, sorted", tc.roadmap_skip() == ["algebra", "topology"])
-        os.environ["TAUCETI_ROADMAP_SKIP"] = ""
+        os.environ["EPSILONERIDANI_ROADMAP_SKIP"] = ""
         check("blank skip → empty list", tc.roadmap_skip() == [])
-        os.environ.pop("TAUCETI_ROADMAP_SKIP", None)
+        os.environ.pop("EPSILONERIDANI_ROADMAP_SKIP", None)
         check("unset skip → empty list", tc.roadmap_skip() == [])
     finally:
         if old is None:
-            os.environ.pop("TAUCETI_ROADMAP_SKIP", None)
+            os.environ.pop("EPSILONERIDANI_ROADMAP_SKIP", None)
         else:
-            os.environ["TAUCETI_ROADMAP_SKIP"] = old
+            os.environ["EPSILONERIDANI_ROADMAP_SKIP"] = old
 
 
 def test_bare_cli_ignores_prefs():
@@ -377,8 +377,8 @@ def test_bare_cli_ignores_prefs():
     at their unset defaults."""
     cfgdir = tempfile.mkdtemp(prefix="epsiloneridani-prefs-cli-")
     old_xdg = os.environ.get("XDG_CONFIG_HOME")
-    old_only = os.environ.pop("TAUCETI_ROADMAP_ONLY", None)
-    old_skip = os.environ.pop("TAUCETI_ROADMAP_SKIP", None)
+    old_only = os.environ.pop("EPSILONERIDANI_ROADMAP_ONLY", None)
+    old_skip = os.environ.pop("EPSILONERIDANI_ROADMAP_SKIP", None)
     os.environ["XDG_CONFIG_HOME"] = cfgdir
     try:
         cfg = SimpleNamespace(home=Path(cfgdir))
@@ -390,9 +390,9 @@ def test_bare_cli_ignores_prefs():
     finally:
         os.environ["XDG_CONFIG_HOME"] = _CFGDIR if old_xdg is None else old_xdg
         if old_only is not None:
-            os.environ["TAUCETI_ROADMAP_ONLY"] = old_only
+            os.environ["EPSILONERIDANI_ROADMAP_ONLY"] = old_only
         if old_skip is not None:
-            os.environ["TAUCETI_ROADMAP_SKIP"] = old_skip
+            os.environ["EPSILONERIDANI_ROADMAP_SKIP"] = old_skip
 
 
 def test_dashboard_uses_saved_pref():
@@ -400,8 +400,8 @@ def test_dashboard_uses_saved_pref():
     process env (so its display and any launched round inherit it) when the env is unset."""
     cfgdir = tempfile.mkdtemp(prefix="epsiloneridani-prefs-dash-")
     old_xdg = os.environ.get("XDG_CONFIG_HOME")
-    old_only = os.environ.pop("TAUCETI_ROADMAP_ONLY", None)
-    old_skip = os.environ.pop("TAUCETI_ROADMAP_SKIP", None)
+    old_only = os.environ.pop("EPSILONERIDANI_ROADMAP_ONLY", None)
+    old_skip = os.environ.pop("EPSILONERIDANI_ROADMAP_SKIP", None)
     os.environ["XDG_CONFIG_HOME"] = cfgdir
     try:
         cfg = SimpleNamespace(home=Path(cfgdir), state=Path(cfgdir) / "state", logdir=Path("/tmp/x"))
@@ -409,24 +409,24 @@ def test_dashboard_uses_saved_pref():
             cfg, {"model": "auto", "bubble": False, "roadmap_only": "topology", "roadmap_skip": "algebra"}
         )
         tc._dashboard_app(cfg, loader=loader)  # runs the saved-pref restore
-        check("dashboard applied the saved only to the env", os.environ.get("TAUCETI_ROADMAP_ONLY") == "topology")
-        check("dashboard applied the saved skip to the env", os.environ.get("TAUCETI_ROADMAP_SKIP") == "algebra")
+        check("dashboard applied the saved only to the env", os.environ.get("EPSILONERIDANI_ROADMAP_ONLY") == "topology")
+        check("dashboard applied the saved skip to the env", os.environ.get("EPSILONERIDANI_ROADMAP_SKIP") == "algebra")
     finally:
-        os.environ.pop("TAUCETI_ROADMAP_ONLY", None)
-        os.environ.pop("TAUCETI_ROADMAP_SKIP", None)
+        os.environ.pop("EPSILONERIDANI_ROADMAP_ONLY", None)
+        os.environ.pop("EPSILONERIDANI_ROADMAP_SKIP", None)
         os.environ["XDG_CONFIG_HOME"] = _CFGDIR if old_xdg is None else old_xdg
         if old_only is not None:
-            os.environ["TAUCETI_ROADMAP_ONLY"] = old_only
+            os.environ["EPSILONERIDANI_ROADMAP_ONLY"] = old_only
         if old_skip is not None:
-            os.environ["TAUCETI_ROADMAP_SKIP"] = old_skip
+            os.environ["EPSILONERIDANI_ROADMAP_SKIP"] = old_skip
 
 
 async def test_skip_dashboard():
-    """The [x] skip control: the TextPrompt sets a normalized TAUCETI_ROADMAP_SKIP, updates the
+    """The [x] skip control: the TextPrompt sets a normalized EPSILONERIDANI_ROADMAP_SKIP, updates the
     survey row immediately, and persists the user-chosen skip to prefs."""
     cfgdir = tempfile.mkdtemp(prefix="epsiloneridani-prefs-skip-")
     old_xdg = os.environ.get("XDG_CONFIG_HOME")
-    old_skip = os.environ.pop("TAUCETI_ROADMAP_SKIP", None)
+    old_skip = os.environ.pop("EPSILONERIDANI_ROADMAP_SKIP", None)
     os.environ["XDG_CONFIG_HOME"] = cfgdir
     try:
         cfg = SimpleNamespace(logdir=Path("/tmp/x"), home=Path(cfgdir), state=Path(cfgdir) / "state")
@@ -435,15 +435,15 @@ async def test_skip_dashboard():
             await await_survey(app, pilot)
             app._apply_skip("topology, algebra,, topology")  # exercise the apply path directly
             await pilot.pause(0.05)
-        check("skip env normalized (deduped, sorted)", os.environ.get("TAUCETI_ROADMAP_SKIP") == "algebra,topology")
+        check("skip env normalized (deduped, sorted)", os.environ.get("EPSILONERIDANI_ROADMAP_SKIP") == "algebra,topology")
         check("roadmap row skip updated immediately", app.sv.roadmap_skip == ["algebra", "topology"])
         saved = json.loads(tc._prefs_path(cfg).read_text())
         check("prefs persisted user-chosen skip", saved.get("roadmap_skip") == "algebra,topology")
     finally:
-        os.environ.pop("TAUCETI_ROADMAP_SKIP", None)
+        os.environ.pop("EPSILONERIDANI_ROADMAP_SKIP", None)
         os.environ["XDG_CONFIG_HOME"] = _CFGDIR if old_xdg is None else old_xdg
         if old_skip is not None:
-            os.environ["TAUCETI_ROADMAP_SKIP"] = old_skip
+            os.environ["EPSILONERIDANI_ROADMAP_SKIP"] = old_skip
 
 
 async def test_persistent_workers_view():
@@ -483,8 +483,8 @@ def test_dashboard_migrates_host_pref():
     PRs in bubble (host=false) is NOT silently un-sandboxed on upgrade. A present `bubble` key wins."""
     cfgdir = tempfile.mkdtemp(prefix="epsiloneridani-prefs-mig-")
     old_xdg = os.environ.get("XDG_CONFIG_HOME")
-    old_only = os.environ.pop("TAUCETI_ROADMAP_ONLY", None)
-    old_skip = os.environ.pop("TAUCETI_ROADMAP_SKIP", None)
+    old_only = os.environ.pop("EPSILONERIDANI_ROADMAP_ONLY", None)
+    old_skip = os.environ.pop("EPSILONERIDANI_ROADMAP_SKIP", None)
     os.environ["XDG_CONFIG_HOME"] = cfgdir
     try:
         cfg = SimpleNamespace(home=Path(cfgdir), state=Path(cfgdir) / "state", logdir=Path("/tmp/x"))
@@ -497,13 +497,13 @@ def test_dashboard_migrates_host_pref():
         tc.save_dashboard_prefs(cfg, {"model": "auto"})  # neither key -> new host default
         check("no sandbox pref defaults to host", tc._dashboard_app(cfg, loader=loader).bubble is False)
     finally:
-        os.environ.pop("TAUCETI_ROADMAP_ONLY", None)
-        os.environ.pop("TAUCETI_ROADMAP_SKIP", None)
+        os.environ.pop("EPSILONERIDANI_ROADMAP_ONLY", None)
+        os.environ.pop("EPSILONERIDANI_ROADMAP_SKIP", None)
         os.environ["XDG_CONFIG_HOME"] = _CFGDIR if old_xdg is None else old_xdg
         if old_only is not None:
-            os.environ["TAUCETI_ROADMAP_ONLY"] = old_only
+            os.environ["EPSILONERIDANI_ROADMAP_ONLY"] = old_only
         if old_skip is not None:
-            os.environ["TAUCETI_ROADMAP_SKIP"] = old_skip
+            os.environ["EPSILONERIDANI_ROADMAP_SKIP"] = old_skip
 
 
 async def run_all():

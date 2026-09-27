@@ -282,7 +282,7 @@ def _ignore_quota_verdict(chosen: str | None, prov: Provider | None) -> str:
 def choose_model(
     cfg: Config, agent: str, quota_cmd: str | None, *, refresh: bool = False, renew: bool = False
 ) -> tuple[str | None, dict]:
-    """Decide which model to run now. With --quota-cmd / TAUCETI_QUOTA_CMD set, consult that external
+    """Decide which model to run now. With --quota-cmd / EPSILONERIDANI_QUOTA_CMD set, consult that external
     command instead of the built-in pacer (the escape hatch for e.g. a multi-account scheme): run
     `<quota_cmd> <agent>`; its first stdout token is the model to run
     (codex/claude/kiro/gemini/deepseek/minimax)

@@ -52,8 +52,8 @@ def raises_exit(fn, *args):
     return None
 
 
-# --- parsing: --pr and $TAUCETI_PR ----------------------------------------------------------------
-os.environ.pop("TAUCETI_PR", None)
+# --- parsing: --pr and $EPSILONERIDANI_PR ----------------------------------------------------------------
+os.environ.pop("EPSILONERIDANI_PR", None)
 check("no flag, no environment -> untargeted", tc.resolve_pr_targets([]), ())
 check("one number", tc.resolve_pr_targets(["412"]), (412,))
 check("a comma list", tc.resolve_pr_targets(["412,415"]), (412, 415))
@@ -99,7 +99,7 @@ check("a repeated # prefix is refused", raises_exit(tc.resolve_pr_targets, ["##4
 check("a non-ASCII digit is refused", raises_exit(tc.resolve_pr_targets, ["\u00b2"]) is not None, True)
 check("surrounding whitespace is still fine", tc.resolve_pr_targets([" 412 , 415 "]), (412, 415))
 
-os.environ["TAUCETI_PR"] = "77,78"
+os.environ["EPSILONERIDANI_PR"] = "77,78"
 check("the environment supplies it when the flag is absent", tc.resolve_pr_targets([]), (77, 78))
 check("the flag wins over the environment", tc.resolve_pr_targets(["412"]), (412,))
 check(
@@ -107,17 +107,17 @@ check(
     raises_exit(tc.resolve_pr_targets, [""]) is not None,
     True,
 )
-os.environ["TAUCETI_PR"] = "nope"
-check("a bad environment value names itself", "$TAUCETI_PR" in (raises_exit(tc.resolve_pr_targets, []) or ""), True)
-os.environ["TAUCETI_PR"] = ",,"
+os.environ["EPSILONERIDANI_PR"] = "nope"
+check("a bad environment value names itself", "$EPSILONERIDANI_PR" in (raises_exit(tc.resolve_pr_targets, []) or ""), True)
+os.environ["EPSILONERIDANI_PR"] = ",,"
 check(
     "an environment value that names nothing is refused",
     "names no pull request" in (raises_exit(tc.resolve_pr_targets, []) or ""),
     True,
 )
-os.environ["TAUCETI_PR"] = "   "
+os.environ["EPSILONERIDANI_PR"] = "   "
 check("a blank environment value is untargeted", tc.resolve_pr_targets([]), ())
-os.environ.pop("TAUCETI_PR", None)
+os.environ.pop("EPSILONERIDANI_PR", None)
 
 # --- the flag reaches both `work` and the internal `_round` ---------------------------------------
 probe = argparse.ArgumentParser(prog="probe")
@@ -536,7 +536,7 @@ readme = (REPO / "README.md").read_text()
 reference = (REPO / "docs" / "reference.md").read_text()
 check("the README documents the flag", "`--pr`" in readme, True)
 check("the reference documents the flag", "`--pr N[,N...]`" in reference, True)
-check("the reference documents the environment variable", "`TAUCETI_PR`" in reference, True)
+check("the reference documents the environment variable", "`EPSILONERIDANI_PR`" in reference, True)
 
 print(f"\n{'PASS' if not fails else 'FAIL'}: {fails} mismatch(es)")
 sys.exit(1 if fails else 0)

@@ -81,8 +81,8 @@ long-running service:
 
 configuration (first that is set wins):
   epsiloneridani workers --config PATH apply         an explicit file, before the action
-  $TAUCETI_WORKERS_CONFIG                     exact default config path
-  $TAUCETI_CONFIG_HOME                        directory holding workers.toml
+  $EPSILONERIDANI_WORKERS_CONFIG                     exact default config path
+  $EPSILONERIDANI_CONFIG_HOME                        directory holding workers.toml
   $XDG_CONFIG_HOME                            root holding epsiloneridani/workers.toml
   platform default                            macOS Application Support, else ~/.config/epsiloneridani
 
@@ -103,7 +103,7 @@ def workers_die(message: str) -> NoReturn:
 
 
 def config_home() -> Path:
-    override = os.environ.get("TAUCETI_CONFIG_HOME")
+    override = os.environ.get("EPSILONERIDANI_CONFIG_HOME")
     if override:
         return Path(override).expanduser()
     xdg = os.environ.get("XDG_CONFIG_HOME")
@@ -115,12 +115,12 @@ def config_home() -> Path:
 
 
 def default_workers_config() -> Path:
-    override = os.environ.get("TAUCETI_WORKERS_CONFIG")
+    override = os.environ.get("EPSILONERIDANI_WORKERS_CONFIG")
     return Path(override).expanduser() if override else config_home() / "workers.toml"
 
 
 def workers_state_dir() -> Path:
-    override = os.environ.get("TAUCETI_WORKERS_STATE_DIR")
+    override = os.environ.get("EPSILONERIDANI_WORKERS_STATE_DIR")
     if override:
         return Path(override).expanduser()
     xdg = os.environ.get("XDG_STATE_HOME")
@@ -132,7 +132,7 @@ def workers_state_dir() -> Path:
 
 
 def workers_runtime_dir() -> Path:
-    override = os.environ.get("TAUCETI_RUNTIME_DIR")
+    override = os.environ.get("EPSILONERIDANI_RUNTIME_DIR")
     if override:
         root = Path(override).expanduser()
     elif os.environ.get("XDG_RUNTIME_DIR"):
@@ -194,11 +194,11 @@ def _pace(value, where: str) -> str | None:
 # Names the manager or the worker's own bootstrap owns. Setting one from the config would break the
 # thing it configures, and the failure would read as a worker bug rather than a configuration error:
 # the first four decide which state file the worker heartbeats into, whether it knows it is managed,
-# where its log goes, and which fd is its parent pipe. TAUCETI_DATA_HOME is worse than broken —
+# where its log goes, and which fd is its parent pipe. EPSILONERIDANI_DATA_HOME is worse than broken —
 # isolate_home() reads it as an "isolation completed" sentinel, so presetting it would silently skip
 # credential isolation and run the worker on the operator's own account.
 _RESERVED_ENV = frozenset(
-    {STATUS_ENV, "TAUCETI_MANAGED", "TAUCETI_LOG_FILE", "TAUCETI_PARENT_PIPE_FD", "TAUCETI_DATA_HOME"}
+    {STATUS_ENV, "EPSILONERIDANI_MANAGED", "EPSILONERIDANI_LOG_FILE", "EPSILONERIDANI_PARENT_PIPE_FD", "EPSILONERIDANI_DATA_HOME"}
 )
 
 # A POSIX-portable variable name, which is also what a shell can refer to. `execve` accepts more, but
@@ -671,9 +671,9 @@ def cmd_managed_runner(args) -> int:
             # nothing here can shadow them.
             env = self_env({**os.environ, **dict(spec.env)})
             env[STATUS_ENV] = str(state)
-            env["TAUCETI_MANAGED"] = "1"
+            env["EPSILONERIDANI_MANAGED"] = "1"
             # stderr is already the durable console log; suppress the second log() copy.
-            env["TAUCETI_LOG_FILE"] = os.devnull
+            env["EPSILONERIDANI_LOG_FILE"] = os.devnull
             logf = log_path.open("ab", buffering=0)
             update_status(
                 state,
@@ -697,12 +697,12 @@ def cmd_managed_runner(args) -> int:
                 exit_code=None,
                 stopped_at=None,
             )
-            test_command = os.environ.get("TAUCETI_MANAGER_TEST_COMMAND")
+            test_command = os.environ.get("EPSILONERIDANI_MANAGER_TEST_COMMAND")
             child_argv = shlex.split(test_command) if test_command else spec.work_argv()
             parent_pipe_read, parent_pipe_write = os.pipe()
             os.set_inheritable(parent_pipe_read, True)
             os.set_inheritable(parent_pipe_write, False)
-            env["TAUCETI_PARENT_PIPE_FD"] = str(parent_pipe_read)
+            env["EPSILONERIDANI_PARENT_PIPE_FD"] = str(parent_pipe_read)
             child = subprocess.Popen(
                 child_argv,
                 cwd=HERE,
@@ -1379,8 +1379,8 @@ def _tmux_shell(argv: list[str]) -> str:
     env = self_env()
     assignments = [
         f"PYTHONPATH={env['PYTHONPATH']}",
-        f"TAUCETI_WORKERS_STATE_DIR={workers_state_dir()}",
-        f"TAUCETI_RUNTIME_DIR={workers_runtime_dir()}",
+        f"EPSILONERIDANI_WORKERS_STATE_DIR={workers_state_dir()}",
+        f"EPSILONERIDANI_RUNTIME_DIR={workers_runtime_dir()}",
     ]
     return shlex.join([shutil.which("env") or "/usr/bin/env", *assignments, *argv])
 

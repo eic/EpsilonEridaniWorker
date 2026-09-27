@@ -52,7 +52,7 @@ subprocess.run(
     check=True,
 )
 args = types.SimpleNamespace(source=str(source))
-old_area = os.environ.pop("TAUCETI_ROADMAP_ONLY", None)
+old_area = os.environ.pop("EPSILONERIDANI_ROADMAP_ONLY", None)
 try:
     check(
         "omitted source needs no roadmap restrictions",
@@ -62,12 +62,12 @@ try:
 
     rejects("unpinned roadmap is rejected", args, ["roadmap"], "single roadmap area")
     rejects("unpinned full cascade is rejected", args, [], "single roadmap area")
-    os.environ["TAUCETI_ROADMAP_ONLY"] = ""
+    os.environ["EPSILONERIDANI_ROADMAP_ONLY"] = ""
     rejects("all-roadmaps selection is rejected", args, ["roadmap"], "single roadmap area")
-    os.environ["TAUCETI_ROADMAP_ONLY"] = "any"
+    os.environ["EPSILONERIDANI_ROADMAP_ONLY"] = "any"
     rejects("explicit any selection is rejected", args, ["roadmap"], "single roadmap area")
 
-    os.environ["TAUCETI_ROADMAP_ONLY"] = "Topology"
+    os.environ["EPSILONERIDANI_ROADMAP_ONLY"] = "Topology"
     resolved = tc.resolve_source(args, ["roadmap"])
     check(
         "pinned roadmap resolves source absolutely", resolved == str(source.resolve()) and Path(resolved).is_absolute()
@@ -172,8 +172,8 @@ try:
     check("loop forwards source to child", tail[-2:] == ["--source", str(source.resolve())])
 finally:
     if old_area is None:
-        os.environ.pop("TAUCETI_ROADMAP_ONLY", None)
+        os.environ.pop("EPSILONERIDANI_ROADMAP_ONLY", None)
     else:
-        os.environ["TAUCETI_ROADMAP_ONLY"] = old_area
+        os.environ["EPSILONERIDANI_ROADMAP_ONLY"] = old_area
 
 raise SystemExit(bool(fails))

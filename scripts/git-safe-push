@@ -14,20 +14,20 @@
 # is what actually protects the write.
 #
 # Inputs (exported by the worker before it launches the agent; the agent just runs `git-safe-push [<branch>]`):
-#   TAUCETI_PUSH_REF     destination branch on the head repo (or pass as $1)
-#   TAUCETI_PUSH_EXPECT  observed remote head oid; empty/unset ⇒ create-only (new branch)
-#   TAUCETI_PUSH_REMOTE  git remote or URL to push to (default: origin)
-#   TAUCETI_CLAIM_KEY    optional claim key to verify/renew before pushing
-#   TAUCETI_CLAIM_REPO   repository containing that claim (default: claim.sh's normal selection)
-#   TAUCETI_CLAIM_SH     path to claim.sh (default: alongside this script)
+#   EPSILONERIDANI_PUSH_REF     destination branch on the head repo (or pass as $1)
+#   EPSILONERIDANI_PUSH_EXPECT  observed remote head oid; empty/unset ⇒ create-only (new branch)
+#   EPSILONERIDANI_PUSH_REMOTE  git remote or URL to push to (default: origin)
+#   EPSILONERIDANI_CLAIM_KEY    optional claim key to verify/renew before pushing
+#   EPSILONERIDANI_CLAIM_REPO   repository containing that claim (default: claim.sh's normal selection)
+#   EPSILONERIDANI_CLAIM_SH     path to claim.sh (default: alongside this script)
 set -uo pipefail
 
-REF="${1:-${TAUCETI_PUSH_REF:-}}"
-EXPECT="${TAUCETI_PUSH_EXPECT:-}"
-REMOTE="${TAUCETI_PUSH_REMOTE:-origin}"
-CLAIM_KEY="${TAUCETI_CLAIM_KEY:-}"
-CLAIM_REPO_OVERRIDE="${TAUCETI_CLAIM_REPO:-}"
-CLAIM_SH="${TAUCETI_CLAIM_SH:-$(cd "$(dirname "$0")" && pwd)/claim.sh}"
+REF="${1:-${EPSILONERIDANI_PUSH_REF:-}}"
+EXPECT="${EPSILONERIDANI_PUSH_EXPECT:-}"
+REMOTE="${EPSILONERIDANI_PUSH_REMOTE:-origin}"
+CLAIM_KEY="${EPSILONERIDANI_CLAIM_KEY:-}"
+CLAIM_REPO_OVERRIDE="${EPSILONERIDANI_CLAIM_REPO:-}"
+CLAIM_SH="${EPSILONERIDANI_CLAIM_SH:-$(cd "$(dirname "$0")" && pwd)/claim.sh}"
 
 die() { echo "git-safe-push: $*" >&2; exit 1; }
 claim() {
@@ -37,7 +37,7 @@ claim() {
         "$CLAIM_SH" "$@"
     fi
 }
-[[ -n "$REF" ]] || die "no destination branch (set TAUCETI_PUSH_REF or pass it as an argument)"
+[[ -n "$REF" ]] || die "no destination branch (set EPSILONERIDANI_PUSH_REF or pass it as an argument)"
 
 # 1) Lease check (fail closed if we no longer hold the claim someone may have taken over).
 if [[ -n "$CLAIM_KEY" && -x "$CLAIM_SH" ]]; then

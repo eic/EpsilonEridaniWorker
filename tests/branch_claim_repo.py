@@ -45,12 +45,12 @@ class Harness:
 
         for key in (
             "CLAIM_REPO",
-            "TAUCETI_CLAIM_KEY",
-            "TAUCETI_CLAIM_REPO",
-            "TAUCETI_CLAIM_SH",
-            "TAUCETI_PUSH_EXPECT",
-            "TAUCETI_PUSH_REF",
-            "TAUCETI_PUSH_REMOTE",
+            "EPSILONERIDANI_CLAIM_KEY",
+            "EPSILONERIDANI_CLAIM_REPO",
+            "EPSILONERIDANI_CLAIM_SH",
+            "EPSILONERIDANI_PUSH_EXPECT",
+            "EPSILONERIDANI_PUSH_REF",
+            "EPSILONERIDANI_PUSH_REMOTE",
         ):
             os.environ.pop(key, None)
         if override is not None:
@@ -108,13 +108,13 @@ def shared_namespace_lifecycle():
         assert h.acquired_from == [CLAIMS]
         assert h.heartbeats == [("branch/143", CLAIMS)]
         assert "CLAIM_REPO" not in os.environ
-        assert os.environ["TAUCETI_CLAIM_REPO"] == CLAIMS
+        assert os.environ["EPSILONERIDANI_CLAIM_REPO"] == CLAIMS
         # The arbiter still pushes to the head repository; only the claim moved.
-        assert os.environ["TAUCETI_PUSH_REMOTE"] == "https://github.com/alice/EpsilonEridani"
+        assert os.environ["EPSILONERIDANI_PUSH_REMOTE"] == "https://github.com/alice/EpsilonEridani"
         h.claims.release()
         assert h.released_from == [CLAIMS]
-        assert "TAUCETI_CLAIM_KEY" not in os.environ
-        assert "TAUCETI_CLAIM_REPO" not in os.environ
+        assert "EPSILONERIDANI_CLAIM_KEY" not in os.environ
+        assert "EPSILONERIDANI_CLAIM_REPO" not in os.environ
 
 
 def fork_namespace_lifecycle():
@@ -124,7 +124,7 @@ def fork_namespace_lifecycle():
         assert h.claims.begin_branch_work(91, "abc", "feature", "bob", "EpsilonEridani")
         assert h.acquired_from == ["alice/EpsilonEridani"]
         assert h.heartbeats == [("branch/91", "alice/EpsilonEridani")]
-        assert os.environ["TAUCETI_PUSH_REMOTE"] == "https://github.com/bob/EpsilonEridani"
+        assert os.environ["EPSILONERIDANI_PUSH_REMOTE"] == "https://github.com/bob/EpsilonEridani"
         h.claims.release()
         assert h.released_from == ["alice/EpsilonEridani"]
 
@@ -142,7 +142,7 @@ def explicit_override():
         assert h.claims.begin_branch_work(143, "abc", "feature", "alice", "EpsilonEridani")
         assert h.acquired_from == ["coordination/claims"]
         assert h.heartbeats == [("branch/143", "coordination/claims")]
-        assert os.environ["TAUCETI_CLAIM_REPO"] == "coordination/claims"
+        assert os.environ["EPSILONERIDANI_CLAIM_REPO"] == "coordination/claims"
         h.claims.release()
         assert h.released_from == ["coordination/claims"]
         assert os.environ["CLAIM_REPO"] == "coordination/claims"
@@ -151,12 +151,12 @@ def explicit_override():
 def skipped_candidate_does_not_leak():
     with Harness([1, 0]) as h:
         assert not h.claims.begin_branch_work(1, "a", "one", "alice", "EpsilonEridani")
-        assert "TAUCETI_CLAIM_KEY" not in os.environ
-        assert "TAUCETI_CLAIM_REPO" not in os.environ
+        assert "EPSILONERIDANI_CLAIM_KEY" not in os.environ
+        assert "EPSILONERIDANI_CLAIM_REPO" not in os.environ
         assert h.claims.begin_branch_work(2, "b", "two", "bob", "EpsilonEridani")
         assert h.acquired_from == [CLAIMS, CLAIMS]
         assert h.heartbeats == [("branch/2", CLAIMS)]
-        assert os.environ["TAUCETI_PUSH_REMOTE"] == "https://github.com/bob/EpsilonEridani"
+        assert os.environ["EPSILONERIDANI_PUSH_REMOTE"] == "https://github.com/bob/EpsilonEridani"
         h.claims.release()
         assert h.released_from == [CLAIMS]
 
@@ -169,10 +169,10 @@ def acquire_error_fails_open():
         assert h.claims.held is None
         # No claim key means git-safe-push has no lease to fail closed on: an unreachable claim
         # namespace must not be able to block a finished round from pushing.
-        assert "TAUCETI_CLAIM_KEY" not in os.environ
-        assert "TAUCETI_CLAIM_REPO" not in os.environ
+        assert "EPSILONERIDANI_CLAIM_KEY" not in os.environ
+        assert "EPSILONERIDANI_CLAIM_REPO" not in os.environ
         assert "CLAIM_REPO" not in os.environ
-        assert os.environ["TAUCETI_PUSH_EXPECT"] == "abc"
+        assert os.environ["EPSILONERIDANI_PUSH_EXPECT"] == "abc"
 
 
 def heartbeat_child_uses_selected_repo():
@@ -195,7 +195,7 @@ def heartbeat_child_uses_selected_repo():
     try:
         claims.start_heartbeat("branch/143", CLAIMS)
         assert captured["env"]["CLAIM_REPO"] == CLAIMS
-        assert captured["env"]["TAUCETI_CLAIM_SH"] == round_mod.CLAIM_SH
+        assert captured["env"]["EPSILONERIDANI_CLAIM_SH"] == round_mod.CLAIM_SH
     finally:
         claims.stop_heartbeat()
         round_mod.subprocess.Popen = real_popen
@@ -216,12 +216,12 @@ def safe_push_scopes_claim_repo():
             "PATH": f"{tmp}:{os.environ['PATH']}",
             "CLAIM_LOG": str(claim_log),
             "CLAIM_REPO": "coordination/global",
-            "TAUCETI_CLAIM_KEY": "branch/143",
-            "TAUCETI_CLAIM_REPO": CLAIMS,
-            "TAUCETI_CLAIM_SH": str(claim),
-            "TAUCETI_PUSH_REF": "feature",
-            "TAUCETI_PUSH_EXPECT": "abc",
-            "TAUCETI_PUSH_REMOTE": "https://github.com/alice/EpsilonEridani",
+            "EPSILONERIDANI_CLAIM_KEY": "branch/143",
+            "EPSILONERIDANI_CLAIM_REPO": CLAIMS,
+            "EPSILONERIDANI_CLAIM_SH": str(claim),
+            "EPSILONERIDANI_PUSH_REF": "feature",
+            "EPSILONERIDANI_PUSH_EXPECT": "abc",
+            "EPSILONERIDANI_PUSH_REMOTE": "https://github.com/alice/EpsilonEridani",
         }
         result = subprocess.run([REPO / "scripts" / "git-safe-push"], env=env, capture_output=True, text=True)
         assert result.returncode == 0, result.stderr

@@ -75,8 +75,8 @@ The first of these that is set wins:
 | Source | Path |
 | --- | --- |
 | `epsiloneridani workers --config PATH` | exactly that file |
-| `$TAUCETI_WORKERS_CONFIG` | exactly that file |
-| `$TAUCETI_CONFIG_HOME` | `$TAUCETI_CONFIG_HOME/workers.toml` |
+| `$EPSILONERIDANI_WORKERS_CONFIG` | exactly that file |
+| `$EPSILONERIDANI_CONFIG_HOME` | `$EPSILONERIDANI_CONFIG_HOME/workers.toml` |
 | `$XDG_CONFIG_HOME` | `$XDG_CONFIG_HOME/epsiloneridani/workers.toml` |
 | macOS default | `~/Library/Application Support/epsiloneridani/workers.toml` |
 | otherwise | `~/.config/epsiloneridani/workers.toml` |
@@ -115,7 +115,7 @@ other top-level key is an error, as is any unrecognized field inside a
 | `stream` | bool | `false` | Keep the agent transcript in the console log instead of a separate file |
 | `isolate_home` | bool | `false` | Force credential isolation for the id `default`; every other id already enables it |
 | `restart` | string | `"always"` | `always` after any exit, `on-failure` after a nonzero exit, or `never`; explicit restart and re-enable still work |
-| `env` | table of strings | `{}` | Extra environment for this worker's process tree, for settings with no flag of their own. Values must be quoted strings, names POSIX-portable, and the table at most 16 KB. The variables the worker sets itself (`TAUCETI_MANAGED`, `TAUCETI_LOG_FILE`, `TAUCETI_PARENT_PIPE_FD`, `TAUCETI_DATA_HOME`, and the runtime-status path) are rejected. **Not a secret store** — see below |
+| `env` | table of strings | `{}` | Extra environment for this worker's process tree, for settings with no flag of their own. Values must be quoted strings, names POSIX-portable, and the table at most 16 KB. The variables the worker sets itself (`EPSILONERIDANI_MANAGED`, `EPSILONERIDANI_LOG_FILE`, `EPSILONERIDANI_PARENT_PIPE_FD`, `EPSILONERIDANI_DATA_HOME`, and the runtime-status path) are rejected. **Not a secret store** — see below |
 
 The manager fingerprints each definition. It stops a worker when `enabled`
 becomes false and restarts an enabled worker when any other field changes,
@@ -300,7 +300,7 @@ What an isolated worker inherits is the credential, not your configuration. Its
 the one `pi` skill the worker itself dispatches through, so a round behaves the
 same whoever ran it and your personal instructions cannot contradict the task
 prompt. Edit that generated `settings.json` in place to tune a worker; it is
-written once and never overwritten. `TAUCETI_INHERIT_CLAUDE_CONFIG=1` restores
+written once and never overwritten. `EPSILONERIDANI_INHERIT_CLAUDE_CONFIG=1` restores
 the previous behaviour of sharing your own `CLAUDE.md`, settings, and skills,
 including on a worker already seeded the clean way; a `settings.json` you have
 edited is kept rather than replaced.
@@ -314,9 +314,9 @@ edited is kept rather than replaced.
 | `<state>/logs/<id>/work-*.log` | Durable per-run console logs |
 | `<runtime>/manager.sock`, `w-<id>.sock` | Control sockets, mode 0600 |
 
-`<state>` is `$TAUCETI_WORKERS_STATE_DIR`, else `$XDG_STATE_HOME/epsiloneridani/workers`,
+`<state>` is `$EPSILONERIDANI_WORKERS_STATE_DIR`, else `$XDG_STATE_HOME/epsiloneridani/workers`,
 else `~/Library/Application Support/epsiloneridani/state/workers` on macOS, else
-`~/.local/state/epsiloneridani/workers`. `<runtime>` is `$TAUCETI_RUNTIME_DIR`, else
+`~/.local/state/epsiloneridani/workers`. `<runtime>` is `$EPSILONERIDANI_RUNTIME_DIR`, else
 `$XDG_RUNTIME_DIR/epsiloneridani`, else `/tmp/epsiloneridani-$(id -u)`; it must be owned by you
 and inaccessible to other users, or the manager refuses to start.
 

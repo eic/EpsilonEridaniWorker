@@ -106,7 +106,7 @@ print("== 3. a round that exits 0 leaves a backgrounded grandchild; the sweep cl
 # Drive the real _round through the test HOLD hook: it spawns `sleep <hold>` and returns 0 immediately —
 # the leak. Spawn it the way spawn_round does (own session) so its pid is the group id to sweep.
 WID = "sweep-test"
-env = dict(os.environ, TAUCETI_WORKER_ID=WID, TAUCETI_TEST_HOLD="300")
+env = dict(os.environ, EPSILONERIDANI_WORKER_ID=WID, EPSILONERIDANI_TEST_HOLD="300")
 round_proc = subprocess.Popen(
     [sys.executable, str(REPO / "epsiloneridani"), "_round", "--worker-id", WID],
     start_new_session=True,
@@ -137,7 +137,7 @@ else:
 print("== 4. run_round_subprocess sweeps the group on a normal (rc 0) return ==")
 # The integration point: not just that reap_round_group works, but that run_round_subprocess's `finally`
 # actually invokes it on the happy path. Spy on spawn_round to capture the round's pgid, drive a real
-# round that leaks a grandchild (TAUCETI_TEST_HOLD), and assert the group is gone once the call returns.
+# round that leaks a grandchild (EPSILONERIDANI_TEST_HOLD), and assert the group is gone once the call returns.
 captured = {}
 orig_spawn = tc.round.spawn_round  # patch where run_round_subprocess looks it up
 
@@ -149,12 +149,12 @@ def spy_spawn(argv_tail):
 
 
 tc.round.spawn_round = spy_spawn
-os.environ["TAUCETI_TEST_HOLD"] = "300"
+os.environ["EPSILONERIDANI_TEST_HOLD"] = "300"
 try:
     rc = tc.run_round_subprocess(["--worker-id", WID])
 finally:
     tc.round.spawn_round = orig_spawn
-    os.environ.pop("TAUCETI_TEST_HOLD", None)
+    os.environ.pop("EPSILONERIDANI_TEST_HOLD", None)
 
 pgid4 = captured.get("pgid")
 if rc != 0:

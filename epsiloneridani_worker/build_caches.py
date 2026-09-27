@@ -124,7 +124,7 @@ def mathlib_pool(host_home: Path, env: dict[str, str] | None = None) -> Path:
     `XDG_CACHE_HOME/mathlib`, else `~/.cache/mathlib` under the LOGIN user's home rather than the
     per-worker one."""
     env = os.environ if env is None else env
-    explicit = env.get("TAUCETI_MATHLIB_POOL") or env.get("MATHLIB_CACHE_DIR")
+    explicit = env.get("EPSILONERIDANI_MATHLIB_POOL") or env.get("MATHLIB_CACHE_DIR")
     if explicit:
         return Path(explicit)
     xdg = env.get("XDG_CACHE_HOME")

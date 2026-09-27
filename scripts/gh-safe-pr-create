@@ -7,16 +7,16 @@
 # PR body carries the machine-readable target marker the dup-sweeper relies on (coordination contract §4).
 #
 # Inputs:
-#   TAUCETI_AUTHOR_CLAIM_KEY   the author/<area>/<target-id> claim acquired in shell before the agent ran
-#   TAUCETI_TARGET_MARKER      the exact <!--epsiloneridani-target:v1 {...}--> string the PR body must contain
-#   TAUCETI_CLAIM_SH           path to claim.sh (default: alongside this script)
+#   EPSILONERIDANI_AUTHOR_CLAIM_KEY   the author/<area>/<target-id> claim acquired in shell before the agent ran
+#   EPSILONERIDANI_TARGET_MARKER      the exact <!--epsiloneridani-target:v1 {...}--> string the PR body must contain
+#   EPSILONERIDANI_CLAIM_SH           path to claim.sh (default: alongside this script)
 # All `gh pr create` flags pass through unchanged.
 set -uo pipefail
 
-CLAIM_KEY="${TAUCETI_AUTHOR_CLAIM_KEY:-}"
-MARKER="${TAUCETI_TARGET_MARKER:-}"
-REQUIRE_MARKER="${TAUCETI_REQUIRE_TARGET_MARKER:-}"   # 1 ⇒ body must carry SOME <!--epsiloneridani-target--> marker
-CLAIM_SH="${TAUCETI_CLAIM_SH:-$(cd "$(dirname "$0")" && pwd)/claim.sh}"
+CLAIM_KEY="${EPSILONERIDANI_AUTHOR_CLAIM_KEY:-}"
+MARKER="${EPSILONERIDANI_TARGET_MARKER:-}"
+REQUIRE_MARKER="${EPSILONERIDANI_REQUIRE_TARGET_MARKER:-}"   # 1 ⇒ body must carry SOME <!--epsiloneridani-target--> marker
+CLAIM_SH="${EPSILONERIDANI_CLAIM_SH:-$(cd "$(dirname "$0")" && pwd)/claim.sh}"
 
 die() { echo "gh-safe-pr-create: $*" >&2; exit 1; }
 
@@ -40,8 +40,8 @@ if [[ -n "$CLAIM_KEY" && -x "$CLAIM_SH" ]]; then
 fi
 
 # 2) The PR body must carry the target marker so the conservative dup-sweeper can match it.
-#    Either an EXACT marker is mandated (TAUCETI_TARGET_MARKER, when the shell pre-picked the target),
-#    or just SOME well-formed marker is required (TAUCETI_REQUIRE_TARGET_MARKER, agent-picked target).
+#    Either an EXACT marker is mandated (EPSILONERIDANI_TARGET_MARKER, when the shell pre-picked the target),
+#    or just SOME well-formed marker is required (EPSILONERIDANI_REQUIRE_TARGET_MARKER, agent-picked target).
 if [[ -n "$MARKER" ]]; then
     body="$(pr_body_from_args "$@")"
     [[ "$body" == *"$MARKER"* ]] \

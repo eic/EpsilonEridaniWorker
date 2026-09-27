@@ -71,9 +71,9 @@ def setup(tmp, *, expired=True, refresh="operator-refresh", opt_in=True):
         d.mkdir(parents=True)
     (dst / ".epsiloneridani-creds-source").write_text(str(src))
     os.environ["CLAUDE_CONFIG_DIR"] = str(dst)
-    os.environ.pop("TAUCETI_AUTO_REFRESH", None)
+    os.environ.pop("EPSILONERIDANI_AUTO_REFRESH", None)
     if opt_in:
-        os.environ["TAUCETI_AUTO_REFRESH"] = "1"
+        os.environ["EPSILONERIDANI_AUTO_REFRESH"] = "1"
     expiry = (time.time() - 60 if expired else time.time() + 86400) * 1000
     (src / ".credentials.json").write_text(creds("stale-access", expiry, refresh))
     (dst / ".credentials.json").write_text(creds("stale-access", expiry, None))  # mirrors carry no token

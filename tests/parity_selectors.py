@@ -43,7 +43,7 @@ except tc.Die:
     # When `gh` isn't authenticated (e.g. in CI), fall back to a placeholder so it still runs; the
     # bot/fork/bump partitions of the fixture are exercised regardless of who ME is.
     ME = "epsiloneridani-ci-placeholder"
-TAUCETI = tc.TAUCETI
+EPSILONERIDANI = tc.EPSILONERIDANI
 
 # jq mirror of PRInfo.from_json's build signal: the commit STATUS (a StatusContext with
 # context=="build", carrying `state`) is the sole authority — that is what branch protection and the
@@ -63,7 +63,7 @@ def jq(data, expr, args=None):
 
 def fetch_live():
     p = subprocess.run(
-        ["gh", "pr", "list", "--repo", TAUCETI, "--state", "open", "--limit", "200", "--json", ",".join(FIELDS)],
+        ["gh", "pr", "list", "--repo", EPSILONERIDANI, "--state", "open", "--limit", "200", "--json", ",".join(FIELDS)],
         text=True,
         capture_output=True,
     )
@@ -97,7 +97,7 @@ def run_checks(data, label):
 
     # tended = a PR the maintenance stages act on: ours OR a FIRST-PARTY bot PR (bot-authored with its
     # head branch in the base repo — the review bot's bump PRs; a fork/external bot is excluded).
-    OWNER = tc.TAUCETI_OWNER
+    OWNER = tc.EPSILONERIDANI_OWNER
     tended = '(.author.login=="%s" or (.author.is_bot and .headRepositoryOwner.login=="%s"))' % (ME, OWNER)
 
     def is_tended(p):

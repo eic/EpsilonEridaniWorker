@@ -31,11 +31,11 @@ ISOLATION_VARS = (
     "HOME",
     "CLAUDE_CONFIG_DIR",
     "CODEX_HOME",
-    "TAUCETI_KIRO_HOME",
-    "TAUCETI_KIRO_DATA_DIR",
-    "TAUCETI_KIRO_PROCESS_HOME",
-    "TAUCETI_KIRO_XDG_DATA_HOME",
-    "TAUCETI_DATA_HOME",
+    "EPSILONERIDANI_KIRO_HOME",
+    "EPSILONERIDANI_KIRO_DATA_DIR",
+    "EPSILONERIDANI_KIRO_PROCESS_HOME",
+    "EPSILONERIDANI_KIRO_XDG_DATA_HOME",
+    "EPSILONERIDANI_DATA_HOME",
     "GH_CONFIG_DIR",
     "GIT_CONFIG_GLOBAL",
 )
@@ -100,14 +100,14 @@ with tempfile.TemporaryDirectory() as root:
     check("macOS leaves $HOME at the operator's", env["HOME"], str(real))
     check("macOS isolates CLAUDE_CONFIG_DIR", env["CLAUDE_CONFIG_DIR"], str(iso / ".claude"))
     check("macOS isolates CODEX_HOME", env["CODEX_HOME"], str(iso / ".codex"))
-    check("macOS isolates KIRO_HOME", env["TAUCETI_KIRO_HOME"], str(iso / ".kiro"))
+    check("macOS isolates KIRO_HOME", env["EPSILONERIDANI_KIRO_HOME"], str(iso / ".kiro"))
     check(
         "macOS isolates Kiro native data",
-        env["TAUCETI_KIRO_DATA_DIR"],
+        env["EPSILONERIDANI_KIRO_DATA_DIR"],
         str(iso / "Library" / "Application Support" / "kiro-cli"),
     )
-    check("macOS redirects HOME only for Kiro", env["TAUCETI_KIRO_PROCESS_HOME"], str(iso))
-    check("data root is exported", env["TAUCETI_DATA_HOME"], str(iso))
+    check("macOS redirects HOME only for Kiro", env["EPSILONERIDANI_KIRO_PROCESS_HOME"], str(iso))
+    check("data root is exported", env["EPSILONERIDANI_DATA_HOME"], str(iso))
     check("codex credential is copied in", (iso / ".codex" / "auth.json").exists(), True)
     check(
         "codex source marker recorded",
@@ -145,10 +145,10 @@ with tempfile.TemporaryDirectory() as root:
     # back to the operator's account.
     check("early return reasserts CLAUDE_CONFIG_DIR", env["CLAUDE_CONFIG_DIR"], str(iso / ".claude"))
     check("early return reasserts CODEX_HOME", env["CODEX_HOME"], str(iso / ".codex"))
-    check("early return reasserts KIRO_HOME", env["TAUCETI_KIRO_HOME"], str(iso / ".kiro"))
+    check("early return reasserts KIRO_HOME", env["EPSILONERIDANI_KIRO_HOME"], str(iso / ".kiro"))
     check(
         "early return reasserts Kiro native data",
-        env["TAUCETI_KIRO_DATA_DIR"],
+        env["EPSILONERIDANI_KIRO_DATA_DIR"],
         str(iso / "Library" / "Application Support" / "kiro-cli"),
     )
 
@@ -173,13 +173,13 @@ with tempfile.TemporaryDirectory() as root:
     check("Linux still moves $HOME", env["HOME"], str(iso))
     check("Linux isolates CLAUDE_CONFIG_DIR", env["CLAUDE_CONFIG_DIR"], str(iso / ".claude"))
     check("Linux isolates CODEX_HOME", env["CODEX_HOME"], str(iso / ".codex"))
-    check("Linux isolates KIRO_HOME", env["TAUCETI_KIRO_HOME"], str(iso / ".kiro"))
+    check("Linux isolates KIRO_HOME", env["EPSILONERIDANI_KIRO_HOME"], str(iso / ".kiro"))
     check(
         "Linux isolates Kiro data",
-        env["TAUCETI_KIRO_DATA_DIR"],
+        env["EPSILONERIDANI_KIRO_DATA_DIR"],
         str(iso / ".local" / "share" / "kiro-cli"),
     )
-    check("Linux exports the same data root", env["TAUCETI_DATA_HOME"], str(iso))
+    check("Linux exports the same data root", env["EPSILONERIDANI_DATA_HOME"], str(iso))
     # gh and git config are redirected back at the operator's, since the moved $HOME has neither.
     check("Linux redirects GH_CONFIG_DIR", env["GH_CONFIG_DIR"], str(real / ".config" / "gh"))
 
@@ -214,9 +214,9 @@ with tempfile.TemporaryDirectory() as root:
 # exact same paths on both platforms and nothing migrates.
 with tempfile.TemporaryDirectory() as root:
     iso = Path(root) / "iso"
-    saved = {k: os.environ.get(k) for k in ("TAUCETI_DATA_HOME", "HOME", "CLAIM_GITDIR_BASE")}
+    saved = {k: os.environ.get(k) for k in ("EPSILONERIDANI_DATA_HOME", "HOME", "CLAIM_GITDIR_BASE")}
     try:
-        os.environ.update(TAUCETI_DATA_HOME=str(iso), HOME=str(Path(root) / "real"))
+        os.environ.update(EPSILONERIDANI_DATA_HOME=str(iso), HOME=str(Path(root) / "real"))
         os.environ.pop("CLAIM_GITDIR_BASE", None)
         cfg = tc.Config.resolve("worker1")
         check("store follows the data root", cfg.store_dir.is_relative_to(iso), True)
@@ -226,7 +226,7 @@ with tempfile.TemporaryDirectory() as root:
 
         # An unisolated worker (the 'default' id) has no sentinel: its data stays under the login
         # home, exactly where it has always been.
-        os.environ.pop("TAUCETI_DATA_HOME", None)
+        os.environ.pop("EPSILONERIDANI_DATA_HOME", None)
         plain = tc.Config.resolve("default")
         check("unisolated data stays at $HOME", plain.data_home, Path(root) / "real")
     finally:

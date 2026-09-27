@@ -46,8 +46,8 @@ Real sandbox rounds need a stable
 installed executable because Bubble owns a host-global auth daemon. For dry-run
 capability checks only, `epsiloneridani` can fetch it with `uvx`. `epsiloneridani doctor`
 reports whether the Bubble and Incus executables are present; the round preflight
-checks the Bubble version and capabilities. `TAUCETI_BUBBLE` overrides the
-executable, and `TAUCETI_BUBBLE_HOME` overrides the private Bubble home.
+checks the Bubble version and capabilities. `EPSILONERIDANI_BUBBLE` overrides the
+executable, and `EPSILONERIDANI_BUBBLE_HOME` overrides the private Bubble home.
 
 ## OpenRouter agents
 

@@ -35,7 +35,7 @@ def prinfo(number, author, labels, *, draft=False):
             "author": {"login": author},
             "isDraft": draft,
             "labels": [{"name": n} for n in labels],
-            "headRepositoryOwner": {"login": tc.TAUCETI_OWNER},
+            "headRepositoryOwner": {"login": tc.EPSILONERIDANI_OWNER},
             "statusCheckRollup": [],
         }
     )

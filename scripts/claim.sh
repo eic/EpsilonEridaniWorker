@@ -23,14 +23,14 @@
 #   claim.sh list    [--full]              # list live claim refs (--full fetches each lease)
 #   claim.sh gc                            # CAS-delete expired claims
 #
-# Env: CLAIM_REPO (default eic/EpsilonEridani), TAUCETI_WORKER_ID (default host-pid),
+# Env: CLAIM_REPO (default eic/EpsilonEridani), EPSILONERIDANI_WORKER_ID (default host-pid),
 #      CLAIM_TTL (default 1500), CLAIM_GITDIR_BASE (per-repo scratch parent),
 #      CLAIM_GITDIR (explicit scratch object store override).
 set -uo pipefail
 
 REPO="${CLAIM_REPO:-eic/EpsilonEridani}"
 URL="https://github.com/$REPO"
-WID="${TAUCETI_WORKER_ID:-$(hostname)-$$}"
+WID="${EPSILONERIDANI_WORKER_ID:-$(hostname)-$$}"
 DEFAULT_TTL="${CLAIM_TTL:-1500}"
 GITDIR="${CLAIM_GITDIR:-${CLAIM_GITDIR_BASE:-$HOME/.cache/epsiloneridani-claims}/${REPO//\//__}.git}"
 NS="refs/epsiloneridani-claims"

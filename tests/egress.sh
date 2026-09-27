@@ -9,7 +9,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 PY=$(command -v python3)
 WID="egress-test"
-export TAUCETI_WORKER_ID="$WID"
+export EPSILONERIDANI_WORKER_ID="$WID"
 
 if ! command -v bubble >/dev/null 2>&1; then
   echo "  [SKIP] bubble not on PATH — egress invariant is bubble-only"; exit 0

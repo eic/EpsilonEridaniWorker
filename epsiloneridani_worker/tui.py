@@ -10,7 +10,7 @@ from pathlib import Path
 
 from .agents import _shq
 from .config import Config, _only_label, _skip_label, roadmap_areas, roadmap_only, roadmap_skip
-from .constants import ALLOWED_TASKS, KIND_BY_NAME, KIND_KEYS, MAX_OPEN_PRS, TAUCETI
+from .constants import ALLOWED_TASKS, KIND_BY_NAME, KIND_KEYS, MAX_OPEN_PRS, EPSILONERIDANI
 from .github import GitHub
 from .paths import entry_cmd
 from .quota import Quota, _read_json_file, quota_line
@@ -129,7 +129,7 @@ def render_survey(
     expanded = expanded or set()
     titles = {p.number: p.title for p in sv.open_prs}
 
-    header = f"[bold]{TAUCETI}[/]   worker: {sv.worker_id}   open: {sv.status_label_line()}"
+    header = f"[bold]{EPSILONERIDANI}[/]   worker: {sv.worker_id}   open: {sv.status_label_line()}"
     if quota_snap is not None:
         header += "\nquota: " + quota_line(quota_snap)
     console.print(Panel(header, title="epsiloneridani"))
@@ -234,17 +234,17 @@ def _dashboard_app(cfg, loader=None):
 
     load = loader or default_loader
 
-    # Restore the operator's last-used dials. An explicit TAUCETI_ROADMAP_ONLY/SKIP in the environment
+    # Restore the operator's last-used dials. An explicit EPSILONERIDANI_ROADMAP_ONLY/SKIP in the environment
     # (exported, or passed by a parent) always wins over the saved one; otherwise apply the saved value
     # to the env now so BOTH the survey display and any round launched from here inherit it. This is the
     # ONLY place a saved value is read — it is dashboard-scoped: a bare `epsiloneridani work` never loads prefs
     # (cmd_work resolves these from the env + the live area list only), so the saved pref cannot leak
     # into a CLI run; rounds launched from here carry it via explicit --roadmap-only/--roadmap-skip flags.
     prefs = load_dashboard_prefs(cfg)
-    if "TAUCETI_ROADMAP_ONLY" not in os.environ and isinstance(prefs.get("roadmap_only"), str):
-        os.environ["TAUCETI_ROADMAP_ONLY"] = prefs["roadmap_only"]
-    if "TAUCETI_ROADMAP_SKIP" not in os.environ and isinstance(prefs.get("roadmap_skip"), str):
-        os.environ["TAUCETI_ROADMAP_SKIP"] = prefs["roadmap_skip"]
+    if "EPSILONERIDANI_ROADMAP_ONLY" not in os.environ and isinstance(prefs.get("roadmap_only"), str):
+        os.environ["EPSILONERIDANI_ROADMAP_ONLY"] = prefs["roadmap_only"]
+    if "EPSILONERIDANI_ROADMAP_SKIP" not in os.environ and isinstance(prefs.get("roadmap_skip"), str):
+        os.environ["EPSILONERIDANI_ROADMAP_SKIP"] = prefs["roadmap_skip"]
 
     class OnlyPicker(ModalScreen):
         """Arrow-key picker over the roadmap areas — the modal cousin of the dashboard cursor."""
@@ -483,7 +483,7 @@ def _dashboard_app(cfg, loader=None):
                 self.query_one("#hdr", Static).update(Panel(msg, title="epsiloneridani"))
                 return
             head = Text()
-            head.append(TAUCETI, style="bold")
+            head.append(EPSILONERIDANI, style="bold")
             head.append(f"   worker: {sv.worker_id}   open: {sv.status_label_line()}")
             if self.quota is not None:
                 head.append("\nquota: ")
@@ -574,7 +574,7 @@ def _dashboard_app(cfg, loader=None):
 
         def _render_worker_header(self) -> None:
             head = Text()
-            head.append(TAUCETI, style="bold")
+            head.append(EPSILONERIDANI, style="bold")
             head.append("   persistent workers")
             head.append(
                 f"\nmanager: {'running' if self.worker_manager_online else 'offline'}   config: {self.workers_config}"
@@ -683,7 +683,7 @@ def _dashboard_app(cfg, loader=None):
 
         def _save_prefs(self) -> None:
             # Persist the roadmap dials only when the operator set them via [o]/[x]; a transient
-            # TAUCETI_ROADMAP_ONLY/SKIP override must not become sticky across future runs. Otherwise
+            # EPSILONERIDANI_ROADMAP_ONLY/SKIP override must not become sticky across future runs. Otherwise
             # leave the saved values as-is.
             data = {"model": self.model_dial, "bubble": self.bubble}
             if self._only_set_by_user:
@@ -734,7 +734,7 @@ def _dashboard_app(cfg, loader=None):
                 self.notify(str(exc), title="worker restart error", severity="error", timeout=8)
 
         def _apply_only(self, value: str) -> None:
-            os.environ["TAUCETI_ROADMAP_ONLY"] = value
+            os.environ["EPSILONERIDANI_ROADMAP_ONLY"] = value
             self._only_set_by_user = True
             if self.sv is not None:  # keep the roadmap row in step with the status bar immediately
                 self.sv.roadmap_only = roadmap_only() or "any"
@@ -765,7 +765,7 @@ def _dashboard_app(cfg, loader=None):
         def _apply_skip(self, value: str) -> None:
             # Normalize through the same parse roadmap_skip() uses, so the env carries a canonical list.
             areas = sorted({tok for tok in (t.strip() for t in value.split(",")) if tok})
-            os.environ["TAUCETI_ROADMAP_SKIP"] = ",".join(areas)
+            os.environ["EPSILONERIDANI_ROADMAP_SKIP"] = ",".join(areas)
             self._skip_set_by_user = True
             if self.sv is not None:  # keep the roadmap row in step with the status bar immediately
                 self.sv.roadmap_skip = roadmap_skip()
@@ -788,7 +788,7 @@ def _dashboard_app(cfg, loader=None):
         def action_copy_cmd(self) -> None:
             if self.view == "workers":
                 return
-            skip = os.environ.get("TAUCETI_ROADMAP_SKIP")
+            skip = os.environ.get("EPSILONERIDANI_ROADMAP_SKIP")
             one = " ".join(_shq(a) for a in launch_cmd(None, self.model_dial, self.bubble, False, roadmap_only(), skip))
             loop = " ".join(_shq(a) for a in launch_cmd(None, self.model_dial, self.bubble, True, roadmap_only(), skip))
             copied = True
@@ -800,7 +800,7 @@ def _dashboard_app(cfg, loader=None):
 
         def _launch(self, *, loop: bool, only_selected: bool) -> None:
             only = ALLOWED_TASKS[self.sel] if only_selected else None
-            skip = os.environ.get("TAUCETI_ROADMAP_SKIP")
+            skip = os.environ.get("EPSILONERIDANI_ROADMAP_SKIP")
             cmd = launch_cmd(only, self.model_dial, self.bubble, loop, roadmap_only(), skip)
             if loop:
                 try:

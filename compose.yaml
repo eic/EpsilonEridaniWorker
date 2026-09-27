@@ -10,8 +10,8 @@ services:
     stop_grace_period: 2m
     command: ["./epsiloneridani", "work", "--loop"]
     environment:
-      TAUCETI_WORKER_ID: docker
-      TAUCETI_WORKER_ARGS: "${TAUCETI_WORKER_ARGS:-}"
+      EPSILONERIDANI_WORKER_ID: docker
+      EPSILONERIDANI_WORKER_ARGS: "${EPSILONERIDANI_WORKER_ARGS:-}"
       KIRO_API_KEY: "${KIRO_API_KEY:-}"
       OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
       OPENROUTER_MANAGEMENT_KEY: "${OPENROUTER_MANAGEMENT_KEY:-}"
@@ -38,7 +38,7 @@ services:
     tty: true
     command: ["bash"]
     environment:
-      TAUCETI_SKIP_GIT_IDENTITY: "1"
+      EPSILONERIDANI_SKIP_GIT_IDENTITY: "1"
     volumes:
       - claude:/root/.claude
       - codex:/root/.codex
@@ -56,8 +56,8 @@ services:
     stop_grace_period: 60s
     command: ["/usr/local/bin/epsiloneridani-oauth-refresh", "claude"]
     environment:
-      TAUCETI_SKIP_GIT_IDENTITY: "1"
-      TAUCETI_REFRESH_MIRROR: /worker-credentials/.credentials.json
+      EPSILONERIDANI_SKIP_GIT_IDENTITY: "1"
+      EPSILONERIDANI_REFRESH_MIRROR: /worker-credentials/.credentials.json
     volumes:
       - claude:/root/.claude
       - claude-worker:/worker-credentials
@@ -69,8 +69,8 @@ services:
     stop_grace_period: 60s
     command: ["/usr/local/bin/epsiloneridani-oauth-refresh", "codex"]
     environment:
-      TAUCETI_SKIP_GIT_IDENTITY: "1"
-      TAUCETI_REFRESH_MIRROR: /worker-credentials/auth.json
+      EPSILONERIDANI_SKIP_GIT_IDENTITY: "1"
+      EPSILONERIDANI_REFRESH_MIRROR: /worker-credentials/auth.json
     volumes:
       - codex:/root/.codex
       - codex-worker:/worker-credentials

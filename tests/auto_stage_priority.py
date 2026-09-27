@@ -31,7 +31,7 @@ checks = [
         ("rebase", "bump", "lint-repair", "progress", "fix-ci", "fix", "review"),
     ),
 ]
-if "TAUCETI_PROGRESS_GAP" not in os.environ:
+if "EPSILONERIDANI_PROGRESS_GAP" not in os.environ:
     checks.append(check("default progress attempt gap is eight hours", tc.PROGRESS_ATTEMPT_GAP, 8 * 3600))
 
 progress_cmd = tc.progress_argv(Path("/worker-state"), "due")

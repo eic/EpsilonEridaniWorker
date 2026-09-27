@@ -46,7 +46,7 @@ def check(name, got, want):
     fails += not ok
 
 
-os.environ.pop("TAUCETI_PACE", None)
+os.environ.pop("EPSILONERIDANI_PACE", None)
 os.environ.pop("CLAUDE_CONFIG_DIR", None)
 tc.quota._claude_keychain_creds = lambda: None  # macOS: never consult the real login Keychain
 
@@ -195,15 +195,15 @@ check(
 
 # Fresh telemetry that comes back WITHOUT headroom still blocks: a bootstrap buys a reading, not a task.
 boot = Bootstrapper().install()
-os.environ["TAUCETI_PACE"] = "0:0,100:0"  # every budget is 0 ⇒ τ₀ = 100 ⇒ not even initializable
+os.environ["EPSILONERIDANI_PACE"] = "0:0,100:0"  # every budget is 0 ⇒ τ₀ = 100 ⇒ not even initializable
 q = make_quota()
 tc.quota._http_get_json = Endpoint(IDLE)
 p = q.authorize_claude_launch()
 check("a curve with no budget anywhere never initializes", boot.calls, 0)
-os.environ.pop("TAUCETI_PACE", None)
+os.environ.pop("EPSILONERIDANI_PACE", None)
 
 boot = Bootstrapper().install()
-os.environ["TAUCETI_PACE"] = "0:20,100:20"  # flat 20% budget: positive at 0 (so initializing is allowed),
+os.environ["EPSILONERIDANI_PACE"] = "0:20,100:20"  # flat 20% budget: positive at 0 (so initializing is allowed),
 q = make_quota()  # and an exact equality afterwards, independent of wall-clock drift
 tc.quota._http_get_json = Endpoint(
     IDLE, {"five_hour": {"utilization": 20, "resets_at": iso(3600)}, "seven_day": weekly()}
@@ -211,7 +211,7 @@ tc.quota._http_get_json = Endpoint(
 p = q.authorize_claude_launch()
 check("bootstrap succeeded, but the fresh window has no headroom yet", boot.calls, 1)
 check("...so no task starts", (p.available, p.windows[0].status), (False, "at-budget"))
-os.environ.pop("TAUCETI_PACE", None)
+os.environ.pop("EPSILONERIDANI_PACE", None)
 
 # A failed bootstrap is an informative hard block, and is not retried for this episode.
 boot = Bootstrapper(ok=False, detail="claude exited 1: Rate limit exceeded").install()
@@ -230,7 +230,7 @@ check("...and the parent loop no longer schedules doomed surveys", p.bootstrap_e
 # A curve that holds the budget at 0 through 90% of a window forbids opening one: the request would
 # spend against a 0% budget, and the plateau cannot be waited out on a window that has no clock.
 boot = Bootstrapper().install()
-os.environ["TAUCETI_PACE"] = "0:0,90:0,100:95"
+os.environ["EPSILONERIDANI_PACE"] = "0:0,90:0,100:95"
 tc.quota._http_get_json = Endpoint(IDLE)
 q = make_quota()
 p = q.authorize_claude_launch()
@@ -248,7 +248,7 @@ check(
     [tc.pace_zero_plateau(tc.parse_pace_curve(s)) for s in ("", "0:0,100:95", "0:10,100:100")],
     [0.0, 0.0, 0.0],
 )
-os.environ.pop("TAUCETI_PACE", None)
+os.environ.pop("EPSILONERIDANI_PACE", None)
 
 # The sibling window must itself be spendable. Every one of these forbids opening the idle one.
 siblings = [
@@ -267,12 +267,12 @@ for label, payload, pace in siblings:
     boot = Bootstrapper().install()
     tc.quota._http_get_json = Endpoint(payload)
     if pace:
-        os.environ["TAUCETI_PACE"] = pace
+        os.environ["EPSILONERIDANI_PACE"] = pace
     q = make_quota()
     p = q.authorize_claude_launch()
     check(f"idle session + {label} ⇒ no bootstrap", boot.calls, 0)
     check(f"idle session + {label} ⇒ not available", p.available, False)
-    os.environ.pop("TAUCETI_PACE", None)
+    os.environ.pop("EPSILONERIDANI_PACE", None)
 
 # Nor does an unreadable window of any other kind buy a request.
 for label, payload in (("malformed", MALFORMED), ("absent", ABSENT)):

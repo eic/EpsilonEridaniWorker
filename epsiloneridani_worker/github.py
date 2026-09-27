@@ -25,7 +25,7 @@ from .constants import (
     GH_TRANSIENT_TRIES,
     OPEN_PR_MAX_PAGES,
     OPEN_PR_PAGE,
-    TAUCETI,
+    EPSILONERIDANI,
 )
 from .review_diagnostics import public_diagnostic_quality
 
@@ -87,7 +87,7 @@ def _resolve_claims_repo() -> str:
         return CLAIMS
     log(
         f"claims: {fork} (your fork — de-duplicating within your own fleet; the shared namespace "
-        f"{CLAIMS} opens on your first merged {TAUCETI} PR)"
+        f"{CLAIMS} opens on your first merged {EPSILONERIDANI} PR)"
     )
     return fork
 
@@ -122,8 +122,8 @@ def accept_claims_invitation() -> bool:
 
 
 def _find_fork() -> str | None:
-    """The authed user's fork of TAUCETI, resolved by PARENT (not by name, so a same-named non-fork is
-    never mistaken for it): the first owned fork whose parent is TAUCETI, as `owner/repo`, or None."""
+    """The authed user's fork of EPSILONERIDANI, resolved by PARENT (not by name, so a same-named non-fork is
+    never mistaken for it): the first owned fork whose parent is EPSILONERIDANI, as `owner/repo`, or None."""
     r = gh_run(["gh", "repo", "list", "--fork", "--limit", "200", "--json", "nameWithOwner,parent"])
     if r.returncode != 0:
         return None
@@ -132,7 +132,7 @@ def _find_fork() -> str | None:
             parent = repo.get("parent") or {}
             owner = (parent.get("owner") or {}).get("login") or ""
             full = f"{owner}/{parent.get('name') or ''}"
-            if full.lower() == TAUCETI.lower():
+            if full.lower() == EPSILONERIDANI.lower():
                 return repo.get("nameWithOwner")
     except (ValueError, json.JSONDecodeError):
         return None
@@ -141,31 +141,31 @@ def _find_fork() -> str | None:
 
 @functools.lru_cache(maxsize=1)
 def ensure_fork() -> str:
-    """The contributor's own fork of TAUCETI (`owner/repo`), creating it if absent. The worker pushes
+    """The contributor's own fork of EPSILONERIDANI (`owner/repo`), creating it if absent. The worker pushes
     authored branches here and opens PRs from it, so it never needs write access to canonical. Fails
     closed if the resolved fork can't be pushed to (e.g. a token scoped only to the base repo)."""
     fork = _resolve_fork()
     if can_push(fork) is False:  # explicit denial only; None (couldn't tell) fails open
         raise Die(
             f"resolved your fork {fork}, but this `gh` account cannot push to it. Use a `gh auth` that can "
-            f"push to your fork (a token scoped only to {TAUCETI} is not enough), or set TAUCETI_FORK."
+            f"push to your fork (a token scoped only to {EPSILONERIDANI} is not enough), or set EPSILONERIDANI_FORK."
         )
     return fork
 
 
 def _resolve_fork() -> str:
-    """Locate (or create) the fork. `$TAUCETI_FORK=<owner/repo>` overrides (escape hatch; also for a fork
+    """Locate (or create) the fork. `$EPSILONERIDANI_FORK=<owner/repo>` overrides (escape hatch; also for a fork
     under a non-default name/org). Otherwise resolve the existing fork by parent; if none, `gh repo fork`
     and poll until GitHub surfaces it (fork creation is async; a concurrent same-account worker may win
     the create — the re-query then finds it). Fails closed if a non-fork repo squats the fork's name."""
-    override = os.environ.get("TAUCETI_FORK", "").strip()
+    override = os.environ.get("EPSILONERIDANI_FORK", "").strip()
     if override:
         return override
     found = _find_fork()
     if found:
         return found
-    gh_run(["gh", "repo", "fork", TAUCETI, "--clone=false"])
-    name = TAUCETI.split("/", 1)[1]
+    gh_run(["gh", "repo", "fork", EPSILONERIDANI, "--clone=false"])
+    name = EPSILONERIDANI.split("/", 1)[1]
     for attempt in range(8):
         found = _find_fork()
         if found:
@@ -173,11 +173,11 @@ def _resolve_fork() -> str:
         clash = gh_run(["gh", "api", f"repos/{me()}/{name}", "--jq", ".fork"])
         if clash.returncode == 0 and clash.stdout.strip() == "false":
             raise Die(
-                f"you already own {me()}/{name}, which is NOT a fork of {TAUCETI} — rename it, or set "
-                f"TAUCETI_FORK=<owner/repo> to your fork of {TAUCETI}."
+                f"you already own {me()}/{name}, which is NOT a fork of {EPSILONERIDANI} — rename it, or set "
+                f"EPSILONERIDANI_FORK=<owner/repo> to your fork of {EPSILONERIDANI}."
             )
         time.sleep(2 * (attempt + 1))
-    raise Die(f"could not create or find your fork of {TAUCETI} via `gh repo fork` (check `gh auth status`).")
+    raise Die(f"could not create or find your fork of {EPSILONERIDANI} via `gh repo fork` (check `gh auth status`).")
 
 
 # ============================================================================
@@ -428,7 +428,7 @@ def _pr_json_from_graphql(node: dict) -> dict:
 
 
 class GitHub:
-    def __init__(self, repo: str = TAUCETI):
+    def __init__(self, repo: str = EPSILONERIDANI):
         self.repo = repo
 
     def _gh(self, args: list[str]) -> subprocess.CompletedProcess:

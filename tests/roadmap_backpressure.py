@@ -20,7 +20,7 @@ def pr(number, *labels, body="", head_ref=""):
             "body": body,
             "headRefName": head_ref,
             "labels": [{"name": label} for label in labels],
-            "headRepositoryOwner": {"login": tc.TAUCETI_OWNER},
+            "headRepositoryOwner": {"login": tc.EPSILONERIDANI_OWNER},
             "statusCheckRollup": [],
         }
     )
@@ -146,17 +146,17 @@ def main():
             return 0
 
     old_me = survey_module.me
-    old_only = os.environ.get("TAUCETI_ROADMAP_ONLY")
-    old_skip = os.environ.get("TAUCETI_ROADMAP_SKIP")
+    old_only = os.environ.get("EPSILONERIDANI_ROADMAP_ONLY")
+    old_skip = os.environ.get("EPSILONERIDANI_ROADMAP_SKIP")
     survey_module.me = lambda: "me"
     try:
-        os.environ["TAUCETI_ROADMAP_ONLY"] = "Topology"
-        os.environ.pop("TAUCETI_ROADMAP_SKIP", None)
+        os.environ["EPSILONERIDANI_ROADMAP_ONLY"] = "Topology"
+        os.environ.pop("EPSILONERIDANI_ROADMAP_SKIP", None)
         sv = survey_module.survey(types.SimpleNamespace(wid="test"), FakeGH(), None, FakeCounters(), deep=False)
         check("survey reaches backpressure at the pinned area's limit", sv.n_mine_open, tc.MAX_OPEN_PRS)
         check("the scoped survey count drives backpressure", sv.roadmap_backpressure, True)
 
-        os.environ["TAUCETI_ROADMAP_ONLY"] = "PDE"
+        os.environ["EPSILONERIDANI_ROADMAP_ONLY"] = "PDE"
         sv = survey_module.survey(types.SimpleNamespace(wid="test"), FakeGH(), None, FakeCounters(), deep=False)
         check("peer, draft, non-roadmap, and other-area PRs stay out", sv.n_mine_open, 1)
         check("another area's low count does not backpressure", sv.roadmap_backpressure, False)
@@ -168,20 +168,20 @@ def main():
         check("live rescope recomputes the selected area's count", sv.n_mine_open, tc.MAX_OPEN_PRS)
         check("live rescope recomputes the backpressure flag", sv.roadmap_backpressure, True)
 
-        os.environ["TAUCETI_ROADMAP_ONLY"] = ""
-        os.environ["TAUCETI_ROADMAP_SKIP"] = "Topology"
+        os.environ["EPSILONERIDANI_ROADMAP_ONLY"] = ""
+        os.environ["EPSILONERIDANI_ROADMAP_SKIP"] = "Topology"
         sv = survey_module.survey(types.SimpleNamespace(wid="test"), FakeGH(), None, FakeCounters(), deep=False)
         check("survey wires roadmap-skip into an all-areas count", sv.n_mine_open, 1)
     finally:
         survey_module.me = old_me
         if old_only is None:
-            os.environ.pop("TAUCETI_ROADMAP_ONLY", None)
+            os.environ.pop("EPSILONERIDANI_ROADMAP_ONLY", None)
         else:
-            os.environ["TAUCETI_ROADMAP_ONLY"] = old_only
+            os.environ["EPSILONERIDANI_ROADMAP_ONLY"] = old_only
         if old_skip is None:
-            os.environ.pop("TAUCETI_ROADMAP_SKIP", None)
+            os.environ.pop("EPSILONERIDANI_ROADMAP_SKIP", None)
         else:
-            os.environ["TAUCETI_ROADMAP_SKIP"] = old_skip
+            os.environ["EPSILONERIDANI_ROADMAP_SKIP"] = old_skip
 
     print(f"\n{'PASS' if not fails else 'FAIL'}: {fails} assertion failure(s)")
     return 1 if fails else 0

@@ -25,11 +25,11 @@ def pr(number, author, *, bot=False, owner="contributor", head="feature", failed
 
 RAW = [
     pr(1, "me", failed=True),
-    pr(2, "review-bot", bot=True, owner=survey_mod.TAUCETI_OWNER, failed=True, conflicting=True),
-    pr(3, "review-bot", bot=True, owner=survey_mod.TAUCETI_OWNER, head="bump-mathlib/test", failed=True),
-    pr(6, "review-bot", bot=True, owner=survey_mod.TAUCETI_OWNER, head="lint-repair/main", failed=True),
+    pr(2, "review-bot", bot=True, owner=survey_mod.EPSILONERIDANI_OWNER, failed=True, conflicting=True),
+    pr(3, "review-bot", bot=True, owner=survey_mod.EPSILONERIDANI_OWNER, head="bump-mathlib/test", failed=True),
+    pr(6, "review-bot", bot=True, owner=survey_mod.EPSILONERIDANI_OWNER, head="lint-repair/main", failed=True),
     pr(4, "external-bot", bot=True, owner="external", conflicting=True),
-    pr(5, "peer", owner=survey_mod.TAUCETI_OWNER, conflicting=True),
+    pr(5, "peer", owner=survey_mod.EPSILONERIDANI_OWNER, conflicting=True),
 ]
 
 

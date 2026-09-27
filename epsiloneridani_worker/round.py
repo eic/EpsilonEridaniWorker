@@ -197,15 +197,15 @@ class Claims:
         if rc == 1:
             log(f"branch #{pr} claimed by another worker — skipping (COOP dedup)")
             return False
-        os.environ["TAUCETI_PUSH_REF"] = refname
-        os.environ["TAUCETI_PUSH_EXPECT"] = head
-        os.environ["TAUCETI_PUSH_REMOTE"] = f"https://github.com/{owner}/{repo}"
-        os.environ["TAUCETI_CLAIM_SH"] = CLAIM_SH
+        os.environ["EPSILONERIDANI_PUSH_REF"] = refname
+        os.environ["EPSILONERIDANI_PUSH_EXPECT"] = head
+        os.environ["EPSILONERIDANI_PUSH_REMOTE"] = f"https://github.com/{owner}/{repo}"
+        os.environ["EPSILONERIDANI_CLAIM_SH"] = CLAIM_SH
         if rc == 0:
             self.held = (key, claim_repo)
             # Keep this scoped to the push arbiter: unrelated agent-invoked claims remain canonical.
-            os.environ["TAUCETI_CLAIM_REPO"] = claim_repo
-            os.environ["TAUCETI_CLAIM_KEY"] = key
+            os.environ["EPSILONERIDANI_CLAIM_REPO"] = claim_repo
+            os.environ["EPSILONERIDANI_CLAIM_KEY"] = key
             self.ctx.add_cleanup(self.release)
             self.start_heartbeat(key, claim_repo)
         else:
@@ -214,8 +214,8 @@ class Claims:
                 f"(branch CAS still protects). If this repeats, this account cannot push there; set "
                 f"CLAIM_REPO=<a repo your whole fleet can push to> to pick the namespace yourself."
             )
-            os.environ.pop("TAUCETI_CLAIM_KEY", None)
-            os.environ.pop("TAUCETI_CLAIM_REPO", None)
+            os.environ.pop("EPSILONERIDANI_CLAIM_KEY", None)
+            os.environ.pop("EPSILONERIDANI_CLAIM_REPO", None)
         return True
 
     def start_heartbeat(self, key: str, claim_repo: str) -> None:
@@ -226,7 +226,7 @@ class Claims:
             {
                 **os.environ,
                 "CLAIM_REPO": claim_repo,
-                "TAUCETI_CLAIM_SH": CLAIM_SH,
+                "EPSILONERIDANI_CLAIM_SH": CLAIM_SH,
                 "CLAIM_TTL": str(CLAIM_TTL_S),
             }
         )
@@ -257,8 +257,8 @@ class Claims:
                 [CLAIM_SH, "release", key], capture_output=True, env={**os.environ, "CLAIM_REPO": claim_repo}
             )
             self.held = None
-            os.environ.pop("TAUCETI_CLAIM_KEY", None)
-            os.environ.pop("TAUCETI_CLAIM_REPO", None)
+            os.environ.pop("EPSILONERIDANI_CLAIM_KEY", None)
+            os.environ.pop("EPSILONERIDANI_CLAIM_REPO", None)
 
 
 def cmd_heartbeat(args) -> int:

@@ -151,7 +151,7 @@ with tempfile.TemporaryDirectory() as raw:
     # Exercise the actual subprocess path, not just the extraction helper.
     reports = []
     original_report = agents.report_failure
-    stream_setting = os.environ.pop("TAUCETI_STREAM", None)
+    stream_setting = os.environ.pop("EPSILONERIDANI_STREAM", None)
     agents.report_failure = lambda reason, **kwargs: reports.append(reason)
     try:
         agents.run_to_logfile(
@@ -162,7 +162,7 @@ with tempfile.TemporaryDirectory() as raw:
     finally:
         agents.report_failure = original_report
         if stream_setting is not None:
-            os.environ["TAUCETI_STREAM"] = stream_setting
+            os.environ["EPSILONERIDANI_STREAM"] = stream_setting
     check("subprocess report retains operative error", "Argument list too long" in reports[-1], True)
 
     for i in range(4):

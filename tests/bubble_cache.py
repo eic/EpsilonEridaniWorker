@@ -35,7 +35,7 @@ epsiloneridani_i = bootstrap.index("lake cache get")
 build_i = bootstrap.index("lake build")
 agent_i = bootstrap.index("exec " + inner)
 check("cache/build/agent order", mathlib_i < epsiloneridani_i < build_i < agent_i)
-check("EpsilonEridani cache uses the canonical repository", f"--repo {tc.TAUCETI}" in bootstrap)
+check("EpsilonEridani cache uses the canonical repository", f"--repo {tc.EPSILONERIDANI}" in bootstrap)
 check("Bubble, not the bootstrap, supplies Lake config", "LAKE_CONFIG" not in bootstrap)
 check("Bubble, not the bootstrap, supplies Lake restore settings", "LAKE_RESTORE_ARTIFACTS" not in bootstrap)
 
@@ -61,7 +61,7 @@ lake.write_text(
     'printf "%s\\n" "$*" >> "$LAKE_CALLS"\n'
     'case "$*" in\n'
     '  "exe cache get"*) exit "${MATHLIB_RC:-0}" ;;\n'
-    '  cache\\ get*) [ -n "$TAUCETI_MSG" ] && printf "%s\\n" "$TAUCETI_MSG"; exit "${TAUCETI_RC:-0}" ;;\n'
+    '  cache\\ get*) [ -n "$EPSILONERIDANI_MSG" ] && printf "%s\\n" "$EPSILONERIDANI_MSG"; exit "${EPSILONERIDANI_RC:-0}" ;;\n'
     '  build) exit "${BUILD_RC:-0}" ;;\n'
     "esac\n"
     "exit 99\n"
@@ -77,8 +77,8 @@ def run_bootstrap(*, mathlib=0, epsiloneridani=0, build=0, epsiloneridani_msg=""
         "PATH": f"{shimdir}:{os.environ.get('PATH', '')}",
         "LAKE_CALLS": str(calls),
         "MATHLIB_RC": str(mathlib),
-        "TAUCETI_RC": str(epsiloneridani),
-        "TAUCETI_MSG": epsiloneridani_msg,
+        "EPSILONERIDANI_RC": str(epsiloneridani),
+        "EPSILONERIDANI_MSG": epsiloneridani_msg,
         "BUILD_RC": str(build),
         "MARKER": str(marker),
     }
@@ -111,7 +111,7 @@ check("a cold revision is reported as cold", "holds no outputs for this revision
 check("a cold revision is not reported as an endpoint failure", "did not answer" not in result.stderr)
 check(
     "a cold revision is not retried",
-    lake_calls.count("cache get --service epsiloneridani-public --repo " + tc.TAUCETI) == 1,
+    lake_calls.count("cache get --service epsiloneridani-public --repo " + tc.EPSILONERIDANI) == 1,
 )
 
 result, lake_calls = run_bootstrap(epsiloneridani=1, epsiloneridani_msg="curl: (22) The requested URL returned 401")
@@ -121,7 +121,7 @@ check("an unreachable cache is not reported as cold", "holds no outputs" not in 
 check("an unreachable cache echoes the fetch log", "cache: curl: (22)" in result.stderr)
 check(
     "an unreachable cache is retried once",
-    lake_calls.count("cache get --service epsiloneridani-public --repo " + tc.TAUCETI) == 2,
+    lake_calls.count("cache get --service epsiloneridani-public --repo " + tc.EPSILONERIDANI) == 2,
 )
 
 shutil.rmtree(shimdir, ignore_errors=True)
@@ -129,8 +129,8 @@ shutil.rmtree(shimdir, ignore_errors=True)
 
 # The cache is reached over the custom domain, not the bucket's `pub-<id>.r2.dev` development URL.
 # That URL was disabled and answered 401 for every path, so `lake cache get` failed on every round.
-check("cache uses the custom domain", tc.TAUCETI_CACHE_DOMAIN == "cache.epsiloneridaniproject.org")
-check("cache does not use the r2.dev development URL", "r2.dev" not in tc.TAUCETI_CACHE_ARTIFACT_URL)
+check("cache uses the custom domain", tc.EPSILONERIDANI_CACHE_DOMAIN == "cache.epsiloneridaniproject.org")
+check("cache does not use the r2.dev development URL", "r2.dev" not in tc.EPSILONERIDANI_CACHE_ARTIFACT_URL)
 
 
 # A bucket with public access switched off answers 401/403 for every path, root included, so no revision
@@ -153,7 +153,7 @@ def _probe_with(exc):
 
 
 def _http_error(code):
-    return urllib.error.HTTPError(tc.TAUCETI_CACHE_REVISION_URL, code, "Unauthorized", {}, None)
+    return urllib.error.HTTPError(tc.EPSILONERIDANI_CACHE_REVISION_URL, code, "Unauthorized", {}, None)
 
 
 check("401 is reported as unreadable", "401" in (_probe_with(_http_error(401)) or ""))
@@ -166,8 +166,8 @@ check("a network fault does not block the round", _probe_with(urllib.error.URLEr
 # later rounds assume overlay mode. Conversely, an already-verified config needs no subprocess.
 cache_home = Path(tempfile.mkdtemp())
 saved_bubble_cmd = tc.agents.bubble_cmd
-old_bubble_home = os.environ.get("TAUCETI_BUBBLE_HOME")
-os.environ["TAUCETI_BUBBLE_HOME"] = str(cache_home)
+old_bubble_home = os.environ.get("EPSILONERIDANI_BUBBLE_HOME")
+os.environ["EPSILONERIDANI_BUBBLE_HOME"] = str(cache_home)
 cache_cfg = SimpleNamespace(home=cache_home, wid="cache-test")
 try:
     tc.agents.bubble_cmd = lambda: ["false"]
@@ -186,9 +186,9 @@ try:
 finally:
     tc.agents.bubble_cmd = saved_bubble_cmd
     if old_bubble_home is None:
-        os.environ.pop("TAUCETI_BUBBLE_HOME", None)
+        os.environ.pop("EPSILONERIDANI_BUBBLE_HOME", None)
     else:
-        os.environ["TAUCETI_BUBBLE_HOME"] = old_bubble_home
+        os.environ["EPSILONERIDANI_BUBBLE_HOME"] = old_bubble_home
     shutil.rmtree(cache_home, ignore_errors=True)
 
 
@@ -207,16 +207,16 @@ saved_home = tc.agents.ensure_bubble_home
 saved_pop = tc.agents._bubble_pop
 tc.agents.ensure_bubble_home = lambda _cfg: dict(os.environ)
 tc.agents._bubble_pop = lambda _cfg, _env: None
-os.environ["TAUCETI_AGENT_ECHO"] = "1"
+os.environ["EPSILONERIDANI_AGENT_ECHO"] = "1"
 try:
     out = io.StringIO()
     with contextlib.redirect_stdout(out):
-        rc = tc.run_in_bubble(w, tc.TAUCETI, "PROMPT", opts)
+        rc = tc.run_in_bubble(w, tc.EPSILONERIDANI, "PROMPT", opts)
     work_argv = out.getvalue()
     check("work echo succeeds", rc == 0)
     cache_grant = (
-        f"--lake-cache-service {tc.TAUCETI_CACHE_SERVICE} "
-        f"{tc.TAUCETI_CACHE_ARTIFACT_URL} {tc.TAUCETI_CACHE_REVISION_URL}"
+        f"--lake-cache-service {tc.EPSILONERIDANI_CACHE_SERVICE} "
+        f"{tc.EPSILONERIDANI_CACHE_ARTIFACT_URL} {tc.EPSILONERIDANI_CACHE_REVISION_URL}"
     )
     check("work round grants the EpsilonEridani download cache", cache_grant in work_argv)
     check("work round does not expose the upstream domain directly", "--allow-domain" not in work_argv)
@@ -228,7 +228,7 @@ try:
 
     out = io.StringIO()
     with contextlib.redirect_stdout(out):
-        rc = tc.run_in_bubble(w, tc.TAUCETI, "", opts, inner_cmd="true", cred_model="claude")
+        rc = tc.run_in_bubble(w, tc.EPSILONERIDANI, "", opts, inner_cmd="true", cred_model="claude")
     review_argv = out.getvalue()
     check("review/probe echo succeeds", rc == 0)
     check("review/probe does not add a cache capability", "--lake-cache-service" not in review_argv)
@@ -237,7 +237,7 @@ try:
         "lake exe cache get Mathlib Physlib TauCeti" not in review_argv,
     )
 finally:
-    os.environ.pop("TAUCETI_AGENT_ECHO", None)
+    os.environ.pop("EPSILONERIDANI_AGENT_ECHO", None)
     tc.agents.ensure_bubble_home = saved_home
     tc.agents._bubble_pop = saved_pop
     shutil.rmtree(tmp, ignore_errors=True)

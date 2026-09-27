@@ -40,13 +40,13 @@ def main() -> int:
 
     provider = oauth.provider(args.provider)
     try:
-        poll_seconds = _positive_env("TAUCETI_REFRESH_POLL_SECONDS", 60)
-        skew_seconds = _positive_env("TAUCETI_REFRESH_SKEW_SECONDS", 5400)
-        minimum_interval = _positive_env("TAUCETI_REFRESH_MIN_INTERVAL_SECONDS", 600)
-        maximum_backoff = _positive_env("TAUCETI_REFRESH_MAX_BACKOFF_SECONDS", 900)
+        poll_seconds = _positive_env("EPSILONERIDANI_REFRESH_POLL_SECONDS", 60)
+        skew_seconds = _positive_env("EPSILONERIDANI_REFRESH_SKEW_SECONDS", 5400)
+        minimum_interval = _positive_env("EPSILONERIDANI_REFRESH_MIN_INTERVAL_SECONDS", 600)
+        maximum_backoff = _positive_env("EPSILONERIDANI_REFRESH_MAX_BACKOFF_SECONDS", 900)
     except ValueError as error:
         parser.error(str(error))
-    run_once = os.environ.get("TAUCETI_REFRESH_ONCE") == "1"
+    run_once = os.environ.get("EPSILONERIDANI_REFRESH_ONCE") == "1"
     stop = threading.Event()
     for number in (signal.SIGHUP, signal.SIGINT, signal.SIGTERM):
         signal.signal(number, lambda _signum, _frame: stop.set())

@@ -16,7 +16,7 @@ sys.path.insert(0, str(REPO))
 
 from epsiloneridani_worker import github as gh_mod  # noqa: E402
 from epsiloneridani_worker.config import Die  # noqa: E402
-from epsiloneridani_worker.constants import CLAIMS, TAUCETI  # noqa: E402
+from epsiloneridani_worker.constants import CLAIMS, EPSILONERIDANI  # noqa: E402
 
 
 class Stub:
@@ -103,7 +103,7 @@ def shared_when_granted():
 def fork_when_not_granted():
     with Stub(push="false") as s:
         assert gh_mod.claims_repo() == "alice/EpsilonEridani"
-        assert not any(TAUCETI in " ".join(c) for c in s.calls), "canonical is never probed as a claim repo"
+        assert not any(EPSILONERIDANI in " ".join(c) for c in s.calls), "canonical is never probed as a claim repo"
 
 
 def fork_when_access_is_unknown():

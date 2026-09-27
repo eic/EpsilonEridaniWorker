@@ -87,7 +87,7 @@ it. "You" is your own `gh auth` identity. If you run workers under several
 accounts, or coordinate with someone whose intentions you are fulfilling, list
 those logins with `--roadmap-extra-identities` so the worker does not avoid your
 own side's claims. This is cooperative and fail-open;
-`--ignore-claims` or `TAUCETI_RESPECT_CLAIMS=false` opts out.
+`--ignore-claims` or `EPSILONERIDANI_RESPECT_CLAIMS=false` opts out.
 
 An assigned intention with the maintainer-applied `administrative-hold` label is different: every
 worker avoids its scope, even when authenticated as the assignee and even with `--ignore-claims`.
@@ -106,8 +106,8 @@ malformed output, and ordinary failures pause the round without downgrading. Bot
 probes are read-only, and the real authoring prompt is always executed exactly
 once.
 
-An explicit `--author-model`, `TAUCETI_AUTHORING_CODEX_MODEL`, or legacy
-`TAUCETI_CODEX_MODEL` is a pin: it bypasses both the probe and the fallback.
+An explicit `--author-model`, `EPSILONERIDANI_AUTHORING_CODEX_MODEL`, or legacy
+`EPSILONERIDANI_CODEX_MODEL` is a pin: it bypasses both the probe and the fallback.
 
 A generic authoring override is rejected with `--agent auto`, because the model
 or effort may not apply to whichever provider quota selection picks.
@@ -121,7 +121,7 @@ Before either a host or Bubble launch, EpsilonEridani runs
 to be present. That command sends no prompt. A missing entitlement pauses the
 round instead of invoking Kiro Auto or silently downgrading.
 
-Reviews use the independent `TAUCETI_REVIEW_KIRO_MODEL` pin, defaulting to the
+Reviews use the independent `EPSILONERIDANI_REVIEW_KIRO_MODEL` pin, defaulting to the
 same exact Sol ID. Use `KIRO_API_KEY` for headless authentication or
 `kiro-cli login` for a persisted browser login.
 
@@ -131,8 +131,8 @@ same exact Sol ID. Use `KIRO_API_KEY` for headless authentication or
 read-only telemetry command. `--provider` is repeatable and defaults to both.
 `--kiro-burn-rate CREDITS` and `--openrouter-burn-rate USD` add estimated rounds
 remaining to the report; they do not pace or select a provider. The equivalent
-environment defaults are `TAUCETI_KIRO_BURN_RATE` and
-`TAUCETI_OPENROUTER_BURN_RATE`.
+environment defaults are `EPSILONERIDANI_KIRO_BURN_RATE` and
+`EPSILONERIDANI_OPENROUTER_BURN_RATE`.
 
 Kiro usage comes from the CLI's ACP extension and retains fractional credit
 values. OpenRouter's inference key reports key usage/limits; an optional
@@ -140,7 +140,7 @@ values. OpenRouter's inference key reports key usage/limits; an optional
 
 ## Codex accounts
 
-`--account EMAIL_OR_ID` (or `TAUCETI_ACCOUNT`) requires the Codex credential to
+`--account EMAIL_OR_ID` (or `EPSILONERIDANI_ACCOUNT`) requires the Codex credential to
 belong to a particular account, and exits the round before spending anything if
 it does not. It checks; it never switches. This is Codex-only because its
 credential carries the account identity, where `codex login status` prints only
@@ -166,56 +166,56 @@ Flags win over these. Most are tuning knobs with sane defaults.
 
 | Variable | Default | Effect |
 | --- | --- | --- |
-| `TAUCETI_AGENT` | `auto` | Default for `--agent`. |
-| `TAUCETI_ACCOUNT` | _(unset)_ | Default for `--account`. |
+| `EPSILONERIDANI_AGENT` | `auto` | Default for `--agent`. |
+| `EPSILONERIDANI_ACCOUNT` | _(unset)_ | Default for `--account`. |
 | `CODEX_HOME` | `~/.codex` | Codex config/credential source. Point it at a private directory to give EpsilonEridani its own Codex account without disturbing the one your interactive `codex` uses. |
-| `TAUCETI_WORKER_ID` | _(unset)_ | Pin the id; when unset, `work` takes the lowest free `workerN`. |
-| `TAUCETI_FORK` | auto-created | Point at an existing fork instead of the one the worker creates. |
-| `TAUCETI_ROADMAP_ONLY` | _(unset)_ | The single roadmap area for `--roadmap-only`. Unset = a fresh random area each round (falls back to all areas if the list can't be fetched); `""` = all areas. |
-| `TAUCETI_ROADMAP_SKIP` | _(unset)_ | Comma-separated roadmap areas to exclude, for `--roadmap-skip`. |
-| `TAUCETI_ROADMAP_EXTRA_IDENTITIES` | _(unset)_ | Comma-separated extra GitHub logins whose claimed intentions count as the worker's own. |
-| `TAUCETI_RESPECT_CLAIMS` | `true` | Whether roadmap workers avoid others' claimed intentions; `false` is the same as `--ignore-claims`. |
-| `TAUCETI_PR` | _(unset)_ | Comma-separated pull request numbers for `--pr`. |
-| `TAUCETI_QUOTA_CMD` | — | Default for `--quota-cmd`. |
-| `TAUCETI_AUTO_REFRESH` | _(unset)_ | `1` is the same as `--auto-refresh`. |
-| `TAUCETI_PACE` | _(unset)_ | Pacing curve for `--pace` (`time%:budget%` points); unset = `60:40`. |
-| `TAUCETI_STREAM` | — | `1` is the same as `--stream`. |
+| `EPSILONERIDANI_WORKER_ID` | _(unset)_ | Pin the id; when unset, `work` takes the lowest free `workerN`. |
+| `EPSILONERIDANI_FORK` | auto-created | Point at an existing fork instead of the one the worker creates. |
+| `EPSILONERIDANI_ROADMAP_ONLY` | _(unset)_ | The single roadmap area for `--roadmap-only`. Unset = a fresh random area each round (falls back to all areas if the list can't be fetched); `""` = all areas. |
+| `EPSILONERIDANI_ROADMAP_SKIP` | _(unset)_ | Comma-separated roadmap areas to exclude, for `--roadmap-skip`. |
+| `EPSILONERIDANI_ROADMAP_EXTRA_IDENTITIES` | _(unset)_ | Comma-separated extra GitHub logins whose claimed intentions count as the worker's own. |
+| `EPSILONERIDANI_RESPECT_CLAIMS` | `true` | Whether roadmap workers avoid others' claimed intentions; `false` is the same as `--ignore-claims`. |
+| `EPSILONERIDANI_PR` | _(unset)_ | Comma-separated pull request numbers for `--pr`. |
+| `EPSILONERIDANI_QUOTA_CMD` | — | Default for `--quota-cmd`. |
+| `EPSILONERIDANI_AUTO_REFRESH` | _(unset)_ | `1` is the same as `--auto-refresh`. |
+| `EPSILONERIDANI_PACE` | _(unset)_ | Pacing curve for `--pace` (`time%:budget%` points); unset = `60:40`. |
+| `EPSILONERIDANI_STREAM` | — | `1` is the same as `--stream`. |
 | `CLAUDE_CONFIG_DIR` | `~/.claude` | Claude config/credential source (account switching; Bubble uses a private transient handoff on macOS). |
 | `ELAN_HOME` | login user's `~/.elan` | Lean toolchains, shared by every worker: an install takes a lock and lands by rename. |
 | `MATHLIB_CACHE_DIR` | `<worker state>/.cache/mathlib` | Where this worker downloads Mathlib artifacts. Private, because `lake exe cache get Mathlib Physlib TauCeti` takes no lock; finished files are exchanged with the machine pool by hardlink before each round. |
-| `TAUCETI_MATHLIB_POOL` | `$XDG_CACHE_HOME/mathlib`, else login user's `~/.cache/mathlib` | The pool those hardlinks go to and come from. |
+| `EPSILONERIDANI_MATHLIB_POOL` | `$XDG_CACHE_HOME/mathlib`, else login user's `~/.cache/mathlib` | The pool those hardlinks go to and come from. |
 | `LAKE_CACHE_DIR` | `<worker state>/.cache/lake` | Lake's own build-output cache. Per-worker: unlike a toolchain install it is written throughout a build. |
 | `LAKE_ARTIFACT_CACHE` | `1` | Keep local build outputs in Lake's artifact store so later rounds can reuse them. |
 | `LAKE_RESTORE_ARTIFACTS` | `1` | Copy artifact-store hits into the build directory for EpsilonEridani's post-build audits. |
-| `TAUCETI_CLAUDE_CMD` | `claude` | The `claude` executable for host rounds; split as a shell word list, the usual flags appended. |
-| `TAUCETI_INHERIT_CLAUDE_CONFIG` | _(unset)_ | `1` gives an isolated worker your own `CLAUDE.md`, `settings.json`, and skills instead of its own. Off by default: a round should not depend on whose config dir it ran from, and personal instructions can contradict the task prompt. |
-| `TAUCETI_AUTHORING_CODEX_MODEL` / `TAUCETI_AUTHORING_CODEX_EFFORT` | `gpt-6-sol` (Luna fallback) / `high` | Codex authoring profile. An explicit model disables automatic fallback; unrelated host configuration remains available. |
-| `TAUCETI_AUTHORING_CLAUDE_MODEL` / `TAUCETI_AUTHORING_CLAUDE_EFFORT` | `claude-opus-5-5` / `high` | Claude authoring profile; the default is an exact model rather than the moving `opus` alias. |
-| `TAUCETI_AUTHORING_KIRO_MODEL` / `TAUCETI_AUTHORING_KIRO_EFFORT` | `gpt-5.6-sol` / `high` | Exact Kiro authoring profile. `claude-opus-5` selects Opus; Kiro Auto is never used. |
-| `TAUCETI_REVIEW_CODEX_MODEL` | engine policy | Optional Codex review-model pin, independent of the authoring model. Unset preserves the review engine's own default and fallback. |
-| `TAUCETI_REVIEW_KIRO_MODEL` | `gpt-5.6-sol` | Exact Kiro review-model pin, independent of authoring. |
-| `TAUCETI_CODEX_MODEL` | _(deprecated)_ | Legacy fallback for the Codex authoring model only. Prefer `TAUCETI_AUTHORING_CODEX_MODEL`. |
+| `EPSILONERIDANI_CLAUDE_CMD` | `claude` | The `claude` executable for host rounds; split as a shell word list, the usual flags appended. |
+| `EPSILONERIDANI_INHERIT_CLAUDE_CONFIG` | _(unset)_ | `1` gives an isolated worker your own `CLAUDE.md`, `settings.json`, and skills instead of its own. Off by default: a round should not depend on whose config dir it ran from, and personal instructions can contradict the task prompt. |
+| `EPSILONERIDANI_AUTHORING_CODEX_MODEL` / `EPSILONERIDANI_AUTHORING_CODEX_EFFORT` | `gpt-6-sol` (Luna fallback) / `high` | Codex authoring profile. An explicit model disables automatic fallback; unrelated host configuration remains available. |
+| `EPSILONERIDANI_AUTHORING_CLAUDE_MODEL` / `EPSILONERIDANI_AUTHORING_CLAUDE_EFFORT` | `claude-opus-5-5` / `high` | Claude authoring profile; the default is an exact model rather than the moving `opus` alias. |
+| `EPSILONERIDANI_AUTHORING_KIRO_MODEL` / `EPSILONERIDANI_AUTHORING_KIRO_EFFORT` | `gpt-5.6-sol` / `high` | Exact Kiro authoring profile. `claude-opus-5` selects Opus; Kiro Auto is never used. |
+| `EPSILONERIDANI_REVIEW_CODEX_MODEL` | engine policy | Optional Codex review-model pin, independent of the authoring model. Unset preserves the review engine's own default and fallback. |
+| `EPSILONERIDANI_REVIEW_KIRO_MODEL` | `gpt-5.6-sol` | Exact Kiro review-model pin, independent of authoring. |
+| `EPSILONERIDANI_CODEX_MODEL` | _(deprecated)_ | Legacy fallback for the Codex authoring model only. Prefer `EPSILONERIDANI_AUTHORING_CODEX_MODEL`. |
 | `DEEPSEEK_MODEL` / `MINIMAX_MODEL` | `deepseek/deepseek-v4-pro` / `minimax/minimax-m3` | OpenRouter model ids for those agents. |
 | `OPENROUTER_API_KEY` | — | Required for `--agent deepseek\|minimax`; staged read-only into the bubble. |
 | `OPENROUTER_MANAGEMENT_KEY` | — | Optional management key for account-wide `epsiloneridani usage` credit totals; never passed to an agent. |
 | `KIRO_API_KEY` | browser login | Optional headless Kiro credential. EpsilonEridani isolates the browser store when set so the key wins deterministically. |
-| `TAUCETI_KIRO_HOME` / `TAUCETI_KIRO_DATA_DIR` | per-worker when isolated | Internal redirects for Kiro settings and its platform-native browser-auth SQLite store. |
-| `TAUCETI_KIRO_BURN_RATE` / `TAUCETI_OPENROUTER_BURN_RATE` | _(unset)_ | Observability-only default burn rates for `epsiloneridani usage`; never used by the loop pacer. |
+| `EPSILONERIDANI_KIRO_HOME` / `EPSILONERIDANI_KIRO_DATA_DIR` | per-worker when isolated | Internal redirects for Kiro settings and its platform-native browser-auth SQLite store. |
+| `EPSILONERIDANI_KIRO_BURN_RATE` / `EPSILONERIDANI_OPENROUTER_BURN_RATE` | _(unset)_ | Observability-only default burn rates for `epsiloneridani usage`; never used by the loop pacer. |
 | `PI_RUN` | `~/.claude/skills/pi/scripts/run.sh` | The `pi` runner for OpenRouter agents on the host. |
-| `TAUCETI_BUBBLE` | `bubble` (else `uvx` for dry-run probes only) | Override the Bubble executable. |
-| `TAUCETI_BUBBLE_HOME` | per-worker cache dir | Override the private bubble home. |
-| `TAUCETI_REVIEW_ENGINE_DIR` | — | Use a local `epsiloneridani-review` checkout instead of fetching the engine. |
-| `TAUCETI_POLL` | `300` | Seconds between quota checks while the loop waits. |
-| `TAUCETI_ROUND_TIMEOUT` | `5400` | Hard cap per round (seconds). |
-| `TAUCETI_INTERROUND` | `20` | Minimum gap after a productive round (seconds). |
-| `TAUCETI_BACKOFF_BASE` / `TAUCETI_BACKOFF_MAX` | `30` / `900` | The escalating no-progress back-off (seconds). |
-| `TAUCETI_PROGRESS_GAP` | `28800` | Minimum gap between progress-report attempts (seconds; eight hours by default). |
-| `TAUCETI_GH_MIN_BUDGET` | `200` | GitHub requests (REST core and GraphQL) the loop requires before launching a round; below it on either bucket, the loop waits for the hourly reset. |
-| `TAUCETI_GH_INROUND_WAIT` | `900` | Cap on how long a single `gh` call waits in place for a secondary rate limit to clear (seconds). Primary limits return immediately so the loop can wait for them before another round. |
-| `TAUCETI_META_TTL` | `120` | How long a cached scoreboard stays fresh (seconds). |
+| `EPSILONERIDANI_BUBBLE` | `bubble` (else `uvx` for dry-run probes only) | Override the Bubble executable. |
+| `EPSILONERIDANI_BUBBLE_HOME` | per-worker cache dir | Override the private bubble home. |
+| `EPSILONERIDANI_REVIEW_ENGINE_DIR` | — | Use a local `epsiloneridani-review` checkout instead of fetching the engine. |
+| `EPSILONERIDANI_POLL` | `300` | Seconds between quota checks while the loop waits. |
+| `EPSILONERIDANI_ROUND_TIMEOUT` | `5400` | Hard cap per round (seconds). |
+| `EPSILONERIDANI_INTERROUND` | `20` | Minimum gap after a productive round (seconds). |
+| `EPSILONERIDANI_BACKOFF_BASE` / `EPSILONERIDANI_BACKOFF_MAX` | `30` / `900` | The escalating no-progress back-off (seconds). |
+| `EPSILONERIDANI_PROGRESS_GAP` | `28800` | Minimum gap between progress-report attempts (seconds; eight hours by default). |
+| `EPSILONERIDANI_GH_MIN_BUDGET` | `200` | GitHub requests (REST core and GraphQL) the loop requires before launching a round; below it on either bucket, the loop waits for the hourly reset. |
+| `EPSILONERIDANI_GH_INROUND_WAIT` | `900` | Cap on how long a single `gh` call waits in place for a secondary rate limit to clear (seconds). Primary limits return immediately so the loop can wait for them before another round. |
+| `EPSILONERIDANI_META_TTL` | `120` | How long a cached scoreboard stays fresh (seconds). |
 | `CLAIM_REPO` | automatic | The repository holding this worker's cooperative claim leases. Without an override it is the shared namespace `eic/epsiloneridani-claims` once your account can push there, and your own fork until then. See [the claim namespace](#the-claim-namespace). |
 | `CLAIM_TTL` / `CLAIM_HEARTBEAT` | `1500` / `300` | Branch-claim lease TTL and heartbeat interval (seconds). |
 
-Worker configuration paths (`TAUCETI_WORKERS_CONFIG`, `TAUCETI_CONFIG_HOME`,
-`TAUCETI_WORKERS_STATE_DIR`, `TAUCETI_RUNTIME_DIR`) are documented in
+Worker configuration paths (`EPSILONERIDANI_WORKERS_CONFIG`, `EPSILONERIDANI_CONFIG_HOME`,
+`EPSILONERIDANI_WORKERS_STATE_DIR`, `EPSILONERIDANI_RUNTIME_DIR`) are documented in
 [the workers documentation](workers.md).

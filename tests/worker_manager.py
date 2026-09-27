@@ -18,17 +18,17 @@ sys.path.insert(0, str(REPO))
 
 root = Path(tempfile.mkdtemp(prefix="epsiloneridani-workers-test-"))
 for key in (
-    "TAUCETI_CONFIG_HOME",
-    "TAUCETI_WORKERS_CONFIG",
-    "TAUCETI_WORKERS_STATE_DIR",
-    "TAUCETI_RUNTIME_DIR",
+    "EPSILONERIDANI_CONFIG_HOME",
+    "EPSILONERIDANI_WORKERS_CONFIG",
+    "EPSILONERIDANI_WORKERS_STATE_DIR",
+    "EPSILONERIDANI_RUNTIME_DIR",
 ):
     os.environ.pop(key, None)
 os.environ["XDG_CONFIG_HOME"] = str(root / "config")
 os.environ["XDG_STATE_HOME"] = str(root / "state")
-os.environ["TAUCETI_RUNTIME_DIR"] = str(root / "run")
-os.environ["TAUCETI_MANAGER_TEST_COMMAND"] = shlex.join(
-    [sys.executable, "-c", "import os; os.read(int(os.environ['TAUCETI_PARENT_PIPE_FD']), 1)"]
+os.environ["EPSILONERIDANI_RUNTIME_DIR"] = str(root / "run")
+os.environ["EPSILONERIDANI_MANAGER_TEST_COMMAND"] = shlex.join(
+    [sys.executable, "-c", "import os; os.read(int(os.environ['EPSILONERIDANI_PARENT_PIPE_FD']), 1)"]
 )
 
 import epsiloneridani_worker.paths as worker_paths
@@ -86,14 +86,14 @@ try:
     assert bare_workers.json is False and bare_workers.watch is False
 
     runtime_probe = root / "runtime-probe.json"
-    os.environ["TAUCETI_RUNTIME_STATUS"] = str(runtime_probe)
+    os.environ["EPSILONERIDANI_RUNTIME_STATUS"] = str(runtime_probe)
     report_runtime("waiting-quota", detail="test", next_action_at=123)
     assert wm.read_json(runtime_probe)["state"] == "waiting-quota"
     report_failure("claude agent: API Error 529 Overloaded", code=1, log_file="/tmp/agent.log")
     failure = wm.read_json(runtime_probe)
     assert failure["failure_reason"] == "claude agent: API Error 529 Overloaded"
     assert failure["failure_code"] == 1 and failure["failure_log"] == "/tmp/agent.log"
-    os.environ.pop("TAUCETI_RUNTIME_STATUS")
+    os.environ.pop("EPSILONERIDANI_RUNTIME_STATUS")
 
     # Legacy command import produces the same semantic settings without retaining shell syntax.
     legacy = root / "workers.conf"
@@ -161,11 +161,11 @@ try:
         ({"env": {"A=B": "x"}}, "name containing ="),
         ({"env": {" A": "x"}}, "name with whitespace"),
         ({"env": {"1A": "x"}}, "name starting with a digit"),
-        ({"env": {"TAUCETI_MANAGED": "0"}}, "manager-owned variable"),
-        ({"env": {"TAUCETI_PARENT_PIPE_FD": "3"}}, "manager-owned variable"),
+        ({"env": {"EPSILONERIDANI_MANAGED": "0"}}, "manager-owned variable"),
+        ({"env": {"EPSILONERIDANI_PARENT_PIPE_FD": "3"}}, "manager-owned variable"),
         # Presetting the isolation sentinel would make isolate_home() return early and leave the
         # worker on the operator's own credentials.
-        ({"env": {"TAUCETI_DATA_HOME": "/tmp/whatever"}}, "credential-isolation sentinel"),
+        ({"env": {"EPSILONERIDANI_DATA_HOME": "/tmp/whatever"}}, "credential-isolation sentinel"),
         # TOML accepts a literal NUL escape; execve does not, so a NUL must fail as configuration rather than as an
         # unexplained restart loop at launch.
         ({"env": {"LAKE_ARTIFACT_CACHE": "1\0"}}, "NUL in a value"),
@@ -447,7 +447,7 @@ worker3 — backing off
     runner_env = worker_paths.self_env()
     # Write the value to a temporary file and rename it into place: `probe.exists()` must not become
     # true between creating the file and writing its contents, or this reads an empty string.
-    runner_env["TAUCETI_MANAGER_TEST_COMMAND"] = shlex.join(
+    runner_env["EPSILONERIDANI_MANAGER_TEST_COMMAND"] = shlex.join(
         [
             sys.executable,
             "-c",

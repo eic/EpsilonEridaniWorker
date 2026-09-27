@@ -122,13 +122,13 @@ jobs:
           '
       - name: Smoke-test configurable worker options
         run: |
-          TAUCETI_WORKER_ARGS=--help docker compose run --rm --no-deps epsiloneridani 2>&1 |
+          EPSILONERIDANI_WORKER_ARGS=--help docker compose run --rm --no-deps epsiloneridani 2>&1 |
             grep -F "usage: epsiloneridani work"
           test ! -e .env
           trap 'rm -f .env' EXIT
-          printf '%s\n' 'TAUCETI_WORKER_ARGS=--help' >.env
+          printf '%s\n' 'EPSILONERIDANI_WORKER_ARGS=--help' >.env
           docker compose config --format json | python3 -c \
-            'import json, sys; assert json.load(sys.stdin)["services"]["epsiloneridani"]["environment"]["TAUCETI_WORKER_ARGS"] == "--help"'
+            'import json, sys; assert json.load(sys.stdin)["services"]["epsiloneridani"]["environment"]["EPSILONERIDANI_WORKER_ARGS"] == "--help"'
       # Exercise the actual tini -> uv -> Python process tree used by Compose. The
       # unit test invokes Python directly and cannot prove that SIGTERM crosses uv.
       - name: Graceful stop reaches the worker loop
@@ -150,7 +150,7 @@ jobs:
           for provider in claude codex; do
             log="$(mktemp)"
             docker run --rm --entrypoint /usr/local/bin/epsiloneridani-oauth-refresh \
-              -e TAUCETI_REFRESH_ONCE=1 \
+              -e EPSILONERIDANI_REFRESH_ONCE=1 \
               epsiloneridani-worker:ci "$provider" >"$log" 2>&1
             grep -F "$provider-refresh: waiting for" "$log"
           done

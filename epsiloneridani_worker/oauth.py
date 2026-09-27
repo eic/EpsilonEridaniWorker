@@ -58,14 +58,14 @@ def provider(name: str, *, credentials: Path | None = None, mirror: Path | None 
     if name == "claude":
         config = Path(os.environ.get("CLAUDE_CONFIG_DIR", home / ".claude"))
         path = credentials or config / ".credentials.json"
-        url = os.environ.get("TAUCETI_CLAUDE_TOKEN_URL", CLAUDE_TOKEN_URL)
+        url = os.environ.get("EPSILONERIDANI_CLAUDE_TOKEN_URL", CLAUDE_TOKEN_URL)
         client = CLAUDE_CLIENT_ID
     else:
         path = credentials or home / ".codex" / "auth.json"
-        url = os.environ.get("TAUCETI_CODEX_TOKEN_URL", CODEX_TOKEN_URL)
+        url = os.environ.get("EPSILONERIDANI_CODEX_TOKEN_URL", CODEX_TOKEN_URL)
         client = CODEX_CLIENT_ID
     if mirror is None:
-        env_mirror = os.environ.get("TAUCETI_REFRESH_MIRROR")
+        env_mirror = os.environ.get("EPSILONERIDANI_REFRESH_MIRROR")
         mirror = Path(env_mirror) if env_mirror else None
     return Provider(name, path, url, client, mirror)
 

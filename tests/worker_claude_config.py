@@ -16,7 +16,7 @@ Pinned here:
   3. An existing worker home is migrated — a symlink WE created into the operator's dir is removed —
      while anything the operator put there by hand (a real file, a symlink elsewhere) survives, and a
      settings.json already written is not overwritten.
-  4. $TAUCETI_INHERIT_CLAUDE_CONFIG=1 restores the old wholesale mirroring.
+  4. $EPSILONERIDANI_INHERIT_CLAUDE_CONFIG=1 restores the old wholesale mirroring.
 
 Exit 0 = all assertions hold; 1 = a mismatch.
 """
@@ -117,11 +117,11 @@ def main():
             iso5 = root / f"iso5-{label.replace(' ', '-')}" / ".claude"
             iso5.mkdir(parents=True)
             prepare(iso5)
-            os.environ["TAUCETI_INHERIT_CLAUDE_CONFIG"] = "1"
+            os.environ["EPSILONERIDANI_INHERIT_CLAUDE_CONFIG"] = "1"
             try:
                 seed(real, iso5)
             finally:
-                del os.environ["TAUCETI_INHERIT_CLAUDE_CONFIG"]
+                del os.environ["EPSILONERIDANI_INHERIT_CLAUDE_CONFIG"]
             check(f"opt-in ({label}) restores the CLAUDE.md symlink", (iso5 / "CLAUDE.md").is_symlink())
             check(f"opt-in ({label}) restores the skills symlink", (iso5 / "skills").is_symlink())
             check(f"opt-in ({label}) restores the settings symlink", (iso5 / "settings.json").is_symlink())
@@ -132,11 +132,11 @@ def main():
         iso6.mkdir(parents=True)
         seed(real, iso6)
         (iso6 / "settings.json").write_text(json.dumps({"effortLevel": "low"}))
-        os.environ["TAUCETI_INHERIT_CLAUDE_CONFIG"] = "1"
+        os.environ["EPSILONERIDANI_INHERIT_CLAUDE_CONFIG"] = "1"
         try:
             seed(real, iso6)
         finally:
-            del os.environ["TAUCETI_INHERIT_CLAUDE_CONFIG"]
+            del os.environ["EPSILONERIDANI_INHERIT_CLAUDE_CONFIG"]
         check(
             "opt-in keeps an edited settings.json rather than discarding it",
             json.loads((iso6 / "settings.json").read_text()) == {"effortLevel": "low"},

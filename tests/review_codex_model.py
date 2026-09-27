@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Codex and Kiro review policy is independent from the authoring profile.
 
-Only $TAUCETI_REVIEW_CODEX_MODEL is forwarded to the engine; authoring model
+Only $EPSILONERIDANI_REVIEW_CODEX_MODEL is forwarded to the engine; authoring model
 overrides must leave its default/fallback policy untouched.
 """
 
@@ -27,22 +27,22 @@ def check(name, cond):
 
 # --- the pure decision helper -----------------------------------------------------------------------
 f = agents._codex_review_model_override
-os.environ.pop("TAUCETI_REVIEW_CODEX_MODEL", None)
+os.environ.pop("EPSILONERIDANI_REVIEW_CODEX_MODEL", None)
 check("unset -> None", f("codex") is None)
-os.environ["TAUCETI_AUTHORING_CODEX_MODEL"] = "author-only"
+os.environ["EPSILONERIDANI_AUTHORING_CODEX_MODEL"] = "author-only"
 check("authoring override does not affect review", f("codex") is None)
-os.environ["TAUCETI_REVIEW_CODEX_MODEL"] = "gpt-5.6-terra"
+os.environ["EPSILONERIDANI_REVIEW_CODEX_MODEL"] = "gpt-5.6-terra"
 check("set + codex -> value", f("codex") == "gpt-5.6-terra")
 check("set + claude -> None (not a codex reviewer)", f("claude") is None)
 check("set + 'claude,codex' -> value", f("claude,codex") == "gpt-5.6-terra")
 
 k = agents._kiro_review_model
-os.environ.pop("TAUCETI_REVIEW_KIRO_MODEL", None)
-os.environ["TAUCETI_AUTHORING_KIRO_MODEL"] = "claude-opus-5"
+os.environ.pop("EPSILONERIDANI_REVIEW_KIRO_MODEL", None)
+os.environ["EPSILONERIDANI_AUTHORING_KIRO_MODEL"] = "claude-opus-5"
 check("Kiro review defaults to exact Sol", k("kiro") == "gpt-5.6-sol")
 check("Kiro authoring override does not affect review", k("kiro") != "claude-opus-5")
 check("non-Kiro review gets no Kiro model", k("codex") is None)
-os.environ["TAUCETI_REVIEW_KIRO_MODEL"] = "claude-opus-5"
+os.environ["EPSILONERIDANI_REVIEW_KIRO_MODEL"] = "claude-opus-5"
 check("Kiro review can explicitly select Opus", k("claude,kiro") == "claude-opus-5")
 
 # --- end-to-end: the flag threads into the real review_in_bubble inner command ----------------------
@@ -60,16 +60,16 @@ agents.fetch_ref = lambda repo, d: True  # no network
 agents.me = lambda: "tester"  # no gh call
 
 tmp = Path(tempfile.mkdtemp())
-os.environ["TAUCETI_REVIEW_ENGINE_DIR"] = str(tmp / "engine")  # skip the engine fetch
+os.environ["EPSILONERIDANI_REVIEW_ENGINE_DIR"] = str(tmp / "engine")  # skip the engine fetch
 w = types.SimpleNamespace(cfg=types.SimpleNamespace(state=tmp / "state", store_dir=tmp / "store"))
 opts = types.SimpleNamespace()
 
-os.environ.pop("TAUCETI_REVIEW_CODEX_MODEL", None)
+os.environ.pop("EPSILONERIDANI_REVIEW_CODEX_MODEL", None)
 agents.review_in_bubble(w, 470, "abc123", "codex", opts)
 check("bubble: unset -> no --codex-model, engine default stands", "--codex-model" not in captured["inner"])
 check("bubble: codex reviewer still seeds codex creds", captured["cred"] == "codex")
 
-os.environ["TAUCETI_REVIEW_CODEX_MODEL"] = "gpt-5.6-terra"
+os.environ["EPSILONERIDANI_REVIEW_CODEX_MODEL"] = "gpt-5.6-terra"
 agents.review_in_bubble(w, 470, "abc123", "codex", opts)
 check("bubble: set -> --codex-model gpt-5.6-terra forwarded", "--codex-model gpt-5.6-terra" in captured["inner"])
 
@@ -81,10 +81,10 @@ check("bubble: Kiro exact model is forwarded", "--kiro-model claude-opus-5" in c
 check("bubble: Kiro reviewer seeds only Kiro creds", captured["cred"] == "kiro")
 check("bubble: Kiro credential bootstrap is present", "kiro-auth.sqlite3" in captured["inner"])
 
-os.environ.pop("TAUCETI_REVIEW_ENGINE_DIR", None)
-os.environ.pop("TAUCETI_REVIEW_CODEX_MODEL", None)
-os.environ.pop("TAUCETI_AUTHORING_CODEX_MODEL", None)
-os.environ.pop("TAUCETI_REVIEW_KIRO_MODEL", None)
-os.environ.pop("TAUCETI_AUTHORING_KIRO_MODEL", None)
+os.environ.pop("EPSILONERIDANI_REVIEW_ENGINE_DIR", None)
+os.environ.pop("EPSILONERIDANI_REVIEW_CODEX_MODEL", None)
+os.environ.pop("EPSILONERIDANI_AUTHORING_CODEX_MODEL", None)
+os.environ.pop("EPSILONERIDANI_REVIEW_KIRO_MODEL", None)
+os.environ.pop("EPSILONERIDANI_AUTHORING_KIRO_MODEL", None)
 print(f"\n{'PASS' if not fails else 'FAIL'}: {fails} failure(s)")
 sys.exit(1 if fails else 0)
