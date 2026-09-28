@@ -129,6 +129,7 @@ environment (flags win; full reference linked below):
   EPSILONERIDANI_AUTHORING_CLAUDE_MODEL / _EFFORT exact Claude authoring profile
   EPSILONERIDANI_STREAM=1       same as --stream
   EPSILONERIDANI_AUTO_REFRESH=1 same as --auto-refresh (renew an expired Claude token; see --auto-refresh)
+  EPSILONERIDANI_CLAUDE_NO_WEEKLY_CAP=1 same as --claude-no-weekly-cap (this account has no weekly cap)
   EPSILONERIDANI_ACCOUNT        default for --account (require a specific Codex account)
   CLAUDE_CONFIG_DIR      Claude config/credential source (Bubble uses a private macOS handoff)
                          (account switching, where the creds live in a file)
@@ -293,6 +294,17 @@ def add_work_flags(p: argparse.ArgumentParser) -> None:
         "credential file: the refresh token is single-use, so an interactive `claude`, a second "
         "refresher, or a copy of the credential on another host can be logged out by the rotation. "
         "Off by default; sets $EPSILONERIDANI_AUTO_REFRESH=1 (inherited by loop children)",
+    )
+    p.add_argument(
+        "--claude-no-weekly-cap",
+        dest="claude_no_weekly_cap",
+        action="store_true",
+        default=None,
+        help="declare that this Claude account has no weekly cap — some seats only ever meter the "
+        "5-hour session window, and the usage endpoint's weekly fields stay null forever rather than "
+        "just through a post-reset gap. Without this, that reads as an uninitialized weekly window: "
+        "the bounded bootstrap retries once an hour and claude never goes available. Off by default; "
+        "sets $EPSILONERIDANI_CLAUDE_NO_WEEKLY_CAP=1 (inherited by loop children)",
     )
     p.add_argument(
         "--ignore-quota",
@@ -790,6 +802,9 @@ def cmd_work(args, *, only: list[str], agent: str, one_round: bool, prs: tuple[i
     # --auto-refresh likewise, so a loop child renews on the same authority the driver was given.
     if getattr(args, "auto_refresh", None):
         os.environ["EPSILONERIDANI_AUTO_REFRESH"] = "1"
+    # --claude-no-weekly-cap likewise, so a loop child stops gating on the weekly window too.
+    if getattr(args, "claude_no_weekly_cap", None):
+        os.environ["EPSILONERIDANI_CLAUDE_NO_WEEKLY_CAP"] = "1"
     # --pace is settled in resolve_pace, before dispatch, together with the environment it overrides.
     # --stream restores live agent output (default redirects it to a log file). Set in the env so loop
     # children inherit it.

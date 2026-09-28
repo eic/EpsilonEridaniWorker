@@ -96,6 +96,20 @@ CLAUDE_BOOTSTRAP_DROP_ENV = frozenset(
 )
 
 
+def _claude_no_weekly_cap() -> bool:
+    """Whether the operator has declared this Claude account carries no weekly cap at all.
+
+    Some seats (seen on at least one org-managed account) only ever meter the 5-hour session
+    window: the usage endpoint's weekly/`seven_day*` fields stay null forever, not just through a
+    post-reset gap. Nothing in a single reading can tell that apart from a window that is merely
+    idle-and-about-to-open, so we do not try to infer it — without this, `idle` never resolves and
+    the bounded bootstrap (see CLAUDE_BOOTSTRAP_RETRY_S) retries once an hour, forever, while
+    `claude` stays permanently unavailable even though the session window it actually reports is
+    healthy. Read live from the env, like the other operator dials (e.g. roadmap_only), so a loop
+    child inherits it. Off by default: the weekly window is read and gates normally."""
+    return os.environ.get("EPSILONERIDANI_CLAUDE_NO_WEEKLY_CAP") == "1"
+
+
 # --- pacing curve --------------------------------------------------------------------------------
 # The pacer decides a window is "under pace" while used% stays under a BUDGET that grows with elapsed
 # time. The operator supplies that budget as piecewise-linear "time%:budget%" control points via
@@ -614,11 +628,13 @@ def _claude_unauthorized(prov: Provider) -> bool:
 
 def _claude_readings(payload: dict, now: float | None = None) -> list[Reading]:
     """The session and the overall (unscoped) weekly, each read on its own. These two gate the
-    worker's opus; the per-model weekly caps do not."""
+    worker's opus; the per-model weekly caps do not. $EPSILONERIDANI_CLAUDE_NO_WEEKLY_CAP drops the
+    weekly window entirely rather than reading it — see _claude_no_weekly_cap."""
     now = time.time() if now is None else now
     if not isinstance(payload, dict):  # never .get() on a non-object; callers treat both as hard blocks
         payload = {}
-    return [_claude_window_reading(payload, w, now) for w in ("session", "weekly")]
+    windows = ("session",) if _claude_no_weekly_cap() else ("session", "weekly")
+    return [_claude_window_reading(payload, w, now) for w in windows]
 
 
 def _claude_valid_until(readings: list[Reading]) -> float | None:

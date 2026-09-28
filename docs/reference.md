@@ -25,6 +25,7 @@ list is in `epsiloneridani work -h`. For persistent workers, see
 | `--roadmap-extra-identities LOGIN[,LOGIN...]` | Extra GitHub logins, beyond your `gh auth` identity, whose claimed intentions the worker treats as its own (won't avoid). |
 | `--ignore-claims` | Don't avoid targets others have claimed on the intentions board (claim-respect is on by default). |
 | `--auto-refresh` | Renew this worker's Claude access token when it expires, instead of reporting Claude unavailable until a human runs `claude` again. Off by default, and only safe when nothing else uses the same credential file — the refresh token is single-use, so the rotation logs out an interactive `claude`, a second refresher, or a copy of the credential elsewhere. See [quota and pacing](quota.md). |
+| `--claude-no-weekly-cap` | Declare that this Claude account has no weekly cap — some seats only ever meter the 5-hour session window, and the usage endpoint's weekly fields stay null forever rather than through a post-reset gap. Without this, that reads as an uninitialized weekly window and `claude` never goes available. See [quota and pacing](quota.md). |
 | `--ignore-quota` | Ignore soft pacing for an explicit `--agent codex\|claude`; unreadable usage and provider hard limits still stop the round. Kiro and OpenRouter agents do not use the subscription pacer. |
 | `--quota-cmd CMD` | External pacer, run as `<cmd> <agent>`: first stdout token = model to run, empty output or nonzero exit = wait. |
 | `--pace T:B[,T:B...]` | Pacing curve as `time%:budget%` points (e.g. `0:10,50:70,90:90`): usage must remain below the interpolated budget; time 0/100 default to 0/100. Default is `60:40`; `0:0,100:100` gives the plain `used% < elapsed%` rule. |
@@ -178,6 +179,7 @@ Flags win over these. Most are tuning knobs with sane defaults.
 | `EPSILONERIDANI_PR` | _(unset)_ | Comma-separated pull request numbers for `--pr`. |
 | `EPSILONERIDANI_QUOTA_CMD` | — | Default for `--quota-cmd`. |
 | `EPSILONERIDANI_AUTO_REFRESH` | _(unset)_ | `1` is the same as `--auto-refresh`. |
+| `EPSILONERIDANI_CLAUDE_NO_WEEKLY_CAP` | _(unset)_ | `1` is the same as `--claude-no-weekly-cap`. |
 | `EPSILONERIDANI_PACE` | _(unset)_ | Pacing curve for `--pace` (`time%:budget%` points); unset = `60:40`. |
 | `EPSILONERIDANI_STREAM` | — | `1` is the same as `--stream`. |
 | `CLAUDE_CONFIG_DIR` | `~/.claude` | Claude config/credential source (account switching; Bubble uses a private transient handoff on macOS). |

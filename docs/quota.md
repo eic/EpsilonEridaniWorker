@@ -108,6 +108,27 @@ The bootstrap runs only under these conditions:
 If the window still is not reporting afterwards, the status reads
 `session bootstrap attempted; awaiting fresh usage` and the worker stays parked.
 
+## Accounts with no weekly cap: `--claude-no-weekly-cap`
+
+Some Claude seats only ever meter the 5-hour session window — for example the
+[Team Plan for Scientists](https://claude.com/programs/team-plan-for-scientists),
+which carries a 5-hour cap and no weekly one. Their usage endpoint's weekly
+fields (`seven_day` and friends, and any `weekly` entry in the structured
+`limits` array) stay `null` permanently, not just through the post-reset gap
+the bootstrap above is for. A single reading cannot tell "idle, about to open"
+apart from "this account has no weekly window at all", so `epsiloneridani`
+does not try to infer it: left alone, the weekly window reads `idle` forever,
+the bootstrap retries once an hour without ever resolving it, and `claude`
+never goes available even though the session window it actually reports is
+healthy.
+
+If your account's usage page shows only a 5-hour limit and no weekly one, tell
+the worker with `epsiloneridani work --loop --claude-no-weekly-cap` (or
+`$EPSILONERIDANI_CLAUDE_NO_WEEKLY_CAP=1`, inherited by loop children). This
+drops the weekly window from every reading entirely — it is not read, not
+gated on, and never bootstrapped — and availability is decided from the
+session window alone.
+
 ## Why "strictly under"
 
 A provider is available while `used%` is strictly under the budget for the
