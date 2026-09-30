@@ -41,7 +41,9 @@ claim() {
 
 # 1) Lease check (fail closed if we no longer hold the claim someone may have taken over).
 if [[ -n "$CLAIM_KEY" && -x "$CLAIM_SH" ]]; then
-    if ! claim holds "$CLAIM_KEY"; then
+    claim holds "$CLAIM_KEY"; rc=$?
+    [[ $rc -eq 2 ]] && die "cannot check lease '$CLAIM_KEY' (claim.sh error above) — refusing to push"
+    if [[ $rc -ne 0 ]]; then
         claim renew "$CLAIM_KEY" >/dev/null 2>&1 \
             || die "lease '$CLAIM_KEY' lost (another agent took over) — refusing to push"
     fi
