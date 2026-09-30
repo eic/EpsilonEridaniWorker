@@ -1160,7 +1160,8 @@ def _gemini_quota_info(payload: dict) -> dict | None:
     if not isinstance(models, dict):
         return None
     default_model = AUTHORING_DEFAULTS.get("gemini", ("gemini-3.1-pro-high", "high"))[0]
-    info = models.get(default_model, {}).get("quotaInfo")
+    model_data = models.get(default_model)
+    info = model_data.get("quotaInfo") if isinstance(model_data, dict) else None
     if isinstance(info, dict) and "remainingFraction" in info:
         return info
     for m, v in models.items():
