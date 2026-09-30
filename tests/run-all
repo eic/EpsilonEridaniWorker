@@ -30,6 +30,7 @@ RUN_STDLIB=(
   claude_config_dir.py
   claude_keychain.py
   claims_repo.py
+  claim_write_failure.py
   codex_account.py
   codex_fallback.py
   contest_claim.py
