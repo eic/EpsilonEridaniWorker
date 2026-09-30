@@ -261,8 +261,10 @@ AUTHORING_DEFAULTS = {
     # id (for example claude-opus-5) with the existing --author-model flag.
     # Kiro does not serve gpt-6-sol yet (https://kiro.dev/changelog/models/).
     "kiro": ("gpt-5.6-sol", "high"),
-    "gemini": ("gemini-1.5-pro", "high"),
+    "gemini": ("gemini-3.1-pro-high", "high"),
 }
+
+GEMINI_USAGE_URL = "https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels"
 
 PI_RUN = os.environ.get("PI_RUN", os.path.expanduser("~/.claude/skills/pi/scripts/run.sh"))
 

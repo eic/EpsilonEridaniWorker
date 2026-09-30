@@ -1945,6 +1945,13 @@ def isolate_home(wid: str) -> Path:
             os.environ["EPSILONERIDANI_KIRO_PROCESS_HOME"] = str(home)
         else:
             os.environ["EPSILONERIDANI_KIRO_XDG_DATA_HOME"] = str(iso_kiro_data.parent)
+        iso_gemini = home / ".gemini"
+        real_gemini = _host_home() / ".gemini"
+        if _safe_exists(real_gemini) and not iso_gemini.exists():
+            try:
+                iso_gemini.symlink_to(real_gemini)
+            except OSError:
+                pass
         return home
     real = Path(os.environ.get("HOME", os.path.expanduser("~")))
     real_claude = claude_dir(real)  # honors the operator's $CLAUDE_CONFIG_DIR before we repoint it
@@ -2007,6 +2014,13 @@ def isolate_home(wid: str) -> Path:
             )
     else:
         kiro_marker.write_text(str(real_kiro_data))
+    real_gemini = real / ".gemini"
+    iso_gemini = home / ".gemini"
+    if _safe_exists(real_gemini) and not iso_gemini.exists():
+        try:
+            iso_gemini.symlink_to(real_gemini)
+        except OSError:
+            pass
     # Both credential dirs are addressed by environment variable, and both CLIs honour the same ones the
     # worker's own claude_dir()/codex_dir() read, so the pacer and the spawned agent always agree. These
     # are the WHOLE isolation on macOS, and they ride alongside the $HOME move elsewhere.
