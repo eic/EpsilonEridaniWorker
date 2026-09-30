@@ -24,7 +24,7 @@ from pathlib import Path
 
 from . import oauth as credential_refresh
 from .config import Config, log
-from .constants import CLAUDE_CMD
+from .constants import AUTHORING_DEFAULTS, CLAUDE_CMD, GEMINI_USAGE_URL
 from .github import GitHubError, _parse_retry_after
 
 CODEX_USAGE_URL = "https://chatgpt.com/backend-api/wham/usage"
@@ -37,7 +37,7 @@ SESSION_WINDOW_S = 5 * 3600
 
 WEEK_WINDOW_S = 7 * 24 * 3600
 
-QUOTA_TTL = {"codex": 600, "claude": 3600}
+QUOTA_TTL = {"codex": 600, "claude": 3600, "gemini": 600}
 
 # Tolerance on a Claude reset clock that reads as already elapsed. Inside it we still treat the window
 # as live (it is about to roll); beyond it the endpoint is describing a window that has already ended,
@@ -743,6 +743,17 @@ def _http_get_json(url: str, headers: dict, timeout: int = 15) -> tuple[int, dic
         raise GitHubError(f"usage fetch failed: {e}") from e
 
 
+def _http_post_json(url: str, headers: dict, data: bytes = b"{}", timeout: int = 15) -> tuple[int, dict, float | None]:
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.status, json.loads(r.read().decode()), None
+    except urllib.error.HTTPError as e:
+        return e.code, {}, _parse_retry_after(e.headers.get("Retry-After"))
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as e:
+        raise GitHubError(f"usage fetch failed: {e}") from e
+
+
 def _read_json_file(path: Path) -> dict | None:
     try:
         return json.loads(path.read_text())
@@ -864,6 +875,23 @@ def claude_dir(home: Path) -> Path:
     the conventional <home>/.claude. Isolation repoints $CLAUDE_CONFIG_DIR at the per-worker copy."""
     d = os.environ.get("CLAUDE_CONFIG_DIR")
     return Path(d) if d else home / ".claude"
+
+
+def gemini_dir(home: Path) -> Path:
+    """Where Gemini / Antigravity CLI keeps its config + credentials. $GEMINI_CONFIG_DIR wins;
+    else the conventional <home>/.gemini."""
+    d = os.environ.get("GEMINI_CONFIG_DIR")
+    return Path(d) if d else home / ".gemini"
+
+
+def _host_home() -> Path:
+    """The login user's real home, unaffected by per-worker $HOME isolation."""
+    try:
+        import pwd
+
+        return Path(pwd.getpwuid(os.getuid()).pw_dir)
+    except (ImportError, KeyError, OSError):
+        return Path(os.path.expanduser("~"))
 
 
 def _write_json_atomic(path: Path, data: dict) -> None:
@@ -1124,6 +1152,38 @@ class CodexAccount:
         return f"{who} (plan: {self.plan})" if self.plan else who
 
 
+def _gemini_quota_info(payload: dict) -> dict | None:
+    """Extract the quotaInfo dictionary for Gemini from a fetchAvailableModels payload."""
+    if not isinstance(payload, dict):
+        return None
+    models = payload.get("models")
+    if not isinstance(models, dict):
+        return None
+    default_model = AUTHORING_DEFAULTS.get("gemini", ("gemini-3.1-pro-high", "high"))[0]
+    model_data = models.get(default_model)
+    info = model_data.get("quotaInfo") if isinstance(model_data, dict) else None
+    if isinstance(info, dict) and "remainingFraction" in info:
+        return info
+    for m, v in models.items():
+        if isinstance(v, dict) and "gemini" in m.lower():
+            qi = v.get("quotaInfo")
+            if isinstance(qi, dict) and "remainingFraction" in qi:
+                return qi
+    return None
+
+
+def _gemini_valid_until(payload: dict, now: float) -> float | None:
+    qi = _gemini_quota_info(payload)
+    if not qi:
+        return None
+    reset_time = qi.get("resetTime")
+    resets_at = _parse_iso(reset_time) if isinstance(reset_time, str) else None
+    if resets_at is None:
+        return None
+    ttl = QUOTA_TTL.get("gemini", 600)
+    return min(now + ttl, resets_at)
+
+
 class Quota:
     """The pacer. Every read here is pure: it may fetch usage and cache it, but it never spends quota.
     Breaking a post-reset deadlock costs a real request, so it lives behind one explicit method —
@@ -1186,11 +1246,14 @@ class Quota:
     ) -> None:
         # `fetched_at` is the instant the caller OBSERVED this payload, kept whole (not truncated to the
         # second) so that re-reading the entry reproduces the verdict the caller already acted on.
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
-        entry = {"fetched_at": time.time() if fetched_at is None else fetched_at, "fp": fp, "payload": payload}
-        if valid_until is not None:
-            entry["valid_until"] = valid_until
-        (self.cache_dir / f"quota-{provider}.json").write_text(json.dumps(entry))
+        try:
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+            entry = {"fetched_at": time.time() if fetched_at is None else fetched_at, "fp": fp, "payload": payload}
+            if valid_until is not None:
+                entry["valid_until"] = valid_until
+            (self.cache_dir / f"quota-{provider}.json").write_text(json.dumps(entry))
+        except OSError:
+            pass
 
     def _forget_raw(self, provider: str) -> None:
         """Drop a provider's cached payload so the next read must go to the network. Used after a
@@ -2152,25 +2215,109 @@ class Quota:
         return min(blocked) if blocked else None
 
     # --- selection ---------------------------------------------------------
+    def _gemini_token(self) -> str | None:
+        """Read access token from antigravity-oauth-token if present."""
+        candidates = [
+            gemini_dir(self.cfg.home) / "antigravity-cli" / "antigravity-oauth-token",
+            _host_home() / ".gemini" / "antigravity-cli" / "antigravity-oauth-token",
+            Path(os.path.expanduser("~")) / ".gemini" / "antigravity-cli" / "antigravity-oauth-token",
+        ]
+        for p in candidates:
+            d = _read_json_file(p)
+            if d and isinstance(d, dict):
+                tok = d.get("token")
+                if isinstance(tok, dict) and tok.get("access_token"):
+                    return str(tok["access_token"])
+        return None
+
+    def _cached_gemini(self, fp: str | None) -> tuple[dict, float] | None:
+        entry = self._cached_entry("gemini", fp)
+        payload = None if entry is None else entry.get("payload")
+        at = None if entry is None else entry.get("fetched_at")
+        if not isinstance(payload, dict) or not _finite_num(at):
+            return None
+        valid_until = _gemini_valid_until(payload, float(at))
+        if valid_until is None or time.time() >= valid_until:
+            return None
+        return payload, float(at)
+
+    def _gemini_from_payload(self, payload: dict, now: float | None = None) -> Provider:
+        now = time.time() if now is None else now
+        if not isinstance(payload, dict):
+            return Provider("gemini", False, None, error="gemini usage response malformed")
+        qi = _gemini_quota_info(payload)
+        model = AUTHORING_DEFAULTS.get("gemini", ("gemini-3.1-pro-high", "high"))[0]
+        if not qi:
+            return Provider("gemini", False, None, error="gemini usage response schema unsupported (no quotaInfo)")
+
+        rem = qi.get("remainingFraction")
+        reset_time = qi.get("resetTime")
+        resets_at = _parse_iso(reset_time) if isinstance(reset_time, str) else None
+
+        if not _finite_num(rem) or resets_at is None:
+            w = Window("session", None, None, resets_at, "unknown", detail="unparseable quotaInfo")
+            return Provider("gemini", False, None, [w])
+
+        rem_f = float(rem)
+        used = round(max(0.0, min(100.0, (1.0 - rem_f) * 100.0)), 4)
+        limit_reached = rem_f <= 0.0 or used >= 100.0
+
+        left = resets_at - now
+        window_s = max(SESSION_WINDOW_S, left)
+        elapsed = round(max(0.0, min(100.0, (window_s - max(0.0, left)) / window_s * 100.0)), 4)
+
+        w = _classify_window("session", used, elapsed, resets_at, limit_reached)
+        wins = [w]
+        avail = (w.status == STATUS_UNDER_PACE) and not limit_reached
+        nxt = self._next_eligible(wins, now)
+        return Provider("gemini", avail, model if avail else None, wins, None, nxt)
+
     def gemini(self, *, refresh: bool = False) -> Provider:
-        # Check if agy or gemini-cli is installed
-        import os
-        import shutil
-
-        from epsiloneridani_worker.constants import AUTHORING_DEFAULTS
-
-        has_cli = shutil.which("agy") or shutil.which("gemini-cli")
+        """Read Gemini usage via Antigravity backend and report whether gemini may run under pace."""
+        has_cli = bool(shutil.which("agy") or shutil.which("gemini-cli"))
         if not has_cli:
             return Provider("gemini", False, None, error="no agy or gemini-cli on PATH")
 
         has_key = bool(os.environ.get("GEMINI_API_KEY"))
-        has_agy_auth = os.path.isdir(os.path.expanduser("~/.gemini/antigravity-cli"))
+        tok = self._gemini_token()
+        model = AUTHORING_DEFAULTS.get("gemini", ("gemini-3.1-pro-high", "high"))[0]
 
-        if not has_key and not has_agy_auth:
-            return Provider("gemini", False, None, error="no GEMINI_API_KEY or ~/.gemini/antigravity-cli")
+        if not tok:
+            if not has_key:
+                return Provider("gemini", False, None, error="no GEMINI_API_KEY or ~/.gemini/antigravity-cli")
+            return Provider("gemini", True, model)
 
-        model = AUTHORING_DEFAULTS.get("gemini", ("gemini-1.5-pro", "high"))[0]
-        return Provider("gemini", True, model)
+        fp = self._fingerprint(tok)
+        cached = self._cached_gemini(fp)
+        if cached is not None and not refresh:
+            return self._gemini_from_payload(*cached)
+
+        headers = {
+            "Authorization": f"Bearer {tok}",
+            "Content-Type": "application/json",
+            "User-Agent": "antigravity",
+        }
+        url = os.environ.get("EPSILONERIDANI_GEMINI_USAGE_URL", GEMINI_USAGE_URL)
+        observed_at = time.time()
+        try:
+            code, payload, retry_after = _http_post_json(url, headers, data=b"{}")
+        except GitHubError as e:
+            still = self._cached_gemini(fp)
+            if still is not None:
+                return self._gemini_from_payload(*still)
+            return Provider("gemini", False, None, error=str(e))
+
+        if code != 200 or not payload:
+            still = self._cached_gemini(fp) if code != 401 else None
+            if still is not None:
+                return self._gemini_from_payload(*still)
+            err = "gemini token expired; refresh left to the operator" if code == 401 else f"gemini usage HTTP {code}"
+            return Provider("gemini", False, None, error=err, retry_after=retry_after)
+
+        valid_until = _gemini_valid_until(payload, observed_at)
+        if valid_until is not None:
+            self._store_raw("gemini", payload, fp, valid_until, observed_at)
+        return self._gemini_from_payload(payload, observed_at)
 
     def choose(self, forced: str | None, *, refresh: bool = False, renew: bool = False) -> tuple[str | None, dict]:
         """Return (agent_to_run_now or None, {codex: Provider, claude: Provider}).

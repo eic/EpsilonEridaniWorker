@@ -69,7 +69,16 @@ from .constants import (
 from .github import GitHub, shared_claims_granted
 from .loop import cmd_loop, resolve_work_model
 from .paths import HERE, ensure_ssl_cert_file
-from .quota import Quota, _claude_keychain_creds, _safe_exists, claude_dir, codex_dir, parse_pace_curve
+from .quota import (
+    Quota,
+    _claude_keychain_creds,
+    _host_home,
+    _safe_exists,
+    claude_dir,
+    codex_dir,
+    gemini_dir,
+    parse_pace_curve,
+)
 from .review_state import ReviewState
 from .round import Claims, RoundContext, cmd_heartbeat
 from .runtime_status import report_failure
@@ -1035,6 +1044,14 @@ def cmd_doctor(args) -> int:
             "$KIRO_API_KEY" if (os.environ.get("KIRO_API_KEY") or "").strip() else str(kiro_db),
         )
     )
+    gemini_key = bool((os.environ.get("GEMINI_API_KEY") or "").strip())
+    gemini_tok = gemini_dir(cfg.home) / "antigravity-cli" / "antigravity-oauth-token"
+    host_gemini_tok = _host_home() / ".gemini" / "antigravity-cli" / "antigravity-oauth-token"
+    has_gemini = gemini_key or _safe_exists(gemini_tok) or _safe_exists(host_gemini_tok)
+    gemini_note = (
+        "$GEMINI_API_KEY" if gemini_key else (str(gemini_tok) if _safe_exists(gemini_tok) else str(host_gemini_tok))
+    )
+    rows.append(("gemini auth", has_gemini, gemini_note))
     bad = 0
     print(f"epsiloneridani doctor — worker '{cfg.wid}'")
     for name, ok, note in rows:

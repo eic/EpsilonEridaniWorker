@@ -315,6 +315,8 @@ def _credential_hint(agent: str, prov: Provider | None) -> str:
     # or "token expired" from something in between is not our credential being rejected.
     if "usage HTTP 401" not in error and "token expired; refresh left to the operator" not in error:
         return ""
+    if agent == "gemini":
+        return ". Run `agy` to authenticate or set GEMINI_API_KEY"
     if agent != "claude":
         return ". Run `codex login` to renew the credential"
     if sys.platform == "darwin":
@@ -375,7 +377,7 @@ def resolve_work_model(
         return agent, False
     if ignore_quota and not quota_cmd and agent == "auto":
         raise SystemExit(
-            "--ignore-quota needs an explicit paced --agent (codex/claude); 'auto' can't choose without the pacer"
+            "--ignore-quota needs an explicit paced --agent (codex/claude/gemini); 'auto' can't choose without the pacer"
         )
     # The round is deciding what it will actually launch, so the token it hands the agent must be live.
     chosen, snap = choose_model(cfg, agent, quota_cmd, refresh=fresh, renew=True)
@@ -405,5 +407,12 @@ def resolve_work_model(
     if chosen is None and claude_pending_init(snap):
         return "claude", True
     if chosen is None:
-        raise NoProgress(f"no model under pace right now (agent={agent}) — nothing to run this round")
+        prov = snap.get(agent)
+        if prov and prov.error:
+            fix = _credential_hint(agent, prov)
+            raise NoProgress(f"{agent} unavailable ({prov.error}) — nothing to run this round{fix}")
+        why = f": {_unavail_reason(prov)[1]}" if (prov and not prov.available) else ""
+        raise NoProgress(
+            f"no model under pace right now (agent={agent}{why}) — nothing to run this round{_retry_hint(prov)}"
+        )
     return chosen, False

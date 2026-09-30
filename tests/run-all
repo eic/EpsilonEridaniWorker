@@ -66,8 +66,9 @@ RUN_STDLIB=(
   quota_claude_bootstrap.py
   quota_claude_no_weekly_cap.py
   quota_claude_windows.py
-  quota_launch_stage.py
   quota_codex_windows.py
+  quota_gemini_windows.py
+  quota_launch_stage.py
   quota_reason.py
   review_codex_model.py
   review_daily_cap.py
