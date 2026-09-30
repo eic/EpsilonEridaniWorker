@@ -8,6 +8,7 @@ and git-safe-push later fails closed with "lease lost". These tests run the real
 bare remote (via url.insteadOf) with a `git` shim that fails `commit-tree`, so no network is touched.
 """
 
+import json
 import os
 import shutil
 import subprocess
@@ -111,10 +112,16 @@ def healthy_renew_still_works():
     with Sandbox() as s:
         assert s.claim("acquire", KEY).returncode == 0
         before = s.remote_oid()
-        r = s.claim("renew", KEY)
+        before_exp = json.loads(s.claim("read", KEY).stdout)["expires_at"]
+        # A lease is a content-addressed commit with 1-second timestamps, so a renew in the same second
+        # as the acquire, with the same TTL, would rebuild the identical oid. A longer TTL guarantees the
+        # lease content (and so the oid) changes regardless of timing.
+        r = s.claim("renew", KEY, "3000")
         assert r.returncode == 0, r.stderr
         after = s.remote_oid()
         assert after and after != before, "renew did not move the lease forward"
+        after_exp = json.loads(s.claim("read", KEY).stdout)["expires_at"]
+        assert after_exp > before_exp, f"renew did not extend expires_at ({before_exp} -> {after_exp})"
 
 
 if not shutil.which("jq"):
