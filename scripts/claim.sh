@@ -65,7 +65,14 @@ lease_json() {
 }
 
 # build_oid JSON — write an orphan commit (empty tree) whose message is JSON; print its oid.
-build_oid() { printf '%s' "$1" | g commit-tree "$(empty_tree)"; }
+# Fails (rc 2, nothing printed) if the object can't be written, e.g. "Disk quota exceeded".
+build_oid() {
+    local tree oid
+    tree=$(empty_tree) && [[ -n "$tree" ]] || { echo "claim: cannot write empty tree in $GITDIR" >&2; return 2; }
+    oid=$(printf '%s' "$1" | g commit-tree "$tree") && [[ -n "$oid" ]] \
+        || { echo "claim: cannot write lease object in $GITDIR" >&2; return 2; }
+    printf '%s\n' "$oid"
+}
 
 # payload KEY EXPIRES — the lease JSON for a claim I'm taking now.
 payload() {
@@ -80,6 +87,8 @@ payload() {
 # push_cas REF EXPECTED NEWOID — CAS push (EXPECTED="" ⇒ create-only). 0 win, 1 lost/rejected.
 push_cas() {
     local out
+    # An empty source makes the refspec ":REF", i.e. a DELETE of the claim. Never push that here.
+    [[ -n "$3" ]] || { echo "claim: refusing to push an empty lease oid to $1" >&2; return 2; }
     out=$(g push --force-with-lease="$1:$2" origin "$3:$1" 2>&1)
     if [[ $? -eq 0 ]]; then return 0; fi
     grep -qiE 'rejected|stale info|failed to push' <<<"$out" && return 1
@@ -98,10 +107,10 @@ cmd_acquire() {
             return 1   # someone else holds a live lease
         fi
         # mine (renew) or expired (takeover): CAS against the observed oid
-        local oid; oid=$(build_oid "$(payload "$key" "$((n+ttl))")")
+        local oid; oid=$(build_oid "$(payload "$key" "$((n+ttl))")") || return 2
         push_cas "$ref" "$cur" "$oid"; return $?
     fi
-    local oid; oid=$(build_oid "$(payload "$key" "$((n+ttl))")")
+    local oid; oid=$(build_oid "$(payload "$key" "$((n+ttl))")") || return 2
     push_cas "$ref" "" "$oid"   # create-only
 }
 
@@ -111,7 +120,7 @@ cmd_renew() {
     cur=$(remote_oid "$ref"); [[ -z "$cur" ]] && return 1
     js=$(lease_json "$cur" "$ref"); owner=$(jq -r '.owner // ""' <<<"$js" 2>/dev/null)
     [[ "$owner" == "$WID" ]] || return 1   # lost / taken over
-    local oid; oid=$(build_oid "$(payload "$key" "$((n+ttl))")")
+    local oid; oid=$(build_oid "$(payload "$key" "$((n+ttl))")") || return 2
     push_cas "$ref" "$cur" "$oid"
 }
 
