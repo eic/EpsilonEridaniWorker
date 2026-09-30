@@ -1049,9 +1049,7 @@ def cmd_doctor(args) -> int:
     host_gemini_tok = _host_home() / ".gemini" / "antigravity-cli" / "antigravity-oauth-token"
     has_gemini = gemini_key or _safe_exists(gemini_tok) or _safe_exists(host_gemini_tok)
     gemini_note = (
-        "$GEMINI_API_KEY"
-        if gemini_key
-        else (str(gemini_tok) if _safe_exists(gemini_tok) else str(host_gemini_tok))
+        "$GEMINI_API_KEY" if gemini_key else (str(gemini_tok) if _safe_exists(gemini_tok) else str(host_gemini_tok))
     )
     rows.append(("gemini auth", has_gemini, gemini_note))
     bad = 0

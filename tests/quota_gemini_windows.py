@@ -22,7 +22,6 @@ import os
 import shutil
 import sys
 import tempfile
-import time
 import types
 from datetime import UTC, datetime
 from pathlib import Path
