@@ -64,6 +64,7 @@ RUN_STDLIB=(
   rebase_handoff.py
   review_sync_failure.py
   quota_claude_bootstrap.py
+  quota_claude_no_weekly_cap.py
   quota_claude_windows.py
   quota_launch_stage.py
   quota_codex_windows.py

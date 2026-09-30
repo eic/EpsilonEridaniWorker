@@ -65,7 +65,9 @@ class Sandbox:
     def remote_oid(self):
         out = subprocess.run(
             ["git", "-C", str(self.remote), "for-each-ref", "--format=%(objectname)", REF],
-            capture_output=True, text=True, check=True,
+            capture_output=True,
+            text=True,
+            check=True,
         ).stdout.strip()
         return out
 
