@@ -178,7 +178,7 @@ cmd="${1:-}"; shift || true
 case "$cmd" in
     acquire|renew|release|holds)
         [[ -n "$WID" ]] || {
-            echo "claim: EPSILONERIDANI_WORKER_ID is unset; set it to a stable owner id to $cmd a claim" >&2
+            echo "claim: EPSILONERIDANI_WORKER_ID is unset; set it to a stable owner id before running '$cmd'" >&2
             exit 2
         };;
 esac
