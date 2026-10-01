@@ -1494,8 +1494,11 @@ def drain_workers(config: Path, worker_ids: list[str], *, every: bool, wait: boo
 
 def resume_workers(config: Path, worker_ids: list[str], *, every: bool) -> int:
     """Clear a drain. A worker still finishing its round just carries on; one that already exited is
-    launched again. That launch is an explicit restart request, because a clean exit is otherwise
-    terminal for a worker with `restart = "on-failure"` or `"never"`."""
+    launched again by the reconciler, now or whenever the manager next starts.
+
+    A drained worker exits cleanly, and a clean exit is terminal for `restart = "on-failure"` or
+    `"never"`, so its terminal record is cleared, as re-enabling a worker does. Only a clean exit is
+    cleared: a worker that failed keeps its record, and with it the back-off before its relaunch."""
     targets = _drain_targets(config, worker_ids, every)
     online = manager_request("ping") is not None
     for spec in targets:
@@ -1503,8 +1506,11 @@ def resume_workers(config: Path, worker_ids: list[str], *, every: bool) -> int:
             drain_path(spec.id).unlink()
         except FileNotFoundError:
             pass
-        if not runner_status(spec.id).get("alive") and online:
-            manager_request("restart", id=spec.id)
+        if runner_status(spec.id).get("alive"):
+            continue
+        prior = read_json(status_path(spec.id))
+        if prior.get("state") == "exited" and prior.get("exit_code") == 0:
+            update_status(status_path(spec.id), stopped_at=None, exit_code=None, state="queued")
     ids = ", ".join(spec.id for spec in targets) or "(no enabled workers)"
     print(f"resumed: {ids}" + ("" if online else " (the manager is offline; they start when it does)"))
     return 0

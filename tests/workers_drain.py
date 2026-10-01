@@ -147,22 +147,31 @@ try:
     check("--all means every enabled worker", [s.id for s in wm._drain_targets(config, [], True)], ["w1", "w2"])
 
     # --- the real manager ---------------------------------------------------------------------------
-    manager = subprocess.Popen(
-        [
-            sys.executable,
-            "-m",
-            "epsiloneridani_worker",
-            "workers",
-            "--config",
-            str(config),
-            "manager",
-            "--interval",
-            "0.1",
-        ],
-        cwd=ROOT,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
+    def start_manager():
+        return subprocess.Popen(
+            [
+                sys.executable,
+                "-m",
+                "epsiloneridani_worker",
+                "workers",
+                "--config",
+                str(config),
+                "manager",
+                "--interval",
+                "0.1",
+            ],
+            cwd=ROOT,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+    def relaunched_since(before):
+        return lambda: all(
+            wm.runner_status(w).get("alive") and wm.runner_status(w).get("wrapper_pid") != before[w]
+            for w in ("w1", "w2")
+        )
+
+    manager = start_manager()
     both_alive = lambda: all(wm.runner_status(w).get("alive") for w in ("w1", "w2"))  # noqa: E731
     check("the manager starts both workers", bool(wait_for(both_alive)), True)
     first = {w: wm.runner_status(w).get("wrapper_pid") for w in ("w1", "w2")}
@@ -183,10 +192,30 @@ try:
 
     check("resume succeeds", wm.resume_workers(config, ["w1", "w2"], every=False), 0)
     check("resume clears the markers", any(wm.drain_path(w).exists() for w in ("w1", "w2")), False)
-    relaunched = lambda: all(  # noqa: E731
-        wm.runner_status(w).get("alive") and wm.runner_status(w).get("wrapper_pid") != first[w] for w in ("w1", "w2")
+    check("resume relaunches both, the on-failure worker too", bool(wait_for(relaunched_since(first))), True)
+
+    # Resumed while the manager is down: the drained workers must start when it comes back, the
+    # on-failure one included, although its clean exit would otherwise be terminal.
+    second = {w: wm.runner_status(w).get("wrapper_pid") for w in ("w1", "w2")}
+    check("a second drain --wait succeeds", wm.drain_workers(config, [], every=True, wait=True, timeout=20), 0)
+    wm.manager_request("shutdown", stop_workers=True)
+    manager.wait(15)
+    manager = None
+    check("resume with the manager offline succeeds", wm.resume_workers(config, [], every=True), 0)
+    check(
+        "...and clears the clean exits it left",
+        [wm.read_json(wm.status_path(w)).get("state") for w in ("w1", "w2")],
+        ["queued", "queued"],
     )
-    check("resume relaunches both, the on-failure worker too", bool(wait_for(relaunched)), True)
+    manager = start_manager()
+    check("both start when the manager returns", bool(wait_for(relaunched_since(second))), True)
+
+    # A worker that FAILED keeps its terminal record, and with it the back-off before a relaunch.
+    failed = {"state": "failed", "exit_code": 1, "stopped_at": time.time()}
+    wm.update_status(wm.status_path("off"), **failed)
+    wm.resume_workers(config, ["off"], every=False)
+    record = wm.read_json(wm.status_path("off"))
+    check("resume leaves a failed worker's record alone", (record.get("state"), record.get("exit_code")), ("failed", 1))
 finally:
     if manager is not None:
         wm.manager_request("shutdown", stop_workers=True)
