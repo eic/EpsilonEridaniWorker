@@ -216,6 +216,7 @@ Flags win over these. Most are tuning knobs with sane defaults.
 | `EPSILONERIDANI_BUBBLE_HOME` | per-worker cache dir | Override the private bubble home. |
 | `EPSILONERIDANI_REVIEW_ENGINE_DIR` | — | Use a local `epsiloneridani-review` checkout instead of fetching the engine. |
 | `EPSILONERIDANI_POLL` | `300` | Seconds between quota checks while the loop waits. |
+| `EPSILONERIDANI_CLAUDE_USAGE_SHARE_S` | `300` | How old a sibling worker's Claude usage reading may be and still be reused instead of fetched (see [sharing one usage reading](quota.md#sharing-one-usage-reading)). |
 | `EPSILONERIDANI_ROUND_TIMEOUT` | `5400` | Hard cap per round (seconds). |
 | `EPSILONERIDANI_MAX_OPEN_PRS` | `8` | Open PRs in the selected roadmap scope at which authoring stops (see [roadmap backpressure](#roadmap-backpressure)). |
 | `EPSILONERIDANI_INTERROUND` | `20` | Minimum gap after a productive round (seconds). |

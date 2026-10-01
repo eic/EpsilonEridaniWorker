@@ -118,6 +118,32 @@ The bootstrap runs only under these conditions:
 If the window still is not reporting afterwards, the status reads
 `session bootstrap attempted; awaiting fresh usage` and the worker stays parked.
 
+## Sharing one usage reading
+
+Workers that read the same Claude credential source also share their usage
+readings. These are files in `.epsiloneridani-quota/` beside that source, next to
+the bootstrap reservation. Claude's usage endpoint rate-limits hard: a `429` can
+ask for up to an hour's wait. Each worker polling it separately multiplied the
+fleet's requests for the same answer, and then every worker found out about the
+429 separately.
+
+- **One request at a time.** A lock serializes the reads, so when several workers
+  poll together one asks and the rest reuse its answer.
+- **A sibling's fresh reading is reused** instead of fetched while it is at most
+  `$EPSILONERIDANI_CLAUDE_USAGE_SHARE_S` seconds old (default 300). It is paced as
+  of the moment it was fetched, never the present, so reusing it cannot make a
+  launch look more permitted than it was. It is checked exactly like a worker's
+  own cache.
+- **A sibling's 429 holds every worker back** until its `Retry-After` has passed.
+  Meanwhile each worker answers from its own valid cache, as it would after a 429
+  of its own.
+
+A different access token (an account switch) is never served another token's
+reading. A bootstrap request clears the shared reading along with the worker's
+own. If the shared directory cannot be used, each worker reads on its own, as
+before. Workers on their own logins (`claude_config_dir`) each have their own
+source, so they share nothing with each other.
+
 ## Accounts with no weekly cap: `--claude-no-weekly-cap`
 
 Some Claude seats only ever meter the 5-hour session window — for example the

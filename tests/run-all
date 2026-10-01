@@ -79,6 +79,7 @@ RUN_STDLIB=(
   quota_gemini_windows.py
   quota_launch_stage.py
   quota_reason.py
+  quota_shared_usage.py
   review_codex_model.py
   review_daily_cap.py
   review_diagnostics.py
