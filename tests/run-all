@@ -17,6 +17,12 @@ cd "$(dirname "$0")/.." || exit 1
 FAIL_FAST=0
 [ "${1:-}" = "--fail-fast" ] && FAIL_FAST=1
 
+# An operator's shell often exports worker settings (a ~/.bashrc that sets EPSILONERIDANI_AUTO_REFRESH
+# for their real workers). The tests set what each case needs; inherited values only make a local run
+# disagree with CI, as the quota tests did.
+unset EPSILONERIDANI_AUTO_REFRESH EPSILONERIDANI_QUOTA_IGNORE EPSILONERIDANI_CLAUDE_NO_WEEKLY_CAP \
+  EPSILONERIDANI_CLAUDE_CONFIG_DIR EPSILONERIDANI_ROUND_TIMEOUT CLAUDE_REFRESH_SKEW_S VIRTUAL_ENV
+
 # stdlib-only python tests, run with the uv-provided interpreter
 RUN_STDLIB=(
   agent_cmds.py
@@ -29,6 +35,7 @@ RUN_STDLIB=(
   build_status_rollup.py
   claude_config_dir.py
   claude_keychain.py
+  claude_worker_login.py
   claims_repo.py
   claim_write_failure.py
   claim_worker_id.py

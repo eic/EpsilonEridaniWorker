@@ -24,7 +24,7 @@ from pathlib import Path
 
 from . import oauth as credential_refresh
 from .config import Config, log
-from .constants import AUTHORING_DEFAULTS, CLAUDE_CMD, GEMINI_USAGE_URL
+from .constants import AUTHORING_DEFAULTS, CLAUDE_CMD, GEMINI_USAGE_URL, ROUND_TIMEOUT
 from .github import GitHubError, _parse_retry_after
 
 CODEX_USAGE_URL = "https://chatgpt.com/backend-api/wham/usage"
@@ -57,7 +57,14 @@ CLAUDE_BOOTSTRAP_TIMEOUT_S = 120
 # token expires: every poll reads HTTP 401 and waits for a human who is not there. The retry bound
 # matters because `claude()` is also called by the dashboard, which polls far faster than the loop —
 # a credential that cannot be rotated at all must not turn into a request flood.
-CLAUDE_REFRESH_SKEW_S = 5400
+#
+# The skew must outlast a whole round. A round's agent holds the access token it was launched with and
+# no refresh token, so a token that lapses mid-round ends the round with a 401. Renewing only within one
+# ROUND_TIMEOUT of expiry (the old fixed 5400 s, equal to the default timeout) left no room for the
+# survey and setup before the agent starts. oauth._effective_skew still caps it at half a fresh token's
+# lifetime, so a short-lived token is not renewed on every poll.
+CLAUDE_REFRESH_MARGIN_S = 1800
+CLAUDE_REFRESH_SKEW_S = int(os.environ.get("CLAUDE_REFRESH_SKEW_S") or ROUND_TIMEOUT + CLAUDE_REFRESH_MARGIN_S)
 CLAUDE_REFRESH_RETRY_S = 600
 
 # How long past its timeout an in-progress reservation is still believed. Covers a request that is
@@ -1775,7 +1782,36 @@ class Quota:
                 if oauth:
                     fp = self._fingerprint(oauth.get("accessToken"))
                     prov, _readings = self._claude_pass(fp, oauth.get("accessToken"), refresh=True)
+        if renew and prov.available and oauth:
+            short = self._claude_token_too_short(oauth)
+            if short:
+                return Provider("claude", False, None, error=short, next_eligible=time.time() + CLAUDE_REFRESH_RETRY_S)
         return prov
+
+    def _claude_token_too_short(self, oauth: dict) -> str | None:
+        """Why a launch on this token would die mid-round, or None when it would not.
+
+        Only for a worker that renews its own login (--auto-refresh on a source that holds a refresh
+        token): renewal runs CLAUDE_REFRESH_SKEW_S ahead of expiry, so a token this close to lapsing means
+        the renewal just failed. Launching anyway spends a round that ends in a 401 once the token
+        lapses, because the agent holds no refresh token of its own. A worker whose source is renewed by
+        something else (an interactive `claude`, the Docker refresher) keeps launching as before; the
+        pacer cannot know when that renewal will come."""
+        if sys.platform == "darwin" or os.environ.get("EPSILONERIDANI_AUTO_REFRESH") != "1":
+            return None
+        source = credential_refresh.provider("claude", credentials=self._claude_creds_source() / ".credentials.json")
+        if not credential_refresh.renewable(source):
+            return None
+        expires = oauth.get("expiresAt")
+        if not isinstance(expires, (int, float)) or isinstance(expires, bool):
+            return None
+        left = (expires / 1000 if expires >= 100_000_000_000 else expires) - time.time()  # ms, as oauth reads it
+        if left >= ROUND_TIMEOUT:
+            return None
+        return (
+            f"claude access token expires in {max(0, int(left // 60))}m, shorter than a round "
+            f"({ROUND_TIMEOUT // 60}m), and renewing it failed — not launching a round that would end in a 401"
+        )
 
     def authorize_claude_launch(self) -> Provider:
         """The launch stage: the ONLY place a Claude request may be spent on initializing a window.

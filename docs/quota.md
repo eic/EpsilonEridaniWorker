@@ -23,7 +23,13 @@ is fine at a keyboard and fatal unattended: `work --loop` will sit at
 someone intervenes.
 
 `epsiloneridani work --loop --auto-refresh` (or `$EPSILONERIDANI_AUTO_REFRESH=1`) lets the
-worker renew the token itself once it is within 90 minutes of expiry.
+worker renew the token itself once it is within one round timeout plus 30
+minutes of expiry: 2 hours by default, and `$CLAUDE_REFRESH_SKEW_S` overrides
+it. The margin has to cover a whole round, because the round's agent holds no
+refresh token and cannot renew mid-round. For the same reason the worker does
+not launch a Claude round on a token that cannot outlast `ROUND_TIMEOUT`. It
+waits for the next renewal attempt instead of starting a round that would end in
+a 401.
 
 **Only turn it on when nothing else uses that credential file.** Claude and Codex
 issue single-use refresh tokens: exchanging one retires it and returns a
@@ -32,7 +38,11 @@ serialize an interactive `claude` sharing `~/.claude/.credentials.json`, a secon
 refresher, or a copy of the credential on another machine — a rotation here logs
 any of those out. The shape this is meant for is a worker running as its own
 user, with its own Claude account nobody signs into interactively;
-`$CLAUDE_CONFIG_DIR` gives the same separation on a shared login. On macOS the
+`$CLAUDE_CONFIG_DIR` gives the same separation on a shared login. With several
+Claude workers, give each its own login (`claude_config_dir`, see
+[one Claude login per worker](workers.md#one-claude-login-per-worker)).
+Otherwise a renewal by one revokes the token every other worker's in-flight
+round holds. On macOS the
 flag does nothing: the Keychain is the store, and the section below applies
 instead.
 

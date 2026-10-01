@@ -270,6 +270,10 @@ worker1 — waiting for quota
   agent:    auto · host sandbox
   pacing:   normal
   roadmap:  auto (random each round)
+  warning:  shares its Claude login with worker3
+            a renewal by one revokes the access token the others hold, ending
+            their in-flight rounds; give each Claude worker its own
+            claude_config_dir
   activity: —
   quota:    codex ~ (weekly ahead, 84% left)
             claude ~ (weekly ahead, 56% left)
@@ -297,6 +301,10 @@ worker3 — backing off
   options:  stream output
             isolated home
             restart: on-failure
+  warning:  shares its Claude login with worker1
+            a renewal by one revokes the access token the others hold, ending
+            their in-flight rounds; give each Claude worker its own
+            claude_config_dir
   activity: —
   reason:   claude agent: API Error: 529 Overloaded. This is a temporary
             server-side issue.

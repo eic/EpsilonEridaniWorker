@@ -1892,6 +1892,43 @@ def _discard_generated(iso_claude: Path) -> None:
         pass
 
 
+# Names the Claude config dir an operator chose as one worker's OWN login. isolate_home reads it to tell a
+# deliberate move to that login (re-seed the worker's copy) from an incidental $CLAUDE_CONFIG_DIR (warn).
+WORKER_CLAUDE_LOGIN_ENV = "EPSILONERIDANI_CLAUDE_CONFIG_DIR"
+
+
+def use_worker_claude_login(wid: str, path: Path) -> None:
+    """Make `path` this worker's Claude credential source, instead of the operator's shared login.
+
+    Workers that share one OAuth grant revoke each other: renewing a grant retires its previous access
+    token, and an isolated worker's agent holds only an access-token copy. Any renewal by a sibling
+    worker, or by an interactive `claude` on the same login, therefore ends whatever Claude round is in
+    flight with "401 OAuth access token has been revoked". A login per worker removes the sharing. The
+    pacer renews only this worker's grant (--auto-refresh), and only between this worker's rounds, which
+    never overlap each other.
+
+    Must run BEFORE isolate_home, which seeds the worker's copy from $CLAUDE_CONFIG_DIR and records it
+    as the source. A round child inherits the finished isolation, whose marker already names the
+    source, so this is a no-op there."""
+    if os.environ.get("EPSILONERIDANI_DATA_HOME"):
+        return
+    if sys.platform == "darwin":
+        raise Die("--claude-config-dir is not supported on macOS, where Claude Code keeps its login in the Keychain")
+    path = path.expanduser()
+    creds = path / ".credentials.json"
+    hint = f"log it in with `epsiloneridani workers login {wid}` (or `CLAUDE_CONFIG_DIR={path} claude`, then /login)"
+    try:
+        block = json.loads(creds.read_text()).get("claudeAiOauth")
+    except (OSError, ValueError, AttributeError):
+        block = None
+    if not isinstance(block, dict) or not block.get("accessToken"):
+        raise Die(f"worker '{wid}' has no Claude login in {path}; {hint}")
+    if not block.get("refreshToken"):
+        raise Die(f"{creds} holds no refresh token, so worker '{wid}' could never renew it; {hint}")
+    os.environ["CLAUDE_CONFIG_DIR"] = str(path)
+    os.environ[WORKER_CLAUDE_LOGIN_ENV] = str(path)
+
+
 def isolate_home(wid: str) -> Path:
     """Give this worker its OWN $HOME so its credentials can't race other workers or the operator (Codex
     review / the --isolate-home flag). Gives the config dir its own agent-facing surface rather than
@@ -1969,13 +2006,25 @@ def isolate_home(wid: str) -> Path:
     # source whenever the operator's external refresher rotates it (the worker never refreshes its own
     # tokens). So a reused --worker-id stays pinned to whatever account it was first seeded from. Record the
     # source and warn if it changes, rather than silently pacing/running the stale account.
+    #
+    # The one exception is a source the operator named for this worker (--claude-config-dir, see
+    # use_worker_claude_login): that is a deliberate move to the worker's own login, so re-seed from it.
+    # Staying pinned would keep the worker on the shared login whose renewals revoke its tokens.
     marker = iso_claude / ".epsiloneridani-creds-source"
     if marker.exists():
-        if marker.read_text().strip() != str(real_claude):
-            log(
-                f"WARNING: worker '{wid}' keeps Claude creds first copied from {marker.read_text().strip()} "
-                f"(not {real_claude}); use a fresh --worker-id to switch accounts."
-            )
+        recorded = marker.read_text().strip()
+        if recorded != str(real_claude):
+            if os.environ.get(WORKER_CLAUDE_LOGIN_ENV) == str(real_claude) and _safe_exists(
+                real_claude / ".credentials.json"
+            ):
+                shutil.copy2(real_claude / ".credentials.json", iso_claude / ".credentials.json")
+                marker.write_text(str(real_claude))
+                log(f"worker '{wid}': Claude login moved from {recorded} to {real_claude}; re-seeded its copy")
+            else:
+                log(
+                    f"WARNING: worker '{wid}' keeps Claude creds first copied from {recorded} "
+                    f"(not {real_claude}); use a fresh --worker-id to switch accounts."
+                )
     else:
         marker.write_text(str(real_claude))
     # Honour an operator-supplied $CODEX_HOME, exactly as real_claude honours $CLAUDE_CONFIG_DIR

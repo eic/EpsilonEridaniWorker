@@ -42,6 +42,7 @@ from .agents import (
     isolate_home,
     resolve_authoring_profile,
     run_in_bubble,
+    use_worker_claude_login,
 )
 from .config import (
     Config,
@@ -375,6 +376,17 @@ def add_work_flags(p: argparse.ArgumentParser) -> None:
         dest="isolate_home",
         action="store_true",
         help="force credential isolation for the 'default' worker id (a distinct id already implies it)",
+    )
+    p.add_argument(
+        "--claude-config-dir",
+        dest="claude_config_dir",
+        default=os.environ.get("EPSILONERIDANI_CLAUDE_CONFIG_DIR"),
+        metavar="DIR",
+        help="this worker's OWN Claude login (a Claude config dir holding .credentials.json), instead of "
+        "the operator's shared ~/.claude. Renewing a shared login revokes the access token every other "
+        "user of it holds, which ends their in-flight rounds; with a login per worker, --auto-refresh "
+        "renews only this worker's, between its own rounds. Create it with `epsiloneridani workers "
+        "login ID`. Not on macOS. Defaults to $EPSILONERIDANI_CLAUDE_CONFIG_DIR",
     )
     p.add_argument(
         "--dry-run", dest="dry_run", action="store_true", help="survey + print the picker's decision; act on nothing"
@@ -878,7 +890,10 @@ def cmd_work(args, *, only: list[str], agent: str, one_round: bool, prs: tuple[i
     # cfg.home and the credential paths derived from it point at the per-worker copy. Off macOS that
     # means moving $HOME; on macOS $HOME deliberately stays put and $CLAUDE_CONFIG_DIR/$CODEX_HOME carry
     # the isolation instead (see isolate_home). Either way it is a no-op once already isolated, so loop
-    # children that inherit the environment don't re-isolate.
+    # children that inherit the environment don't re-isolate. A worker's own Claude login is selected
+    # first, because isolation seeds the worker's copy from whatever $CLAUDE_CONFIG_DIR names.
+    if getattr(args, "claude_config_dir", None):
+        use_worker_claude_login(wid, Path(args.claude_config_dir))
     if wid != "default" or getattr(args, "isolate_home", False):
         isolate_home(wid)
     cfg = Config.resolve(wid)

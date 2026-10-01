@@ -18,3 +18,12 @@ enabled = true
 only = ["roadmap", "fix", "fix-ci"]
 roadmap_only = "RepresentationTheory"
 source = "https://github.com/FormalFrontier/Etingof-RepresentationTheory-draft1"
+
+# An unattended Claude worker on its own login, so renewals by other workers or an interactive
+# `claude` cannot revoke its tokens mid-round. Log it in once: `epsiloneridani workers login worker4`.
+[[workers]]
+id = "worker4"
+enabled = true
+agent = "claude"
+auto_refresh = true
+claude_config_dir = "~/.config/epsiloneridani/claude/worker4"
