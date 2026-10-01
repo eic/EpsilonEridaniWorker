@@ -449,6 +449,11 @@ def _toml_value(value) -> str:
     raise WorkersError(f"cannot encode TOML value of type {type(value).__name__}")
 
 
+def _toml_key(name: str) -> str:
+    """A TOML key: bare when it can be, else a quoted (basic-string) key."""
+    return name if re.fullmatch(r"[A-Za-z0-9_-]+", name) else json.dumps(name, ensure_ascii=False)
+
+
 @contextlib.contextmanager
 def _config_lock(path: Path):
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -465,8 +470,17 @@ def _write_worker_specs(path: Path, specs: list[WorkerSpec]) -> None:
     ]
     for spec in specs:
         lines += ["", "[[workers]]"]
+        # A table field (today only `env`) becomes a `[workers.<field>]` sub-table, the way the docs and
+        # hand-written files spell it. A sub-table must follow every plain key of its parent table.
+        tables = []
         for key, value in spec.as_dict().items():
-            lines.append(f"{key} = {_toml_value(value)}")
+            if isinstance(value, dict):
+                tables.append((key, value))
+            else:
+                lines.append(f"{key} = {_toml_value(value)}")
+        for key, table in tables:
+            lines += ["", f"[workers.{_toml_key(key)}]"]
+            lines += [f"{_toml_key(name)} = {_toml_value(item)}" for name, item in table.items()]
     path.parent.mkdir(parents=True, exist_ok=True)
     text = "\n".join(lines) + "\n"
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
