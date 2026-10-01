@@ -3,6 +3,7 @@
 
 import importlib
 import os
+import subprocess
 import sys
 import types
 from pathlib import Path
@@ -44,6 +45,16 @@ def main():
         pr(6, "roadmap/Topology", "roadmap/PDE"),  # counted once in any/all scopes
         pr(7, "roadmap/"),  # malformed empty area is not a roadmap scope
     ]
+
+    # The limit is read once at import, so probe it in a fresh interpreter rather than this one.
+    probe = "from epsiloneridani_worker import constants as c; print(c.MAX_OPEN_PRS)"
+    root = Path(__file__).resolve().parent.parent
+    env = {k: v for k, v in os.environ.items() if k != "EPSILONERIDANI_MAX_OPEN_PRS"}
+    default = subprocess.run([sys.executable, "-c", probe], cwd=root, env=env, capture_output=True, text=True)
+    check("the backpressure limit defaults to 8", default.stdout.strip(), "8")
+    env["EPSILONERIDANI_MAX_OPEN_PRS"] = "24"
+    raised = subprocess.run([sys.executable, "-c", probe], cwd=root, env=env, capture_output=True, text=True)
+    check("$EPSILONERIDANI_MAX_OPEN_PRS sets the backpressure limit", raised.stdout.strip(), "24")
 
     check("one pinned roadmap counts only that exact area", tc.roadmap_open_count(prs, "Topology", []), 3)
     check("another pinned roadmap has its independent count", tc.roadmap_open_count(prs, "PDE", []), 2)

@@ -43,6 +43,11 @@ PRs, and PRs for roadmaps outside the selected scope do not consume its authorin
 limit. An open roadmap PR whose area is temporarily unknown counts conservatively
 in every scope until its area label resolves.
 
+The limit is 8 open PRs per scope by default. Set `$EPSILONERIDANI_MAX_OPEN_PRS`
+to change it. That is useful when several workers author into the same scope,
+or when PRs wait long for review or merge. It is per worker, so one can be
+given its own value through its `workers.toml` `env` table.
+
 ## The claim namespace
 
 Two workers must not spend two subscriptions writing the same report or fixing
@@ -212,6 +217,7 @@ Flags win over these. Most are tuning knobs with sane defaults.
 | `EPSILONERIDANI_REVIEW_ENGINE_DIR` | — | Use a local `epsiloneridani-review` checkout instead of fetching the engine. |
 | `EPSILONERIDANI_POLL` | `300` | Seconds between quota checks while the loop waits. |
 | `EPSILONERIDANI_ROUND_TIMEOUT` | `5400` | Hard cap per round (seconds). |
+| `EPSILONERIDANI_MAX_OPEN_PRS` | `8` | Open PRs in the selected roadmap scope at which authoring stops (see [roadmap backpressure](#roadmap-backpressure)). |
 | `EPSILONERIDANI_INTERROUND` | `20` | Minimum gap after a productive round (seconds). |
 | `EPSILONERIDANI_BACKOFF_BASE` / `EPSILONERIDANI_BACKOFF_MAX` | `30` / `900` | The escalating no-progress back-off (seconds). |
 | `EPSILONERIDANI_PROGRESS_GAP` | `28800` | Minimum gap between progress-report attempts (seconds; eight hours by default). |

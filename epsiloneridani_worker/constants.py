@@ -112,8 +112,8 @@ MAX_LINT_REPAIR_PR_ATTEMPTS = 6  # per-PR lifetime backstop for lint repair acro
 LINT_REPAIR_HEAD_PREFIX = "lint-repair/"
 
 # Backpressure: don't author into the selected roadmap scope while this many of our PRs in that scope
-# are open.
-MAX_OPEN_PRS = 8
+# are open. A fleet of several authoring workers, or a slow merge pipeline, may want more in flight.
+MAX_OPEN_PRS = int(os.environ.get("EPSILONERIDANI_MAX_OPEN_PRS", "8"))
 
 # The status labels EpsilonEridani's CI keeps on every open PR to track where it sits in the review pipeline.
 # The survey counts open PRs into these buckets for the per-round "open PRs" line, in lifecycle order
