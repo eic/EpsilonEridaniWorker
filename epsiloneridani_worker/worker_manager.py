@@ -33,7 +33,7 @@ from .constants import AGENTS, ALLOWED_TASKS
 from .paths import HERE, ensure_ssl_cert_file, entry_cmd, self_argv, self_env
 from .quota import parse_pace_curve
 from .round import signal_group
-from .runtime_status import STATUS_ENV, read_json, update_status
+from .runtime_status import STATUS_ENV, drain_marker, read_json, update_status
 
 CONFIG_VERSION = 1
 DEFAULT_INTERVAL = 2.0
@@ -506,6 +506,11 @@ def status_path(worker_id: str, state_dir: Path | None = None) -> Path:
     return (state_dir or workers_state_dir()) / f"{worker_id}.json"
 
 
+def drain_path(worker_id: str, state_dir: Path | None = None) -> Path:
+    """The marker asking `worker_id` to stop between rounds (see runtime_status.drain_marker)."""
+    return drain_marker(status_path(worker_id, state_dir))
+
+
 def runner_socket(worker_id: str, runtime_dir: Path | None = None) -> Path:
     return (runtime_dir or workers_runtime_dir()) / f"w-{worker_id}.sock"
 
@@ -579,12 +584,17 @@ def worker_snapshots(specs: list[WorkerSpec] | None = None, config: Path | None 
         actual = runner_status(wid)
         alive = bool(actual.get("alive"))
         desired = "running" if spec and spec.enabled else "stopped"
+        draining = drain_path(wid).exists()
         if alive:
             state_name = str(actual.get("state") or "running")
             if spec is None or not spec.enabled:
                 state_name = "stopping"
             elif actual.get("spec_hash") != spec.fingerprint():
                 state_name = "restarting"
+            elif draining:
+                state_name = "draining"
+        elif spec and spec.enabled and draining:
+            state_name = "drained"
         elif spec and spec.enabled:
             state_name = "missing" if not actual else str(actual.get("state") or "stale")
         else:
@@ -597,6 +607,7 @@ def worker_snapshots(specs: list[WorkerSpec] | None = None, config: Path | None 
                 "actual": state_name,
                 "alive": alive,
                 "enabled": bool(spec and spec.enabled),
+                "draining": draining,
                 "actual_spec_hash": actual.get("spec_hash"),
                 "spec_hash": spec.fingerprint() if spec else None,
                 "spec": spec.as_dict() if spec else None,
@@ -923,6 +934,10 @@ def run_manager(config: Path, interval: float = DEFAULT_INTERVAL) -> int:
                     live = runner_status(wid, state_dir, runtime_dir)
                     is_live = bool(live.get("alive"))
                     should_run = bool(spec and spec.enabled)
+                    # A drained worker finishes the round it is in and then exits between rounds by
+                    # itself. So a drain never stops a live worker here, which would kill that round;
+                    # it only keeps one that has exited from being launched again, until `resume`.
+                    draining = drain_path(wid, state_dir).exists()
                     changed = bool(is_live and spec and live.get("spec_hash") != spec.fingerprint())
                     if (
                         is_live
@@ -935,11 +950,12 @@ def run_manager(config: Path, interval: float = DEFAULT_INTERVAL) -> int:
                     if is_live and (not should_run or changed or wid in restart_ids):
                         _stop_runner(wid, runtime_dir)
                         continue
-                    if is_live or not should_run or wid in children:
+                    if is_live or not should_run or draining or wid in children:
                         if not is_live and spec is None and live.get("managed"):
                             for stale in (
                                 status_path(wid, state_dir),
                                 status_path(wid, state_dir).with_suffix(".json.lock"),
+                                drain_path(wid, state_dir),
                             ):
                                 try:
                                     stale.unlink()
@@ -1373,6 +1389,8 @@ def _worker_status_lines(config: Path, snapshots: list[dict], online: bool, *, w
             "checking-quota": "checking quota",
             "waiting-github": "waiting for GitHub",
             "waiting-quota": "waiting for quota",
+            "draining": "draining (stops after its current round)",
+            "drained": f"drained (resume with `epsiloneridani workers resume {item['id']}`)",
         }.get(state, state)
         heading = f"{item['id']} — {display_state}"
         if item["desired"] == "stopped" or state in {"missing", "restarting", "stale", "stopped", "stopping"}:
@@ -1418,8 +1436,84 @@ def print_worker_status(config: Path, *, as_json: bool = False) -> bool:
     else:
         width = shutil.get_terminal_size(fallback=(100, 24)).columns
         print("\n".join(_worker_status_lines(config, snapshots, bool(online), width=width)))
-    healthy = bool(online) and all(item["desired"] == "stopped" or item.get("alive") for item in snapshots)
+    # A drained worker is down on purpose, exactly like a disabled one.
+    healthy = bool(online) and all(
+        item["desired"] == "stopped" or item.get("alive") or item.get("actual") == "drained" for item in snapshots
+    )
     return healthy
+
+
+def _drain_targets(config: Path, worker_ids: list[str], every: bool) -> list[WorkerSpec]:
+    specs = load_worker_specs(config)
+    if every:
+        if worker_ids:
+            raise WorkersError("give worker ids or --all, not both")
+        return [spec for spec in specs if spec.enabled]
+    if not worker_ids:
+        raise WorkersError("name the workers, or pass --all")
+    known = {spec.id: spec for spec in specs}
+    unknown = [wid for wid in worker_ids if wid not in known]
+    if unknown:
+        raise WorkersError(f"unknown worker(s): {', '.join(unknown)}")
+    return [known[wid] for wid in dict.fromkeys(worker_ids)]
+
+
+def drain_workers(config: Path, worker_ids: list[str], *, every: bool, wait: bool, timeout: float) -> int:
+    """Ask workers to stop between rounds: each finishes the round in flight, then exits and stays
+    down (the manager does not relaunch it) until `resume`. Nothing is killed, so this is how to
+    take a fleet down for an upgrade or a restart without discarding work in progress.
+
+    The request is a marker file the worker's loop checks before each round and while it waits, so it
+    does not need the manager to be running, and it survives a manager or service restart."""
+    targets = _drain_targets(config, worker_ids, every)
+    for spec in targets:
+        marker = drain_path(spec.id)
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text(json.dumps({"requested_at": time.time()}) + "\n")
+    ids = [spec.id for spec in targets]
+    print(f"drain requested: {', '.join(ids) or '(no enabled workers)'}")
+    if not wait:
+        return 0
+    deadline = time.monotonic() + timeout
+    reported: set[str] = set()
+    while True:
+        live = {item["id"] for item in worker_snapshots(config=config) if item["id"] in ids and item.get("alive")}
+        for wid in sorted(set(ids) - live - reported):
+            print(f"drained: {wid}", flush=True)
+            reported.add(wid)
+        if not live:
+            return 0
+        if time.monotonic() >= deadline:
+            print(
+                f"epsiloneridani workers: still finishing a round after {timeout:g}s: {', '.join(sorted(live))}",
+                file=sys.stderr,
+            )
+            return 1
+        time.sleep(2)
+
+
+def resume_workers(config: Path, worker_ids: list[str], *, every: bool) -> int:
+    """Clear a drain. A worker still finishing its round just carries on; one that already exited is
+    launched again by the reconciler, now or whenever the manager next starts.
+
+    A drained worker exits cleanly, and a clean exit is terminal for `restart = "on-failure"` or
+    `"never"`, so its terminal record is cleared, as re-enabling a worker does. Only a clean exit is
+    cleared: a worker that failed keeps its record, and with it the back-off before its relaunch."""
+    targets = _drain_targets(config, worker_ids, every)
+    online = manager_request("ping") is not None
+    for spec in targets:
+        try:
+            drain_path(spec.id).unlink()
+        except FileNotFoundError:
+            pass
+        if runner_status(spec.id).get("alive"):
+            continue
+        prior = read_json(status_path(spec.id))
+        if prior.get("state") == "exited" and prior.get("exit_code") == 0:
+            update_status(status_path(spec.id), stopped_at=None, exit_code=None, state="queued")
+    ids = ", ".join(spec.id for spec in targets) or "(no enabled workers)"
+    print(f"resumed: {ids}" + ("" if online else " (the manager is offline; they start when it does)"))
+    return 0
 
 
 def _mutate_enabled(config: Path, wid: str, enabled: bool) -> None:
@@ -1823,6 +1917,22 @@ def add_workers_parser(subparsers) -> None:
     for action in ("enable", "disable", "restart", "remove"):
         item = actions.add_parser(action, help=descriptions[action])
         item.add_argument("worker_id", help="worker id")
+    drain = actions.add_parser(
+        "drain",
+        help="stop workers between rounds: each finishes its current round, then stays down until `resume`",
+    )
+    drain.add_argument("worker_ids", nargs="*", metavar="ID", help="workers to drain")
+    drain.add_argument("--all", dest="all_workers", action="store_true", help="drain every enabled worker")
+    drain.add_argument("--wait", action="store_true", help="return only once every named worker has stopped")
+    drain.add_argument(
+        "--timeout",
+        type=float,
+        default=7200.0,
+        help="with --wait, give up after this many seconds and exit 1 (default: 7200)",
+    )
+    resume = actions.add_parser("resume", help="clear a drain and let the workers run again")
+    resume.add_argument("worker_ids", nargs="*", metavar="ID", help="workers to resume")
+    resume.add_argument("--all", dest="all_workers", action="store_true", help="resume every enabled worker")
     add = actions.add_parser("add", help="add an enabled persistent worker definition")
     add.add_argument("worker_id", nargs="?", help="stable id (default: next free workerN)")
     add.add_argument("--agent", choices=AGENTS, default="auto", help="agent for each round (default: auto)")
@@ -1955,6 +2065,10 @@ def cmd_workers(args) -> int:
             _remove_spec(config, args.worker_id)
             ensure_manager(config)
             return 0
+        if action == "drain":
+            return drain_workers(config, args.worker_ids, every=args.all_workers, wait=args.wait, timeout=args.timeout)
+        if action == "resume":
+            return resume_workers(config, args.worker_ids, every=args.all_workers)
         if action == "restart":
             restart_worker(config, args.worker_id)
             return 0

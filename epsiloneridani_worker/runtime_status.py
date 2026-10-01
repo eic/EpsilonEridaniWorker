@@ -79,6 +79,20 @@ def runtime_snapshot() -> dict:
     return read_json(Path(raw)) if raw else {}
 
 
+def drain_marker(status: Path) -> Path:
+    """The file whose presence asks a managed worker to stop before its next round.
+
+    It sits beside the worker's status file (`<id>.drain` next to `<id>.json`), so the loop finds it
+    through the status path it already holds, it survives a manager restart, and `ls` shows it."""
+    return status.with_suffix(".drain")
+
+
+def drain_requested() -> bool:
+    """Whether this managed process tree has been asked to drain. Unmanaged workers never are."""
+    raw = os.environ.get(STATUS_ENV)
+    return bool(raw) and drain_marker(Path(raw)).exists()
+
+
 def report_failure(reason: str, *, code: int | None = None, log_file: Path | str | None = None) -> None:
     """Publish a concise, structured failure for the supervising loop and human status views."""
     clean = _RICH_STYLE_RE.sub("", str(reason)).strip()
