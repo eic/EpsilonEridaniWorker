@@ -3,6 +3,7 @@ timeout, then settle (short pause if productive, escalating back-off otherwise).
 
 from __future__ import annotations
 
+import os
 import signal
 import subprocess
 import sys
@@ -14,11 +15,32 @@ from .constants import BACKOFF_BASE, BACKOFF_MAX, EX_NOPROGRESS, GH_MIN_BUDGET, 
 from .github import github_budget
 from .quota import Provider, Quota, _glyph, _hours, _pace_reason, _unavail_reason, quota_line
 from .round import run_round_subprocess
-from .runtime_status import report_runtime, runtime_snapshot
+from .runtime_status import STATUS_ENV, drain_requested, report_runtime, runtime_snapshot
 
 
 class _LoopTerminated(KeyboardInterrupt):
     """SIGTERM translated to the same teardown path as Ctrl-C, with the right exit code."""
+
+
+# How often a managed worker's waits look for a drain request.
+DRAIN_POLL_S = 2.0
+
+
+def _sleep(seconds: float) -> None:
+    """Wait `seconds`, waking early for a drain (`epsiloneridani workers drain`).
+
+    The loop's waits run to an hour (a quota window, a GitHub reset), and a drained worker must not sit
+    out the rest of one before noticing it has nothing left to finish, so a managed worker sleeps in
+    DRAIN_POLL_S slices. An unmanaged one cannot be drained and sleeps in one call, as before. Both go
+    through this module's `time`, which tests replace with a fake clock."""
+    if not os.environ.get(STATUS_ENV):
+        time.sleep(seconds)
+        return
+    left = max(0.0, float(seconds))
+    while left > 0 and not drain_requested():
+        step = min(DRAIN_POLL_S, left)
+        time.sleep(step)
+        left -= step
 
 
 def _wait_quota_line(snap: dict, *, markup: bool = True) -> str:
@@ -80,6 +102,12 @@ def cmd_loop(args, cfg: Config, *, only: list[str], agent: str, prs: tuple[int, 
     signal.signal(signal.SIGTERM, terminate)
     try:
         while True:
+            # A drain (`epsiloneridani workers drain`) stops the worker between rounds, never inside
+            # one: the round in flight has finished by the time control is back here, and every wait
+            # below wakes early for it. Exiting 0 is what the manager reads as "drained, leave it".
+            if drain_requested():
+                log("drain requested — stopping between rounds")
+                return 0
             report_runtime(
                 "checking-quota",
                 detail="checking provider availability",
@@ -127,7 +155,7 @@ def cmd_loop(args, cfg: Config, *, only: list[str], agent: str, prs: tuple[int, 
                         f"block; sleeping {nap}s{_credential_hint(agent, prov)}"
                     )
                     report_runtime("waiting-quota", detail=why, next_action_at=time.time() + nap)
-                    time.sleep(nap)
+                    _sleep(nap)
                     continue
                 if verdict == "over-pace":
                     log(f"quota: {agent} over-pace; --ignore-quota set — running anyway")
@@ -154,7 +182,7 @@ def cmd_loop(args, cfg: Config, *, only: list[str], agent: str, prs: tuple[int, 
                     waiting = _wait_quota_line(snap, markup=False)
                     log(f"quota: {waiting} — sleeping {nap}s")
                     report_runtime("waiting-quota", detail=waiting, next_action_at=time.time() + nap)
-                    time.sleep(nap)
+                    _sleep(nap)
                     continue
 
             # 1b) GitHub budget preflight. A round does many gh calls AND launches the review engine,
@@ -175,7 +203,7 @@ def cmd_loop(args, cfg: Config, *, only: list[str], agent: str, prs: tuple[int, 
                     f"waiting {nap}s for the reset before launching a round"
                 )
                 report_runtime("waiting-github", detail=detail, next_action_at=time.time() + nap)
-                time.sleep(nap)
+                _sleep(nap)
                 continue
 
             # 2) Run ONE round as a child in its own process group, under the hard timeout.
@@ -219,6 +247,11 @@ def cmd_loop(args, cfg: Config, *, only: list[str], agent: str, prs: tuple[int, 
             source = getattr(args, "source", None)
             if source is not None:
                 tail += ["--source", source]
+            # Pacing and the GitHub preflight can take a while; a drain asked for meanwhile must still
+            # stop the worker before the round, not after it.
+            if drain_requested():
+                log("drain requested — stopping between rounds")
+                return 0
             report_runtime("surveying", detail="selecting the next work unit", next_action_at=None)
             rc = run_round_subprocess(tail)
 
@@ -228,7 +261,7 @@ def cmd_loop(args, cfg: Config, *, only: list[str], agent: str, prs: tuple[int, 
                 report_runtime(
                     "idle", detail="round completed", phase=None, target=None, next_action_at=time.time() + INTERROUND
                 )
-                time.sleep(INTERROUND)
+                _sleep(INTERROUND)
             else:
                 streak += 1
                 nap = min(BACKOFF_BASE * (1 << min(streak, 5)), BACKOFF_MAX)
@@ -248,7 +281,7 @@ def cmd_loop(args, cfg: Config, *, only: list[str], agent: str, prs: tuple[int, 
                     target=failed.get("target"),
                     next_action_at=time.time() + nap,
                 )
-                time.sleep(nap)
+                _sleep(nap)
     except _LoopTerminated:
         log("loop terminated — stopping")
         return 143

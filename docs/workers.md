@@ -187,6 +187,8 @@ always writes `enabled = true`. Use `workers edit` for those.
 | `add [ID] [flags]` | Append an enabled definition and reconcile |
 | `enable ID` / `disable ID` | Persist desired running or stopped state |
 | `restart ID` | Request a restart without changing desired state; a disabled worker stays stopped |
+| `drain ID... \| --all [--wait] [--timeout S]` | Stop workers between rounds: each finishes the round it is in, then stays down until `resume`. `--wait` returns once all have stopped, or exits 1 after `--timeout` (default 7200s). See [draining for a restart](#draining-for-a-restart) |
+| `resume ID... \| --all` | Clear a drain. A worker still finishing its round carries on; a stopped one is launched again |
 | `remove ID` | Drop the definition and stop the worker |
 | `login ID` | Open `claude` on the worker's `claude_config_dir` so you can `/login` it into its own account, then confirm the login is renewable |
 | `logs ID [--follow] [--lines N]` | The durable console log. `--follow` continues across worker restarts |
@@ -238,6 +240,34 @@ cannot silently disable fallback discovery.
 
 The reconciler and the worker control sockets are portable Unix code. No Linux
 `/proc` interface is required.
+
+## Draining for a restart
+
+Stopping a worker stops its round with it. `disable`, `restart`,
+`manager-stop` and stopping the service all send SIGTERM, which tears down the
+round in flight and throws away whatever its agent had not pushed yet.
+
+`drain` stops workers *between* rounds instead. Each one finishes the round it
+is in, then exits instead of starting another. A worker that is waiting (on
+quota, a GitHub reset, or the pause after a round) stops within a couple of
+seconds. The manager leaves a drained worker down until you `resume` it:
+
+```bash
+epsiloneridani workers drain --all --wait      # every round in flight runs to completion
+systemctl --user stop epsiloneridani-workers   # nothing is running any more
+# ... upgrade, edit the unit, reboot ...
+systemctl --user start epsiloneridani-workers
+epsiloneridani workers resume --all
+```
+
+A drain is a file, `<id>.drain` beside the worker's status file in the state
+directory, which its loop checks before every round. So it needs no manager, and
+it outlasts a manager or service restart: workers drained before a restart stay
+drained after it until resumed. `workers status` shows them as `draining` while
+they finish and `drained` once stopped, and counts a drained worker as healthy,
+as it does a disabled one. `resume` clears the file. A worker that already
+stopped is launched again, even one with `restart = "on-failure"` or `"never"`,
+whose clean exit would otherwise be final.
 
 ## Worker ids and credential isolation
 
