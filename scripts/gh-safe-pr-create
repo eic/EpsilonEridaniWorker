@@ -35,7 +35,9 @@ pr_body_from_args() {
 
 # 1) Author claim must still be ours (else another agent is authoring this target — abandon).
 if [[ -n "$CLAIM_KEY" && -x "$CLAIM_SH" ]]; then
-    "$CLAIM_SH" holds "$CLAIM_KEY" \
+    "$CLAIM_SH" holds "$CLAIM_KEY"; rc=$?
+    [[ $rc -eq 2 ]] && die "cannot check author lease '$CLAIM_KEY' (claim.sh error above) — do NOT create the PR"
+    [[ $rc -eq 0 ]] \
         || die "author lease '$CLAIM_KEY' lost (another agent took the target) — do NOT create the PR"
 fi
 

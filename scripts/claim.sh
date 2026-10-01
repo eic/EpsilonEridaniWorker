@@ -17,20 +17,24 @@
 # Usage:
 #   claim.sh acquire <key> [ttl_seconds]   # 0 acquired (or renewed mine) · 1 held by another · 2 error
 #   claim.sh renew   <key> [ttl_seconds]   # 0 renewed · 1 lost (taken over / gone) · 2 error
-#   claim.sh release <key>                 # 0 released (or wasn't mine / already gone)
-#   claim.sh holds   <key>                 # 0 I hold it and it's unexpired · 1 otherwise
+#   claim.sh release <key>                 # 0 released (or wasn't mine / already gone) · 2 error
+#   claim.sh holds   <key>                 # 0 I hold it and it's unexpired · 1 otherwise · 2 error
 #   claim.sh read    <key>                 # print the lease JSON (empty if unclaimed)
 #   claim.sh list    [--full]              # list live claim refs (--full fetches each lease)
 #   claim.sh gc                            # CAS-delete expired claims
 #
-# Env: CLAIM_REPO (default eic/EpsilonEridani), EPSILONERIDANI_WORKER_ID (default host-pid),
+# acquire, renew, release and holds compare the lease owner with EPSILONERIDANI_WORKER_ID, so they
+# exit 2 when it is unset. A per-process default would make every invocation a different owner:
+# a claim taken by one call would read as "held by another" on the next.
+#
+# Env: CLAIM_REPO (default eic/EpsilonEridani), EPSILONERIDANI_WORKER_ID (required, see above),
 #      CLAIM_TTL (default 1500), CLAIM_GITDIR_BASE (per-repo scratch parent),
 #      CLAIM_GITDIR (explicit scratch object store override).
 set -uo pipefail
 
 REPO="${CLAIM_REPO:-eic/EpsilonEridani}"
 URL="https://github.com/$REPO"
-WID="${EPSILONERIDANI_WORKER_ID:-$(hostname)-$$}"
+WID="${EPSILONERIDANI_WORKER_ID:-}"
 DEFAULT_TTL="${CLAIM_TTL:-1500}"
 GITDIR="${CLAIM_GITDIR:-${CLAIM_GITDIR_BASE:-$HOME/.cache/epsiloneridani-claims}/${REPO//\//__}.git}"
 NS="refs/epsiloneridani-claims"
@@ -171,6 +175,13 @@ cmd_gc() {
 }
 
 cmd="${1:-}"; shift || true
+case "$cmd" in
+    acquire|renew|release|holds)
+        [[ -n "$WID" ]] || {
+            echo "claim: EPSILONERIDANI_WORKER_ID is unset; set it to a stable owner id before running '$cmd'" >&2
+            exit 2
+        };;
+esac
 case "$cmd" in
     acquire) cmd_acquire "$@";;
     renew)   cmd_renew "$@";;

@@ -31,6 +31,7 @@ RUN_STDLIB=(
   claude_keychain.py
   claims_repo.py
   claim_write_failure.py
+  claim_worker_id.py
   codex_account.py
   codex_fallback.py
   contest_claim.py
