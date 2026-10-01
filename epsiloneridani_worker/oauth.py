@@ -21,6 +21,7 @@ from __future__ import annotations
 import base64
 import fcntl
 import http.client
+import importlib.metadata
 import json
 import math
 import os
@@ -39,6 +40,20 @@ CLAUDE_SCOPE = "user:profile user:inference user:sessions:claude_code user:mcp_s
 CODEX_TOKEN_URL = "https://auth.openai.com/oauth/token"
 CODEX_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann"
 CODEX_REFRESH_PLACEHOLDER = "rt.0.epsiloneridani-worker-placeholder-never-a-real-refresh-token"
+
+
+def _user_agent() -> str:
+    try:
+        version = importlib.metadata.version("epsiloneridani")
+    except importlib.metadata.PackageNotFoundError:
+        version = "unknown"
+    return f"epsiloneridani-worker/{version} (+https://github.com/eic/EpsilonEridaniWorker)"
+
+
+# Cloudflare in front of platform.claude.com rejects urllib's default `Python-urllib/3.x` signature with
+# HTTP 403 (error 1010) before the request reaches the token endpoint, so every rotation failed as
+# "OAuth endpoint returned HTTP 403". Any explicit agent passes; name this program honestly.
+USER_AGENT = _user_agent()
 
 
 @dataclass(frozen=True)
@@ -272,7 +287,7 @@ def _post_json(url: str, payload: dict[str, Any], timeout: int = 15) -> tuple[in
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        headers={"Content-Type": "application/json", "Accept": "application/json", "User-Agent": USER_AGENT},
         method="POST",
     )
     # http.client raises its own exception tree for a truncated or malformed response (IncompleteRead,
