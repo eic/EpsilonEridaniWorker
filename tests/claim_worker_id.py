@@ -138,7 +138,10 @@ fails = sum(
         ("read and list need no worker id", read_only_commands_need_no_worker_id),
         ("a stable worker id recognises its own claim", a_stable_worker_id_recognises_its_own_claim),
         ("git-safe-push reports a missing worker id, not a lost lease", git_safe_push_reports_a_missing_worker_id),
-        ("gh-safe-pr-create reports a missing worker id, not a lost lease", gh_safe_pr_create_reports_a_missing_worker_id),
+        (
+            "gh-safe-pr-create reports a missing worker id, not a lost lease",
+            gh_safe_pr_create_reports_a_missing_worker_id,
+        ),
     )
 )
 print(f"\n{'PASS' if not fails else 'FAIL'}: {fails} mismatch(es)")
