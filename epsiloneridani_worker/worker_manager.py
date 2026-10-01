@@ -56,6 +56,7 @@ _WORKER_KEYS = {
     "pace",
     "stream",
     "isolate_home",
+    "claude_config_dir",
     "restart",
     "env",
 }
@@ -263,6 +264,8 @@ class WorkerSpec:
     pace: str | None = None
     stream: bool = False
     isolate_home: bool = False
+    # This worker's own Claude login (see agents.use_worker_claude_login); None means the operator's.
+    claude_config_dir: str | None = None
     restart: str = "always"
     # Extra environment for this worker's process tree, as sorted (name, value) pairs so the spec stays
     # hashable and its fingerprint is order-independent.
@@ -293,6 +296,14 @@ class WorkerSpec:
         restart = _string(raw.get("restart", "always"), f"workers[{index}].restart")
         if restart not in ("always", "on-failure", "never"):
             raise WorkersError(f"workers[{index}].restart must be 'always', 'on-failure', or 'never'")
+        claude_config_dir = _string(raw.get("claude_config_dir"), f"workers[{index}].claude_config_dir", optional=True)
+        if claude_config_dir is not None:
+            # Absolute, because the worker resolves it after moving $HOME. Existence is checked when the
+            # worker starts, not here: refusing the file would stop every worker until this one logs in.
+            expanded = os.path.expanduser(claude_config_dir)
+            if not os.path.isabs(expanded):
+                raise WorkersError(f"workers[{index}].claude_config_dir must be an absolute path (or start with ~)")
+            claude_config_dir = os.path.normpath(expanded)
         spec = WorkerSpec(
             id=wid,
             enabled=enabled,
@@ -313,6 +324,7 @@ class WorkerSpec:
             pace=_pace(raw.get("pace"), f"workers[{index}].pace"),
             stream=_boolean(raw.get("stream", False), f"workers[{index}].stream"),
             isolate_home=_boolean(raw.get("isolate_home", False), f"workers[{index}].isolate_home"),
+            claude_config_dir=claude_config_dir,
             restart=restart,
             env=_env_pairs(raw.get("env", {}), f"workers[{index}].env"),
         )
@@ -350,6 +362,8 @@ class WorkerSpec:
             value["stream"] = True
         if self.isolate_home:
             value["isolate_home"] = True
+        if self.claude_config_dir is not None:
+            value["claude_config_dir"] = self.claude_config_dir
         if self.restart != "always":
             value["restart"] = self.restart
         if self.env:
@@ -394,6 +408,8 @@ class WorkerSpec:
             argv.append("--stream")
         if self.isolate_home:
             argv.append("--isolate-home")
+        if self.claude_config_dir is not None:
+            argv += ["--claude-config-dir", self.claude_config_dir]
         return argv
 
 
@@ -1162,6 +1178,124 @@ def _backoff_reason(item: dict) -> str:
     return f"round exited with status {match.group(1)}" if match else (detail or "unknown failure")
 
 
+# How close to its refresh token's expiry a worker's own Claude login is flagged. Claude refresh tokens
+# outlive no renewal: they lapse a fixed time after the browser login, which then has to be repeated.
+CLAUDE_LOGIN_WARN_S = 3 * 86400
+
+
+def _claude_login_state(directory: Path) -> tuple[bool, float | None]:
+    """Whether `directory` holds a renewable Claude login, and when its refresh token expires (epoch)."""
+    try:
+        block = json.loads((directory / ".credentials.json").read_text()).get("claudeAiOauth")
+    except (OSError, ValueError, AttributeError):
+        return False, None
+    if not isinstance(block, dict) or not block.get("refreshToken"):
+        return False, None
+    raw = block.get("refreshTokenExpiresAt")
+    if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+        return True, raw / 1000 if raw >= 100_000_000_000 else float(raw)  # ms, as Claude Code writes it
+    return True, None
+
+
+def _claude_login_summary(directory: Path, worker_id: str) -> str:
+    ok, expires = _claude_login_state(directory)
+    if not ok:
+        return f"NOT LOGGED IN — run `epsiloneridani workers login {worker_id}`"
+    if expires is None:
+        return "logged in"
+    left = expires - time.time()
+    when = time.strftime("%Y-%m-%d", time.localtime(expires))
+    if left <= 0:
+        return f"login EXPIRED {when} — run `epsiloneridani workers login {worker_id}`"
+    if left < CLAUDE_LOGIN_WARN_S:
+        return f"login expires {when} ({left / 3600:.0f}h) — run `epsiloneridani workers login {worker_id}`"
+    return f"logged in until {when}"
+
+
+def _operator_claude_dir() -> str:
+    """The shared login a worker without claude_config_dir mirrors (agents.isolate_home's source)."""
+    return os.path.normpath(os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude"))
+
+
+def _claude_login_peers(snapshots: list[dict]) -> dict[str, list[str]]:
+    """Claude-capable, enabled workers grouped by the login they draw tokens from."""
+    peers: dict[str, list[str]] = {}
+    for item in snapshots:
+        spec = item.get("spec") if isinstance(item.get("spec"), dict) else {}
+        if item.get("desired") == "stopped" or str(spec.get("agent") or "auto") not in ("claude", "auto"):
+            continue
+        source = spec.get("claude_config_dir") or _operator_claude_dir()
+        peers.setdefault(source, []).append(str(item["id"]))
+    return peers
+
+
+def _claude_login_lines(item: dict, peers: dict[str, list[str]], width: int) -> list[str]:
+    """Where this worker's Claude tokens come from, and who else renews (and so revokes) them."""
+    spec = item.get("spec") if isinstance(item.get("spec"), dict) else {}
+    wid = str(item["id"])
+    lines: list[str] = []
+    own = spec.get("claude_config_dir")
+    if own:
+        lines.extend(_status_field("claude login", [own, _claude_login_summary(Path(own), wid)], width))
+    source = own or _operator_claude_dir()
+    others = [other for other in peers.get(source, []) if other != wid]
+    if wid not in peers.get(source, []):
+        return lines
+    warnings = []
+    if others:
+        warnings.append(f"shares its Claude login with {', '.join(others)}")
+    if not own and spec.get("auto_refresh"):
+        warnings.append(f"renews the operator's own login ({source}), which an interactive `claude` also renews")
+    if warnings:
+        warnings.append(
+            "a renewal by one revokes the access token the others hold, ending their in-flight rounds; "
+            "give each Claude worker its own claude_config_dir"
+        )
+        lines.extend(_status_field("warning", warnings, width))
+    return lines
+
+
+def claude_login(config: Path, worker_id: str) -> int:
+    """Run an interactive `claude` against a worker's own config dir, so the operator can /login into it."""
+    spec = next((spec for spec in load_worker_specs(config) if spec.id == worker_id), None)
+    if spec is None:
+        raise WorkersError(f"unknown worker: {worker_id}")
+    if spec.claude_config_dir is None:
+        raise WorkersError(
+            f"worker {worker_id} has no claude_config_dir; add one to {config} first, e.g.\n"
+            f'  claude_config_dir = "~/.config/epsiloneridani/claude/{worker_id}"'
+        )
+    if sys.platform == "darwin":
+        raise WorkersError(
+            "claude_config_dir is not supported on macOS, where Claude Code keeps its login in the Keychain"
+        )
+    claude = shutil.which("claude")
+    if claude is None:
+        raise WorkersError("`claude` is not on PATH")
+    directory = Path(spec.claude_config_dir)
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    print(
+        f"Logging worker {worker_id} into its own Claude login in {directory}.\n"
+        "In the Claude session that opens, run /login, finish the sign-in in your browser, then /exit."
+    )
+    # An API key or long-lived token in the environment would take precedence over the login being
+    # created and leave nothing in .credentials.json; the session must use the directory alone.
+    env = {
+        name: value
+        for name, value in os.environ.items()
+        if name not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN")
+    }
+    env["CLAUDE_CONFIG_DIR"] = str(directory)
+    subprocess.run([claude], env=env, cwd=Path.home())
+    ok, _expires = _claude_login_state(directory)
+    if not ok:
+        print(f"epsiloneridani workers: {directory} holds no renewable Claude login yet", file=sys.stderr)
+        return 1
+    print(f"worker {worker_id}: {_claude_login_summary(directory, worker_id)}")
+    print(f"restart it to start using this login: epsiloneridani workers restart {worker_id}")
+    return 0
+
+
 def _worker_configuration_lines(item: dict, width: int) -> list[str]:
     """Render the desired worker definition independently of its transient runtime state."""
     raw = item.get("spec")
@@ -1231,6 +1365,7 @@ def _worker_status_lines(config: Path, snapshots: list[dict], online: bool, *, w
     if not snapshots:
         return [*lines, "", "workers: none"]
 
+    peers = _claude_login_peers(snapshots)
     for item in snapshots:
         state = str(item["actual"])
         display_state = {
@@ -1244,6 +1379,7 @@ def _worker_status_lines(config: Path, snapshots: list[dict], online: bool, *, w
             heading += f" (desired: {item['desired']})"
         lines.extend(["", heading])
         lines.extend(_worker_configuration_lines(item, width))
+        lines.extend(_claude_login_lines(item, peers, width))
         phase = item.get("phase")
         if phase:
             work_values = [str(phase)]
@@ -1718,6 +1854,15 @@ def add_workers_parser(subparsers) -> None:
         action="store_true",
         help="force credential isolation for id 'default'; other ids are isolated automatically",
     )
+    add.add_argument(
+        "--claude-config-dir",
+        help="this worker's own Claude login directory (create it with `workers login ID`); "
+        "see `epsiloneridani work --help`",
+    )
+    login = actions.add_parser(
+        "login", help="log a worker with claude_config_dir into its own Claude account (runs `claude`)"
+    )
+    login.add_argument("worker_id", help="worker id")
     logs = actions.add_parser("logs", help="show a worker's durable console log")
     logs.add_argument("worker_id", help="worker id")
     logs.add_argument("--follow", "-f", action="store_true", help="keep printing, across worker restarts")
@@ -1795,7 +1940,7 @@ def cmd_workers(args) -> int:
                     "stream": args.stream,
                     "isolate_home": args.isolate_home,
                 }
-                for key in ("roadmap_only", "source", "author_model", "author_effort", "pace"):
+                for key in ("roadmap_only", "source", "author_model", "author_effort", "pace", "claude_config_dir"):
                     value = getattr(args, key)
                     if value is not None:
                         raw[key] = value
@@ -1804,6 +1949,8 @@ def cmd_workers(args) -> int:
             ensure_manager(config)
             print(f"added {spec.id}")
             return 0
+        if action == "login":
+            return claude_login(config, args.worker_id)
         if action == "remove":
             _remove_spec(config, args.worker_id)
             ensure_manager(config)

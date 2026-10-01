@@ -103,7 +103,7 @@ other top-level key is an error, as is any unrecognized field inside a
 | `only` | string list | `[]` | Work phases: `rebase`, `bump`, `progress`, `fix-ci`, `fix`, `review`, `roadmap`, `lint-repair`. Empty means the whole cascade |
 | `sandbox` | string | `"host"` | `host` or `bubble`. Progress-report rounds always run on the host |
 | `ignore_quota` | bool | `false` | Skip soft pacing. Provider hard limits still apply; an `auto` worker cannot launch with this enabled |
-| `auto_refresh` | bool | `false` | Renew this worker's Claude access token when it expires, instead of parking until a human runs `claude`. Only safe when nothing else uses the same credential file — the refresh token is single-use. See [quota and pacing](quota.md) |
+| `auto_refresh` | bool | `false` | Renew this worker's Claude access token when it expires, instead of parking until a human runs `claude`. Only safe when nothing else uses the same credential file — the refresh token is single-use, so pair it with `claude_config_dir`. See [quota and pacing](quota.md) |
 | `roadmap_only` | string | unset | The single roadmap area for roadmap rounds. `""` means all areas; unset means a fresh random area each round |
 | `roadmap_skip` | string list | `[]` | Roadmap areas to exclude. `roadmap_only` wins on overlap |
 | `roadmap_extra_identities` | string list | `[]` | Extra GitHub logins whose claimed intentions count as this worker's own |
@@ -114,6 +114,7 @@ other top-level key is an error, as is any unrecognized field inside a
 | `pace` | string | unset | Pacing curve as `time%:budget%` points, for example `0:10,50:70,90:90`; rejected by `apply --check` if malformed |
 | `stream` | bool | `false` | Keep the agent transcript in the console log instead of a separate file |
 | `isolate_home` | bool | `false` | Force credential isolation for the id `default`; every other id already enables it |
+| `claude_config_dir` | string | unset | This worker's **own** Claude login: a Claude config directory holding `.credentials.json`, used instead of the operator's `~/.claude`. Absolute, or starting with `~`. Create it with `workers login ID`. Not on macOS. See [one Claude login per worker](#one-claude-login-per-worker) |
 | `restart` | string | `"always"` | `always` after any exit, `on-failure` after a nonzero exit, or `never`; explicit restart and re-enable still work |
 | `env` | table of strings | `{}` | Extra environment for this worker's process tree, for settings with no flag of their own. Values must be quoted strings, names POSIX-portable, and the table at most 16 KB. The variables the worker sets itself (`EPSILONERIDANI_MANAGED`, `EPSILONERIDANI_LOG_FILE`, `EPSILONERIDANI_PARENT_PIPE_FD`, `EPSILONERIDANI_DATA_HOME`, and the runtime-status path) are rejected. **Not a secret store** — see below |
 
@@ -171,6 +172,7 @@ entry with `enabled = true`.
 | `--pace CURVE` | `pace` |
 | `--stream` | `stream` |
 | `--isolate-home` | `isolate_home`; useful when the id is `default` |
+| `--claude-config-dir DIR` | `claude_config_dir` |
 
 `add` cannot set `roadmap_extra_identities`, `respect_claims`, or `restart`, and
 always writes `enabled = true`. Use `workers edit` for those.
@@ -186,6 +188,7 @@ always writes `enabled = true`. Use `workers edit` for those.
 | `enable ID` / `disable ID` | Persist desired running or stopped state |
 | `restart ID` | Request a restart without changing desired state; a disabled worker stays stopped |
 | `remove ID` | Drop the definition and stop the worker |
+| `login ID` | Open `claude` on the worker's `claude_config_dir` so you can `/login` it into its own account, then confirm the login is renewable |
 | `logs ID [--follow] [--lines N]` | The durable console log. `--follow` continues across worker restarts |
 | `tmux [--no-attach]` | Build the optional tmux viewing workspace |
 | `manager [--interval N]` | Run the reconciler in the foreground |
@@ -304,6 +307,55 @@ written once and never overwritten. `EPSILONERIDANI_INHERIT_CLAUDE_CONFIG=1` res
 the previous behaviour of sharing your own `CLAUDE.md`, settings, and skills,
 including on a worker already seeded the clean way; a `settings.json` you have
 edited is kept rather than replaced.
+
+## One Claude login per worker
+
+By default every Claude worker draws its tokens from the operator's `~/.claude`,
+the same OAuth grant your interactive `claude` uses. An isolated worker holds
+only a copy of the *access* token, with the refresh token stripped. Renewing a
+grant retires its previous access token. So when anything renews that shared
+login, every Claude round then in flight fails with
+`401 OAuth access token has been revoked`. "Anything" includes your own
+`claude`, or another worker with `auto_refresh`. One worker with `auto_refresh`
+is enough to hit the others, and every extra Claude worker makes a collision
+more likely.
+
+Giving each Claude worker its own login removes the sharing:
+
+```toml
+[[workers]]
+id = "worker1"
+agent = "claude"
+auto_refresh = true
+claude_config_dir = "~/.config/epsiloneridani/claude/worker1"
+```
+
+```console
+$ epsiloneridani workers login worker1    # opens claude; run /login, then /exit
+$ epsiloneridani workers restart worker1
+```
+
+Each login is a separate OAuth grant on the same account, so the worker still
+draws on your quota. With `auto_refresh`, the pacer renews only that grant, and
+only between that worker's own rounds, which never overlap each other. It renews
+`ROUND_TIMEOUT` plus 30 minutes ahead of expiry; set `$CLAUDE_REFRESH_SKEW_S` to
+change that. It also does not launch a round on a token that cannot outlast
+`ROUND_TIMEOUT`, which is what a failed renewal leaves behind. So no round
+starts only to end in a 401.
+
+A worker that already ran on the shared login keeps its credential copy pinned
+to that source. Naming `claude_config_dir` is the one change it follows: the
+next start re-seeds the copy from the new login. Any other change of
+`$CLAUDE_CONFIG_DIR` still only warns.
+
+`workers status` shows each worker's login and when its refresh token expires.
+That happens a fixed time after the browser sign-in, so expect to repeat
+`workers login` about monthly. Status flags a login within three days of
+expiry. It also warns when two enabled Claude workers share a login, or when a
+worker with `auto_refresh` renews the operator's own `~/.claude`.
+
+Not on macOS, where Claude Code keeps its login in the Keychain rather than in
+the config directory.
 
 ## State on disk
 
