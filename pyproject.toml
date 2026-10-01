@@ -19,6 +19,7 @@ source = "vcs"
 [project.scripts]
 epsiloneridani = "epsiloneridani_worker.cli:cli_main"
 tauceti = "epsiloneridani_worker.cli:cli_main"
+eeri = "epsiloneridani_worker.cli:cli_main"
 
 # The worker is the epsiloneridani_worker/ package. Its prompts/ and scripts/ wrappers live at the repo
 # root for the `./epsiloneridani` shim (HERE resolves to the repo root in a checkout); the wheel bundles
