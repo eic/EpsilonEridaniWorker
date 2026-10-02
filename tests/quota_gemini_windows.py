@@ -196,18 +196,18 @@ q_mock = tc.Quota(cfg)
 
 q_mock.codex = lambda refresh=False: tc.Provider("codex", False, None)
 q_mock.claude = lambda refresh=False, renew=False: tc.Provider("claude", False, None)
-q_mock.gemini = lambda refresh=False: tc.Provider("gemini", True, "gemini-3.1-pro-high")
+q_mock.gemini = lambda refresh=False, renew=False: tc.Provider("gemini", True, "gemini-3.1-pro-high")
 
 check("auto selects gemini when codex/claude unavailable", q_mock.choose("auto")[0], "gemini")
 check("forced gemini selects gemini when available", q_mock.choose("gemini")[0], "gemini")
 
-q_mock.gemini = lambda refresh=False: tc.Provider("gemini", False, None)
+q_mock.gemini = lambda refresh=False, renew=False: tc.Provider("gemini", False, None)
 check("forced gemini returns None when unavailable", q_mock.choose("gemini")[0], None)
 check("auto returns None when all unavailable", q_mock.choose("auto")[0], None)
 
 # Codex takes precedence over Gemini in auto:
 q_mock.codex = lambda refresh=False: tc.Provider("codex", True, "gpt-5")
-q_mock.gemini = lambda refresh=False: tc.Provider("gemini", True, "gemini-3.1-pro-high")
+q_mock.gemini = lambda refresh=False, renew=False: tc.Provider("gemini", True, "gemini-3.1-pro-high")
 check("auto prefers codex over gemini", q_mock.choose("auto")[0], "codex")
 
 # -----------------------------------------------------------------------------

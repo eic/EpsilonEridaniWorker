@@ -55,6 +55,30 @@ round, a round resolving the model it will launch, and the launch stage. Reading
 commands stay reads: `epsiloneridani status` and the dashboard report an expired token
 rather than rotating it behind you.
 
+## Keeping the Gemini token alive
+
+Gemini rounds run the Antigravity CLI, `agy`, whose access token in
+`~/.gemini/antigravity-cli/antigravity-oauth-token` (`$GEMINI_CONFIG_DIR`
+honored) lasts an hour. Only `agy` renews it, and only when it runs. A Gemini
+worker that is paced for longer than that therefore finds the token expired, and
+the usage read returns 401. Without renewal it would wait forever, because the
+rounds that would have renewed the token never start.
+
+So the pacer renews it: when the stored expiry is within two minutes, or the
+usage endpoint rejects the token, it runs `agy models` once, re-reads the token
+and retries the read. `agy models` only lists models; it spends no quota. It runs
+with the quota cache as its working directory, never your home. Attempts are
+rate-limited to one per 10 minutes, so a login `agy` can no longer renew costs
+one `agy` run per interval and reads `gemini token expired and could not be
+renewed; log in to agy again`.
+
+Unlike `--auto-refresh` for Claude, this is on by default. Google's refresh
+token is reusable rather than single-use, so a renewal here cannot log out an
+interactive `agy` or another worker sharing the file. Set
+`$EPSILONERIDANI_GEMINI_NO_RENEW=1` to turn it off. As with Claude, only the
+paths about to run something renew; `epsiloneridani status` and the dashboard
+report an expired token without running `agy`.
+
 ## macOS and the login Keychain
 
 On macOS, Claude Code keeps its credentials in the login Keychain rather than in

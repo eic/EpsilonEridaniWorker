@@ -126,6 +126,48 @@ def _claude_no_weekly_cap() -> bool:
     return os.environ.get("EPSILONERIDANI_CLAUDE_NO_WEEKLY_CAP") == "1"
 
 
+# --- Gemini / Antigravity credential renewal ---------------------------------------------------
+# The Antigravity access token lasts an hour, and only `agy` renews it — as a side effect of running.
+# A worker that sits paced for longer than that finds the token expired, the usage read returns 401,
+# and without renewal the pacer then refuses the very rounds that would have renewed it. So a caller
+# about to run something (renew=True: the loop, never `status`) asks `agy` to renew it: `agy models`
+# is the cheapest call that does (it lists models, generates nothing). The token's refresh token is
+# Google's, which is reusable rather than single-use, so unlike the Claude rotation this cannot log
+# out another holder of the same file and is on by default; $EPSILONERIDANI_GEMINI_NO_RENEW=1 turns
+# it off. Attempts are rate-limited by a marker in the quota
+# cache so a login that can no longer be renewed costs one `agy` run per interval, not one per poll.
+GEMINI_RENEW_RETRY_S = 600
+GEMINI_RENEW_SKEW_S = 120  # renew this close to the stored expiry rather than waiting for the 401
+GEMINI_RENEW_TIMEOUT_S = 90
+
+
+def _gemini_no_renew() -> bool:
+    """Whether the operator has turned Antigravity token renewal off (read live, like the other dials)."""
+    return os.environ.get("EPSILONERIDANI_GEMINI_NO_RENEW") == "1"
+
+
+def _parse_rfc3339(value: object) -> float | None:
+    """An RFC 3339 timestamp as epoch seconds, or None. Go writes up to nine fractional digits
+    (`2026-10-02T10:00:53.766296895-05:00`), which datetime.fromisoformat rejects before 3.11's
+    widened parser and truncates inconsistently after, so the fraction is cut to microseconds first."""
+    if not isinstance(value, str) or not value:
+        return None
+    s = value.strip().replace("Z", "+00:00")
+    head, dot, rest = s.partition(".")
+    if dot:
+        i = 0
+        while i < len(rest) and rest[i].isdigit():
+            i += 1
+        s = f"{head}.{rest[:i][:6].ljust(6, '0')}{rest[i:]}"
+    try:
+        from datetime import datetime
+
+        dt = datetime.fromisoformat(s)
+    except ValueError:
+        return None
+    return dt.timestamp() if dt.tzinfo is not None else None
+
+
 # --- pacing curve --------------------------------------------------------------------------------
 # The pacer decides a window is "under pace" while used% stays under a BUDGET that grows with elapsed
 # time. The operator supplies that budget as piecewise-linear "time%:budget%" control points via
@@ -2403,8 +2445,8 @@ class Quota:
         return min(blocked) if blocked else None
 
     # --- selection ---------------------------------------------------------
-    def _gemini_token(self) -> str | None:
-        """Read access token from antigravity-oauth-token if present."""
+    def _gemini_token_record(self) -> dict | None:
+        """The `token` block of the first antigravity-oauth-token that has an access token."""
         candidates = [
             gemini_dir(self.cfg.home) / "antigravity-cli" / "antigravity-oauth-token",
             _host_home() / ".gemini" / "antigravity-cli" / "antigravity-oauth-token",
@@ -2415,8 +2457,67 @@ class Quota:
             if d and isinstance(d, dict):
                 tok = d.get("token")
                 if isinstance(tok, dict) and tok.get("access_token"):
-                    return str(tok["access_token"])
+                    return tok
         return None
+
+    def _gemini_token(self) -> str | None:
+        """Read access token from antigravity-oauth-token if present."""
+        tok = self._gemini_token_record()
+        return str(tok["access_token"]) if tok else None
+
+    def _gemini_token_due(self) -> bool:
+        """Whether the stored Antigravity token has expired or is about to. An unknown expiry is not
+        due: the usage read is then the judge, and a 401 from it renews."""
+        tok = self._gemini_token_record()
+        expiry = _parse_rfc3339(tok.get("expiry")) if tok else None
+        return expiry is not None and expiry <= time.time() + GEMINI_RENEW_SKEW_S
+
+    def _renew_gemini_credential(self) -> bool:
+        """Have `agy` renew the Antigravity access token, and report whether the token on disk changed.
+        See GEMINI_RENEW_RETRY_S for why this exists and why it is on by default. A failure is logged
+        and swallowed: gemini then stays unavailable, which is the honest answer."""
+        if _gemini_no_renew():
+            return False
+        agy = shutil.which("agy")
+        if not agy:
+            return False
+        marker = Path(self.cache_dir) / "gemini-renew-attempt"
+        try:
+            if time.time() - marker.stat().st_mtime < GEMINI_RENEW_RETRY_S:
+                return False
+        except OSError:
+            pass
+        try:
+            marker.parent.mkdir(parents=True, exist_ok=True)
+            marker.touch()
+        except OSError as e:
+            log(f"gemini credential: cannot record the renewal attempt ({e}) — not renewing")
+            return False
+        before = self._gemini_token()
+        try:
+            # The quota cache as cwd: `agy` registers its working directory, and the operator's home
+            # is not a directory it should be handed.
+            r = subprocess.run(
+                [agy, "models"],
+                cwd=marker.parent,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=GEMINI_RENEW_TIMEOUT_S,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as e:
+            log(f"gemini credential: `agy models` failed ({e}) — gemini stays unavailable until it is renewed")
+            return False
+        after = self._gemini_token()
+        if after and after != before:
+            log("gemini credential: access token renewed (via `agy models`)")
+            return True
+        log(
+            f"gemini credential: `agy models` exited {r.returncode} without renewing the token — "
+            "gemini stays unavailable until someone logs in to agy again"
+        )
+        return False
 
     def _cached_gemini(self, fp: str | None) -> tuple[dict, float] | None:
         entry = self._cached_entry("gemini", fp)
@@ -2460,13 +2561,20 @@ class Quota:
         nxt = self._next_eligible(wins, now)
         return Provider("gemini", avail, model if avail else None, wins, None, nxt)
 
-    def gemini(self, *, refresh: bool = False) -> Provider:
-        """Read Gemini usage via Antigravity backend and report whether gemini may run under pace."""
+    def gemini(self, *, refresh: bool = False, renew: bool = False) -> Provider:
+        """Read Gemini usage via Antigravity backend and report whether gemini may run under pace.
+
+        `renew`, as for Quota.claude, is for a caller about to act on the answer: it may have `agy`
+        renew an expired access token (see GEMINI_RENEW_RETRY_S). An inspection command reports the
+        expired token instead."""
         has_cli = bool(shutil.which("agy") or shutil.which("gemini-cli"))
         if not has_cli:
             return Provider("gemini", False, None, error="no agy or gemini-cli on PATH")
 
         has_key = bool(os.environ.get("GEMINI_API_KEY"))
+        renewed = False
+        if renew and self._gemini_token() and self._gemini_token_due():
+            renewed = self._renew_gemini_credential()
         tok = self._gemini_token()
         model = AUTHORING_DEFAULTS.get("gemini", ("gemini-3.1-pro-high", "high"))[0]
 
@@ -2489,6 +2597,14 @@ class Quota:
         observed_at = time.time()
         try:
             code, payload, retry_after = _http_post_json(url, headers, data=b"{}")
+            if code == 401 and renew and not renewed and self._renew_gemini_credential():
+                # The stored expiry said the token was fine and the endpoint said otherwise; one
+                # renewal, one retry with the new token.
+                tok = self._gemini_token() or tok
+                fp = self._fingerprint(tok)
+                headers["Authorization"] = f"Bearer {tok}"
+                observed_at = time.time()
+                code, payload, retry_after = _http_post_json(url, headers, data=b"{}")
         except GitHubError as e:
             still = self._cached_gemini(fp)
             if still is not None:
@@ -2499,7 +2615,15 @@ class Quota:
             still = self._cached_gemini(fp) if code != 401 else None
             if still is not None:
                 return self._gemini_from_payload(*still)
-            err = "gemini token expired; refresh left to the operator" if code == 401 else f"gemini usage HTTP {code}"
+            err = (
+                (
+                    "gemini token expired and could not be renewed; log in to agy again"
+                    if renew and not _gemini_no_renew()
+                    else "gemini token expired; refresh left to the operator"
+                )
+                if code == 401
+                else f"gemini usage HTTP {code}"
+            )
             return Provider("gemini", False, None, error=err, retry_after=retry_after)
 
         valid_until = _gemini_valid_until(payload, observed_at)
@@ -2513,8 +2637,8 @@ class Quota:
         forced in {codex, claude}: only that provider counts. None/'auto': codex preferred, opus
         fallback. Kiro and OpenRouter agents bypass this entirely (handled by the caller).
 
-        `renew` is passed through to Quota.claude: a caller that is about to act on the answer may
-        renew an expiring access token, an inspection command may not.
+        `renew` is passed through to Quota.claude and Quota.gemini: a caller that is about to act on
+        the answer may renew an expiring access token, an inspection command may not.
         """
         snap = {}
         if forced in (None, "auto", "codex"):
@@ -2522,7 +2646,7 @@ class Quota:
         if forced in (None, "auto", "claude"):
             snap["claude"] = self.claude(refresh=refresh, renew=renew)
         if forced in (None, "auto", "gemini"):
-            snap["gemini"] = self.gemini(refresh=refresh)
+            snap["gemini"] = self.gemini(refresh=refresh, renew=renew)
         codex_ok = snap.get("codex") and snap["codex"].available
         opus_ok = snap.get("claude") and snap["claude"].available
         gemini_ok = snap.get("gemini") and snap["gemini"].available
