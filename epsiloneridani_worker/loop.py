@@ -346,9 +346,18 @@ def _credential_hint(agent: str, prov: Provider | None) -> str:
     # Match what THIS pacer writes, not any text mentioning a token: each provider phrases its own
     # refusal (see Quota.codex / Quota._claude_pass), and a transport error that happens to carry `401`
     # or "token expired" from something in between is not our credential being rejected.
-    if "usage HTTP 401" not in error and "token expired; refresh left to the operator" not in error:
+    if not any(
+        m in error
+        for m in (
+            "usage HTTP 401",
+            "token expired; refresh left to the operator",
+            "token expired and could not be renewed",
+        )
+    ):
         return ""
     if agent == "gemini":
+        # The pacer already tried `agy models` (unless $EPSILONERIDANI_GEMINI_NO_RENEW): what is left is
+        # a login that agy itself can no longer renew.
         return ". Run `agy` to authenticate or set GEMINI_API_KEY"
     if agent != "claude":
         return ". Run `codex login` to renew the credential"

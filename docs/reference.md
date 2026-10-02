@@ -188,6 +188,7 @@ Flags win over these. Most are tuning knobs with sane defaults.
 | `EPSILONERIDANI_CLAUDE_CONFIG_DIR` | _(unset)_ | Default for `--claude-config-dir`. |
 | `CLAUDE_REFRESH_SKEW_S` | `ROUND_TIMEOUT` + 1800 | How long before expiry `--auto-refresh` renews the Claude access token (seconds). |
 | `EPSILONERIDANI_CLAUDE_NO_WEEKLY_CAP` | _(unset)_ | `1` is the same as `--claude-no-weekly-cap`. |
+| `EPSILONERIDANI_GEMINI_NO_RENEW` | _(unset)_ | `1` stops the pacer from running `agy models` to renew an expired Gemini (Antigravity) access token. See [quota and pacing](quota.md#keeping-the-gemini-token-alive). |
 | `EPSILONERIDANI_PACE` | _(unset)_ | Pacing curve for `--pace` (`time%:budget%` points); unset = `60:40`. |
 | `EPSILONERIDANI_STREAM` | — | `1` is the same as `--stream`. |
 | `CLAUDE_CONFIG_DIR` | `~/.claude` | Claude config/credential source (account switching; Bubble uses a private transient handoff on macOS). |
