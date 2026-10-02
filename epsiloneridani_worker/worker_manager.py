@@ -547,6 +547,17 @@ def drain_restarts(worker_id: str, state_dir: Path | None = None) -> bool:
     return bool(read_json(drain_path(worker_id, state_dir)).get("restart"))
 
 
+def _clear_restart_request(worker_id: str, state_dir: Path | None = None) -> None:
+    """Drop a pending graceful restart, when the manager stops the worker itself (disable, an explicit
+    restart, shutdown). Left behind, it would relaunch the worker later regardless of `restart`
+    policy. A plain drain is the operator's request and stays."""
+    if drain_restarts(worker_id, state_dir):
+        try:
+            drain_path(worker_id, state_dir).unlink()
+        except FileNotFoundError:
+            pass
+
+
 def runner_socket(worker_id: str, runtime_dir: Path | None = None) -> Path:
     return (runtime_dir or workers_runtime_dir()) / f"w-{worker_id}.sock"
 
@@ -716,6 +727,12 @@ def cmd_managed_runner(args) -> int:
         except BlockingIOError:
             return 73
         server = _bind_socket(sock_path)
+        # Test hook: widen the window between taking the slot and publishing this run's status, which the
+        # manager must not mistake for a changed definition (see run_manager). Read from the worker's own
+        # env table, so it slows only the worker under test.
+        startup_delay = dict(spec.env).get("EPSILONERIDANI_TEST_RUNNER_STARTUP_DELAY")
+        if startup_delay:
+            time.sleep(float(startup_delay))
         stopping = False
         child: subprocess.Popen | None = None
         parent_pipe_read: int | None = None
@@ -975,7 +992,15 @@ def run_manager(config: Path, interval: float = DEFAULT_INTERVAL) -> int:
                     # itself. So a drain never stops a live worker here, which would kill that round;
                     # it only keeps one that has exited from being launched again, until `resume`.
                     draining = drain_path(wid, state_dir).exists()
-                    changed = bool(is_live and spec and live.get("spec_hash") != spec.fingerprint())
+                    # Judge a definition change only on a record the live runner wrote. A runner holds its
+                    # slot (lock, socket) before it publishes its first status, so until then the file
+                    # still carries the previous run's fingerprint, or none, and reading it as a change
+                    # restarted a worker that had just started on the current definition. A runner this
+                    # manager launched is known by pid; one adopted from an earlier manager has long
+                    # since published.
+                    launched = children.get(wid)
+                    reported = launched is None or live.get("wrapper_pid") == launched.pid
+                    changed = bool(is_live and spec and reported and live.get("spec_hash") != spec.fingerprint())
                     if (
                         is_live
                         and not changed
@@ -986,6 +1011,7 @@ def run_manager(config: Path, interval: float = DEFAULT_INTERVAL) -> int:
                         launch_failures.pop(wid, None)
                     # Disabling, removing and an explicit `workers restart` stop a live worker at once.
                     if is_live and (not should_run or wid in restart_ids):
+                        _clear_restart_request(wid, state_dir)
                         _stop_runner(wid, runtime_dir)
                         continue
                     # A changed definition does not: the worker finishes the round it is in, and the
@@ -1067,6 +1093,7 @@ def run_manager(config: Path, interval: float = DEFAULT_INTERVAL) -> int:
             if stop_workers:
                 live_ids = [item["id"] for item in worker_snapshots(last_good or []) if item.get("alive")]
                 for wid in live_ids:
+                    _clear_restart_request(wid, state_dir)  # the next manager starts every worker afresh anyway
                     _stop_runner(wid, runtime_dir)
                 deadline = time.monotonic() + 25
                 while time.monotonic() < deadline and any(
