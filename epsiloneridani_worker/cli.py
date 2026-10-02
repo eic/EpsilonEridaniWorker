@@ -947,7 +947,13 @@ def cmd_work(args, *, only: list[str], agent: str, one_round: bool, prs: tuple[i
         # use that. A one-shot `epsiloneridani work` has nothing recent behind it and must look for itself,
         # rather than refuse the round on a cached verdict that may be an hour old.
         work_model, pending_init = resolve_work_model(
-            cfg, agent, dry=dry, ignore_quota=ignore_quota, quota_cmd=quota_cmd, fresh=not one_round
+            cfg,
+            agent,
+            dry=dry,
+            ignore_quota=ignore_quota,
+            quota_cmd=quota_cmd,
+            fresh=not one_round,
+            author_model=author_model,
         )
         authoring_profile = None
         if work_model != "auto":

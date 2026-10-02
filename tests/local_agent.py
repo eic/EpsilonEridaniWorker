@@ -186,6 +186,36 @@ prof = agents.resolve_authoring_profile("local")
 check("model defaults to the file's alias", prof.model, "my-local-model")
 check("--author-model overrides", agents.resolve_authoring_profile("local", cli_model="leanstral").model, "leanstral")
 check("effort refused", bool(raises_die(lambda: agents.resolve_authoring_profile("local", cli_effort="high"))), True)
+# An override must not need the file's model: a file that names none still works with --author-model
+# or the env pin, and the file is not consulted for the model at all.
+(tmp / "nomodel.env").write_text('export OPENAI_BASE_URL="http://10.0.33.174:4000/v1"\n')
+saved = os.environ[local_endpoint.ENV_FILE_VAR]
+os.environ[local_endpoint.ENV_FILE_VAR] = str(tmp / "nomodel.env")
+check(
+    "no OPENAI_MODEL and no override is Die",
+    "OPENAI_MODEL" in (raises_die(lambda: agents.resolve_authoring_profile("local")) or ""),
+    True,
+)
+check(
+    "--author-model works with a model-less file",
+    agents.resolve_authoring_profile("local", cli_model="leanstral").model,
+    "leanstral",
+)
+os.environ["EPSILONERIDANI_AUTHORING_LOCAL_MODEL"] = "leanstral-env"
+check("env pin works with a model-less file", agents.resolve_authoring_profile("local").model, "leanstral-env")
+os.environ.pop("EPSILONERIDANI_AUTHORING_LOCAL_MODEL")
+os.environ[local_endpoint.ENV_FILE_VAR] = str(tmp / "absent.env")
+check(
+    "--author-model needs no file at all",
+    agents.resolve_authoring_profile("local", cli_model="leanstral").model,
+    "leanstral",
+)
+os.environ[local_endpoint.ENV_FILE_VAR] = saved
+check(
+    "file default records its source",
+    agents.resolve_authoring_profile("local").model_source,
+    "endpoint file OPENAI_MODEL",
+)
 
 # --- 8. bubble refused ----------------------------------------------------------------------------
 check("bubble refused", "host only" in (raises_die(lambda: agents.agent_inner_cmd(prof)) or ""), True)
@@ -204,6 +234,11 @@ with patch.object(local_endpoint, "_get_json", side_effect=recorder):
     write_env(base="http://10.0.99.1:4000/v1")  # the job moved
     loop.local_agent_available()
 check("gate: picked up the moved job", any(u.startswith("http://10.0.99.1:4000/v1/") for u in seen), True)
+
+# The gate probes for the model the round will launch: --author-model, not the file's alias.
+with patch.object(local_endpoint, "_get_json", side_effect=served(models=("leanstral",))):
+    check("gate: probes the --author-model pin", loop.local_agent_available("leanstral")[0], True)
+    check("gate: without the pin, the file's alias is missing", loop.local_agent_available()[0], False)
 write_env()
 
 # --- 10. CLI refuses review for a local worker ----------------------------------------------------

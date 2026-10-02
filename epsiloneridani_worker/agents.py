@@ -109,8 +109,9 @@ def resolve_authoring_profile(
         default_model, default_effort = OPENROUTER_MODELS[provider], None
     elif provider == "local":
         # The alias the endpoint file names; the weights behind it are the server's business (see
-        # local_endpoint). Read lazily so a worker that never selects `local` never needs the file.
-        default_model, default_effort = (_local_default_model(), None)
+        # local_endpoint). Resolved below, and only when neither --author-model nor the env pins
+        # one, so an override still works with a file that names no model.
+        default_model, default_effort = None, None
     else:
         raise Die(f"no authoring profile for provider {provider!r}")
 
@@ -122,6 +123,8 @@ def resolve_authoring_profile(
         model, model_source = env_model, f"${model_env}"
     elif legacy:
         model, model_source = legacy, "$EPSILONERIDANI_CODEX_MODEL (deprecated; authoring only)"
+    elif provider == "local":
+        model, model_source = _local_default_model(), "endpoint file OPENAI_MODEL"
     else:
         model, model_source = default_model, "repository default"
 

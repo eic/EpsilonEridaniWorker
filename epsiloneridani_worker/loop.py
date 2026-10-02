@@ -125,7 +125,7 @@ def cmd_loop(args, cfg: Config, *, only: list[str], agent: str, prs: tuple[int, 
                 # No subscription to pace against: availability is reachability. A serving job that
                 # ended or is still queued leaves an address nobody answers on — wait for the next
                 # one rather than launch a round that fails at its first request.
-                live, detail = local_agent_available()
+                live, detail = local_agent_available(getattr(args, "author_model", None))
                 if not live:
                     log(f"local endpoint: {detail} — sleeping {POLL}s")
                     report_runtime("waiting-quota", detail=detail, next_action_at=time.time() + POLL)
@@ -355,10 +355,11 @@ def choose_model(
     return Quota(cfg).choose(None if agent == "auto" else agent, refresh=refresh, renew=renew)
 
 
-def local_agent_available() -> tuple[bool, str]:
+def local_agent_available(author_model: str | None = None) -> tuple[bool, str]:
     """(live, detail) for `--agent local`: re-read the endpoint file and probe it. An absent file (no
     serving job) or an endpoint that does not answer is a wait; an unset setting or a malformed file
-    is a configuration error and stops the worker (Die)."""
+    is a configuration error and stops the worker (Die). The probe asks for the model the round will
+    actually launch: `author_model` (--author-model) when given, else the authoring profile's."""
     from . import local_endpoint
     from .agents import resolve_authoring_profile
 
@@ -366,7 +367,7 @@ def local_agent_available() -> tuple[bool, str]:
         ep = local_endpoint.read_endpoint()
     except local_endpoint.EndpointDown as e:
         return False, str(e)
-    return local_endpoint.probe(ep, resolve_authoring_profile("local").model)
+    return local_endpoint.probe(ep, resolve_authoring_profile("local", cli_model=author_model).model)
 
 
 def _credential_hint(agent: str, prov: Provider | None) -> str:
@@ -431,7 +432,14 @@ def claude_pending_init(snap: dict) -> bool:
 
 
 def resolve_work_model(
-    cfg: Config, agent: str, *, dry: bool, ignore_quota: bool, quota_cmd: str | None = None, fresh: bool = False
+    cfg: Config,
+    agent: str,
+    *,
+    dry: bool,
+    ignore_quota: bool,
+    quota_cmd: str | None = None,
+    fresh: bool = False,
+    author_model: str | None = None,
 ) -> tuple[str, bool]:
     """Turn the --agent dial into (concrete model, needs-launch-stage-bootstrap). 'auto' consults the
     pacer (or --quota-cmd); codex preferred, opus fallback. Kiro and OpenRouter agents are explicit
@@ -452,7 +460,7 @@ def resolve_work_model(
     if agent in OPENROUTER_MODELS or agent == "kiro":
         return agent, False
     if agent == "local":
-        live, detail = local_agent_available()
+        live, detail = local_agent_available(author_model)
         if not live:
             raise NoProgress(f"local endpoint: {detail}")
         return agent, False
