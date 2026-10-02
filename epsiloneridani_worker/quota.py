@@ -82,6 +82,15 @@ CLAUDE_BOOTSTRAP_FILE = "bootstrap.json"
 # measuring this account contends for the same file, whatever its worker id or checkout.
 CLAUDE_QUOTA_DIRNAME = ".epsiloneridani-quota"
 
+# The usage reading shared by every worker measuring the same credential source, beside the bootstrap
+# reservation. Each worker used to poll the usage endpoint itself on every loop cycle, so a fleet made
+# N times the calls of one worker for the same answer. The endpoint rate-limits hard (a 429 asking for
+# up to an hour), and then every worker found that out for itself. A sibling's reading at most this many
+# seconds old is reused instead of fetched, and a sibling's 429 makes every worker wait out the same
+# Retry-After.
+CLAUDE_USAGE_SHARED_FILE = "usage.json"
+CLAUDE_USAGE_SHARE_S = int(os.environ.get("EPSILONERIDANI_CLAUDE_USAGE_SHARE_S", "300"))
+
 # Environment the bootstrap request must NOT inherit. Every one of these can route a `claude -p` turn
 # to different credentials or a different backend than the one whose quota we just measured — an API
 # key, a second OAuth token, a proxy, or Bedrock/Vertex/Foundry — which would make the request bill
@@ -1269,6 +1278,132 @@ class Quota:
             (self.cache_dir / f"quota-{provider}.json").unlink()
         except OSError:
             pass
+        paths = self._shared_usage_paths() if provider == "claude" else None
+        if paths is not None:
+            # The siblings' shared reading predates the request too; reusing it would hide the change.
+            try:
+                paths[0].unlink()
+            except OSError:
+                pass
+
+    # --- Claude usage shared across workers ----------------------------------
+    def _shared_usage_paths(self) -> tuple[Path, Path] | None:
+        """(reading, lock) shared by the workers measuring this credential source, or None when this
+        pacer has no configuration and so no credential source to share through."""
+        if getattr(self, "cfg", None) is None:
+            return None
+        d = self._claude_creds_source() / CLAUDE_QUOTA_DIRNAME
+        return d / CLAUDE_USAGE_SHARED_FILE, d / "usage.lock"
+
+    @contextmanager
+    def _shared_usage_lock(self):
+        """Serialize usage fetches among the workers sharing a credential source, so one fetches and the
+        rest reuse its answer. Yields False when the lock cannot be taken, and the caller then fetches on
+        its own, as before. Unlike the bootstrap reservation this fails open: reading usage spends
+        nothing, so the worst case without the lock is one extra request."""
+        paths = self._shared_usage_paths()
+        if paths is None:
+            yield False
+            return
+        lockpath = paths[1]
+        try:
+            lockpath.parent.mkdir(parents=True, exist_ok=True)
+            handle = lockpath.open("a+")
+        except OSError:
+            yield False
+            return
+        with handle:
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX)
+            except OSError:
+                yield False
+                return
+            yield True
+
+    def _shared_usage_reuse(self, fp: str | None) -> tuple[Provider, list[Reading] | None] | None:
+        """A sibling's answer this worker may use instead of asking, or None to fetch.
+
+        First a reading younger than CLAUDE_USAGE_SHARE_S that passes the same checks as this worker's
+        own cache. A reused reading is paced as of its fetch, never the present (see
+        _from_cached_claude), so sharing it cannot make a launch look more permitted than it was when
+        the sibling fetched it. It is also kept as this worker's own cache entry, under its original
+        fetch time, so a worker that only ever reuses its siblings' readings still has one.
+
+        Failing that, a 429 whose Retry-After has not passed: every worker waits it out, answering
+        meanwhile from the best valid reading it can, exactly as after a 429 of its own. That is its own
+        cache if valid, else the shared reading if it is still within the private cache's own bounds
+        (QUOTA_TTL, and no reset it describes has passed).
+
+        The token fingerprint must match, as for the private cache: an account switch in the shared
+        file invalidates what the siblings learned."""
+        paths = self._shared_usage_paths()
+        entry = _read_json_file(paths[0]) if paths is not None else None
+        if not entry or entry.get("fp") != fp:
+            return None
+        now = time.time()
+        fresh = self._shared_reading(entry, now, CLAUDE_USAGE_SHARE_S)
+        if fresh is not None:
+            payload, at, valid_until = fresh
+            self._store_raw("claude", payload, fp, valid_until, at)
+            return self._from_cached_claude((payload, at))
+        blocked = entry.get("blocked_until")
+        if not (_finite_num(blocked) and now < blocked):
+            return None
+        own = self._cached_claude(fp)
+        if own is not None:
+            return self._from_cached_claude(own)
+        usable = self._shared_reading(entry, now, QUOTA_TTL["claude"])
+        if usable is not None:
+            payload, at, valid_until = usable
+            self._store_raw("claude", payload, fp, valid_until, at)
+            return self._from_cached_claude((payload, at))
+        return (
+            Provider(
+                "claude",
+                False,
+                None,
+                error="claude usage HTTP 429 (usage endpoint rate-limited; waiting out a sibling worker's Retry-After)",
+                retry_after=blocked - now,
+            ),
+            None,
+        )
+
+    @staticmethod
+    def _shared_reading(entry: dict, now: float, max_age: float) -> tuple[dict, float, float] | None:
+        """(payload, fetched_at, valid_until) of the shared entry's reading if at most `max_age` old,
+        well-formed, and still describing the windows it was fetched for; else None."""
+        at, payload = entry.get("fetched_at"), entry.get("payload")
+        if not (_finite_num(at) and 0 <= now - at <= max_age):
+            return None
+        if _claude_payload_problem(payload) is not None:
+            return None
+        valid_until = _claude_valid_until(_claude_readings(payload))
+        if valid_until is None or now >= valid_until:
+            return None
+        return payload, float(at), valid_until
+
+    def _shared_usage_record(self, fp: str | None, **fields) -> None:
+        """Publish a usage outcome to the siblings: a reading, or a Retry-After deadline. Best effort.
+
+        Merged into what is there for the same token, so a 429 does not erase a reading the siblings can
+        still use, and a new reading does not erase a back-off that has not yet passed. Callers hold the
+        shared lock (see _claude_pass), so the read-modify-write is not raced by a sibling."""
+        paths = self._shared_usage_paths()
+        if paths is None:
+            return
+        path = paths[0]
+        previous = _read_json_file(path) or {}
+        entry = {**(previous if previous.get("fp") == fp else {}), "fp": fp, **fields}
+        tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp.write_text(json.dumps(entry))
+            os.replace(tmp, path)
+        except OSError:
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
 
     # --- Codex -------------------------------------------------------------
     def _codex_creds(self) -> dict | None:
@@ -1863,6 +1998,17 @@ class Quota:
             return self._from_cached_claude(cached)
         if not tok:
             return Provider("claude", False, None, error="no claude accessToken"), None
+        # Siblings on the same credential source ask one at a time; the first answer serves the rest.
+        with self._shared_usage_lock() as shared:
+            if shared:
+                reused = self._shared_usage_reuse(fp)
+                if reused is not None:
+                    return reused
+            return self._claude_fetch(fp, tok, share=shared)
+
+    def _claude_fetch(self, fp: str | None, tok: str, *, share: bool) -> tuple[Provider, list[Reading] | None]:
+        """The network half of _claude_pass: one request to the usage endpoint. With `share`, the
+        outcome is published to sibling workers (see _shared_usage_reuse)."""
         headers = {"Authorization": f"Bearer {tok}", "anthropic-beta": CLAUDE_BETA, "User-Agent": "claude-code/2.1"}
         try:
             code, payload, retry_after = _http_get_json(CLAUDE_USAGE_URL, headers)
@@ -1881,6 +2027,10 @@ class Quota:
         # survives into. Always name the status code: an auth failure, a rate-limited endpoint and a
         # server error are different problems with different fixes, and none of them is "usage unknown".
         if code != 200 or not payload:
+            # Tell the siblings first, even when this worker can answer from its own cache: the
+            # back-off is about the endpoint, and any worker asking before it passes only prolongs it.
+            if code == 429 and share and retry_after:
+                self._shared_usage_record(fp, blocked_until=observed_at + retry_after)
             still = self._cached_claude(fp) if code != 401 else None
             if still is not None:
                 return self._from_cached_claude(still)
@@ -1904,6 +2054,8 @@ class Quota:
         valid_until = _claude_valid_until(readings)
         if valid_until is not None:
             self._store_raw("claude", payload, fp, valid_until, observed_at)
+            if share:
+                self._shared_usage_record(fp, fetched_at=observed_at, payload=payload, valid_until=valid_until)
         notes, bootstrap_recorded = self._idle_notes(readings)
         return self._claude_provider(readings, notes, bootstrap_recorded=bootstrap_recorded, now=observed_at), readings
 
