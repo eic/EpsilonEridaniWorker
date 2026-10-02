@@ -1326,8 +1326,14 @@ class Quota:
         First a reading younger than CLAUDE_USAGE_SHARE_S that passes the same checks as this worker's
         own cache. A reused reading is paced as of its fetch, never the present (see
         _from_cached_claude), so sharing it cannot make a launch look more permitted than it was when
-        the sibling fetched it. Failing that, a 429 whose Retry-After has not passed: every worker
-        waits it out, answering from its own valid cache meanwhile, exactly as after a 429 of its own.
+        the sibling fetched it. It is also kept as this worker's own cache entry, under its original
+        fetch time, so a worker that only ever reuses its siblings' readings still has one.
+
+        Failing that, a 429 whose Retry-After has not passed: every worker waits it out, answering
+        meanwhile from the best valid reading it can, exactly as after a 429 of its own. That is its own
+        cache if valid, else the shared reading if it is still within the private cache's own bounds
+        (QUOTA_TTL, and no reset it describes has passed).
+
         The token fingerprint must match, as for the private cache: an account switch in the shared
         file invalidates what the siblings learned."""
         paths = self._shared_usage_paths()
@@ -1335,21 +1341,22 @@ class Quota:
         if not entry or entry.get("fp") != fp:
             return None
         now = time.time()
-        at, payload = entry.get("fetched_at"), entry.get("payload")
-        if (
-            _finite_num(at)
-            and 0 <= now - at <= CLAUDE_USAGE_SHARE_S
-            and _claude_payload_problem(payload) is None
-            and (valid_until := _claude_valid_until(_claude_readings(payload))) is not None
-            and now < valid_until
-        ):
-            return self._from_cached_claude((payload, float(at)))
+        fresh = self._shared_reading(entry, now, CLAUDE_USAGE_SHARE_S)
+        if fresh is not None:
+            payload, at, valid_until = fresh
+            self._store_raw("claude", payload, fp, valid_until, at)
+            return self._from_cached_claude((payload, at))
         blocked = entry.get("blocked_until")
         if not (_finite_num(blocked) and now < blocked):
             return None
         own = self._cached_claude(fp)
         if own is not None:
             return self._from_cached_claude(own)
+        usable = self._shared_reading(entry, now, QUOTA_TTL["claude"])
+        if usable is not None:
+            payload, at, valid_until = usable
+            self._store_raw("claude", payload, fp, valid_until, at)
+            return self._from_cached_claude((payload, at))
         return (
             Provider(
                 "claude",
@@ -1360,6 +1367,20 @@ class Quota:
             ),
             None,
         )
+
+    @staticmethod
+    def _shared_reading(entry: dict, now: float, max_age: float) -> tuple[dict, float, float] | None:
+        """(payload, fetched_at, valid_until) of the shared entry's reading if at most `max_age` old,
+        well-formed, and still describing the windows it was fetched for; else None."""
+        at, payload = entry.get("fetched_at"), entry.get("payload")
+        if not (_finite_num(at) and 0 <= now - at <= max_age):
+            return None
+        if _claude_payload_problem(payload) is not None:
+            return None
+        valid_until = _claude_valid_until(_claude_readings(payload))
+        if valid_until is None or now >= valid_until:
+            return None
+        return payload, float(at), valid_until
 
     def _shared_usage_record(self, fp: str | None, **fields) -> None:
         """Publish a usage outcome to the siblings: a reading, or a Retry-After deadline. Best effort.

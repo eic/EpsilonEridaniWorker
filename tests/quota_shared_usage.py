@@ -65,6 +65,7 @@ try:
     check("a sibling reuses it instead of fetching", len(calls), 1)
     check("...reaching the same verdict", (second.available, second.error), (first.available, first.error))
     check("...with real readings", bool(readings), True)
+    check("...and keeps it as its own cache entry", b._cached_claude("fp") is not None, True)
 
     entry = json.loads(shared_file.read_text())
     entry["fetched_at"] = time.time() - tc.quota.CLAUDE_USAGE_SHARE_S - 5
@@ -108,6 +109,30 @@ try:
     a._store_raw("claude", payload, "fp", time.time() + 3600, time.time())
     own, _ = a._claude_pass("fp", "token", refresh=True)
     check("a held-back sibling answers from its own valid cache", (len(calls) - n, own.error), (1, None))
+
+    # A late-joining worker has no cache of its own. Held back by a sibling's Retry-After, it paces on
+    # the shared reading, which is past the sharing window but still valid by the private cache's rules.
+    late = worker("late")
+    entry = json.loads(shared_file.read_text())
+    entry.update(
+        payload=payload,
+        fetched_at=time.time() - tc.quota.CLAUDE_USAGE_SHARE_S - 5,
+        blocked_until=time.time() + 600,
+    )
+    shared_file.write_text(json.dumps(entry))
+    n = len(calls)
+    paced, _ = late._claude_pass("fp", "token", refresh=True)
+    check("a held-back worker with no cache paces on the shared reading", (len(calls) - n, paced.error), (0, None))
+    entry["fetched_at"] = time.time() - tc.quota.QUOTA_TTL["claude"] - 5
+    shared_file.write_text(json.dumps(entry))
+    late._forget_raw("claude")
+    shared_file.write_text(json.dumps(entry))  # _forget_raw dropped it; restore the too-old reading
+    parked, _ = late._claude_pass("fp", "token", refresh=True)
+    check(
+        "...but not on one older than the cache TTL",
+        (len(calls) - n, "Retry-After" in (parked.error or "")),
+        (0, True),
+    )
 
     forget_all()
     answer["value"] = (429, {}, None)
