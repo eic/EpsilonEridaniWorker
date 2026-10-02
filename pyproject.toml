@@ -1,17 +1,56 @@
 [build-system]
-requires = ["hatchling", "hatch-vcs"]
+requires = ["hatchling>=1.27", "hatch-vcs", "hatch-fancy-pypi-readme"]
 build-backend = "hatchling.build"
 
 [project]
 name = "epsiloneridani"
-dynamic = ["version"]
+dynamic = ["version", "readme"]
 description = "Autonomous worker for the eic/EpsilonEridani Lean library"
 requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Wouter Deconinck" }]
+keywords = ["lean", "lean4", "mathlib", "formalization", "ai-agents", "claude", "codex", "automation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Software Development :: Build Tools",
+]
 dependencies = [
     "epsiloneridani-progress>=0.1.0",
     "rich>=13",
     "textual>=8,<9",
 ]
+
+[project.urls]
+Homepage = "https://github.com/eic/EpsilonEridaniWorker"
+Documentation = "https://github.com/eic/EpsilonEridaniWorker/tree/main/docs"
+Source = "https://github.com/eic/EpsilonEridaniWorker"
+Issues = "https://github.com/eic/EpsilonEridaniWorker/issues"
+Changelog = "https://github.com/eic/EpsilonEridaniWorker/releases"
+
+# The PyPI description is the README, with its relative links (docs/...) made absolute, since PyPI
+# renders the text on its own and a relative link there leads nowhere.
+[tool.hatch.metadata.hooks.fancy-pypi-readme]
+content-type = "text/markdown"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.fragments]]
+path = "README.md"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '\]\((?!https?://|#|mailto:)([^)]+)\)'
+replacement = '](https://github.com/eic/EpsilonEridaniWorker/blob/main/\1)'
 
 [tool.hatch.version]
 source = "vcs"
