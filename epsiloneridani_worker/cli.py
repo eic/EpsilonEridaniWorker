@@ -803,6 +803,18 @@ def cmd_work(args, *, only: list[str], agent: str, one_round: bool, prs: tuple[i
         raise Die("--author-model/--author-effort require an explicit --agent; auto may choose another provider")
     if author_effort and agent in OPENROUTER_MODELS:
         raise Die(f"--author-effort is not supported for the OpenRouter provider {agent!r}")
+    if agent == "local":
+        # Reviews go through the review engine, which has no local provider; the default cascade ends
+        # in review, so the stages must be named. Bubble cannot reach a cluster-internal endpoint.
+        if not only or "review" in only:
+            raise Die(
+                "--agent local authors only: pass --only with the stages it should run "
+                "(e.g. --only fix-ci,lint-repair or --only roadmap), without review"
+            )
+        if getattr(args, "bubble", False):
+            raise Die("--agent local runs on the host only; it is not supported with --bubble")
+        if author_effort:
+            raise Die("--author-effort is not supported for the local agent")
     # --roadmap-only overrides the env for this run (and is inherited by loop children, which read it
     # live via roadmap_only()). Empty string is a meaningful value: "all areas".
     if getattr(args, "roadmap_only", None) is not None:
@@ -1029,6 +1041,7 @@ def cmd_doctor(args) -> int:
     rows.append(("pi", _have("pi"), "for --agent deepseek/minimax"))
     rows.append(("kiro-cli", _have("kiro-cli"), "for --agent kiro"))
     rows.append(("agy", _have("agy"), "for --agent gemini"))
+    rows.append(("pi", _have("pi"), "for --agent local"))
     rows.append(("tmux", _have("tmux"), "optional `epsiloneridani workers tmux` log workspace"))
     codex_creds = codex_dir(cfg.home) / "auth.json"
     rows.append(("codex creds", _safe_exists(codex_creds), str(codex_creds)))

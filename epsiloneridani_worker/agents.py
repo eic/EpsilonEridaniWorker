@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:  # annotations only; importing at runtime would invert the layer order
     from .work_units import RoundOpts, Worker
 
-from . import build_caches
+from . import build_caches, local_endpoint
 from .config import Config, Die, NoProgress, log
 from .constants import (
     AUTHORING_DEFAULTS,
@@ -107,6 +107,10 @@ def resolve_authoring_profile(
         default_model, default_effort = AUTHORING_DEFAULTS[provider]
     elif provider in OPENROUTER_MODELS:
         default_model, default_effort = OPENROUTER_MODELS[provider], None
+    elif provider == "local":
+        # The alias the endpoint file names; the weights behind it are the server's business (see
+        # local_endpoint). Read lazily so a worker that never selects `local` never needs the file.
+        default_model, default_effort = (_local_default_model(), None)
     else:
         raise Die(f"no authoring profile for provider {provider!r}")
 
@@ -124,6 +128,8 @@ def resolve_authoring_profile(
     env_effort = (os.environ.get(effort_env) or "").strip() or None
     if provider in OPENROUTER_MODELS and (cli_effort or env_effort):
         raise Die(f"authoring effort is not supported for OpenRouter agent {provider}")
+    if provider == "local" and (cli_effort or env_effort):
+        raise Die("authoring effort is not supported for the local agent")
     if cli_effort:
         effort, effort_source = cli_effort, "--author-effort"
     elif env_effort:
@@ -593,6 +599,66 @@ def fetch_git_source(url: str, dir: Path) -> bool:
     return _fetch_shallow(url, dir)
 
 
+def _read_local_endpoint() -> local_endpoint.Endpoint:
+    """The endpoint for a round about to launch. The loop's gate saw it a moment ago; if the serving
+    job has gone since, this round backs off (NoProgress) rather than stopping the worker."""
+    try:
+        return local_endpoint.read_endpoint()
+    except local_endpoint.EndpointDown as e:
+        raise NoProgress(f"local endpoint: {e}") from e
+
+
+def _local_default_model() -> str:
+    ep = _read_local_endpoint()
+    if not ep.model:
+        raise Die(f"{ep.source} sets no OPENAI_MODEL; pass --author-model to name the served model")
+    return ep.model
+
+
+def _pi_executable() -> str:
+    """`pi` for the local agent: $EPSILONERIDANI_PI, else on PATH, else beside this interpreter (a
+    venv that installed node + pi via nodeenv). Falls back to the bare name so preflight reports it."""
+    explicit = (os.environ.get("EPSILONERIDANI_PI") or "").strip()
+    if explicit:
+        return explicit
+    found = shutil.which("pi")
+    if found:
+        return found
+    beside = Path(sys.executable).parent / "pi"
+    return str(beside) if beside.exists() else "pi"
+
+
+def _local_agent_argv(prompt: str, model: str, env: dict) -> tuple[list[str], dict]:
+    """pi driving the self-hosted endpoint. The endpoint file is re-read here, for every round,
+    because the serving job rewrites it whenever it moves. With an empty prompt (a preflight asking
+    only which executable to check) nothing is read or written."""
+    pi = _pi_executable()
+    # pi's entry point is `#!/usr/bin/env node`. When pi sits in a venv's bin/ beside its own node
+    # (nodeenv), launch that node explicitly rather than prepending the venv's bin/ to PATH, which
+    # would also put the venv's python and pip ahead of the system ones for every command the
+    # agent runs.
+    node = Path(pi).parent / "node" if os.sep in pi else None
+    launcher = [str(node), pi] if node is not None and node.exists() else [pi]
+    argv = [*launcher, "--provider", local_endpoint.PI_PROVIDER, "--model", model, "--print", "--no-session"]
+    if not prompt:
+        return [*argv, prompt], env
+    ep = _read_local_endpoint()
+    agent_dir = local_endpoint.write_pi_agent_dir(
+        ep,
+        model,
+        Path(os.environ.get("EPSILONERIDANI_DATA_HOME") or Path.home()) / ".cache" / "epsiloneridani" / "pi-local",
+    )
+    env = {k: v for k, v in env.items() if k not in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OPENROUTER_API_KEY")}
+    env.update(
+        {
+            local_endpoint.API_KEY_ENV: ep.api_key or "none",
+            "PI_CODING_AGENT_DIR": str(agent_dir),
+            "PI_OFFLINE": "1",  # no startup update checks or package fetches from an unattended round
+        }
+    )
+    return [*argv, prompt], env
+
+
 def host_agent_argv(prompt: str, profile: AuthoringProfile | str) -> tuple[list[str], dict]:
     """The exact argv + env for the host work agent. HERE is on PATH so the agent
     resolves git-safe-push / gh-safe-pr-create / claim.sh; close_fds=True replaces `9>&-`."""
@@ -630,6 +696,8 @@ def host_agent_argv(prompt: str, profile: AuthoringProfile | str) -> tuple[list[
         argv += [prompt]
     elif profile.provider in OPENROUTER_MODELS:
         argv = [PI_RUN, "openrouter", profile.model, "--prompt", prompt]
+    elif profile.provider == "local":
+        argv, env = _local_agent_argv(prompt, profile.model, env)
     else:  # claude (Opus); ANTHROPIC_API_KEY unset so it bills the Max plan
         env.pop("ANTHROPIC_API_KEY", None)
         base = shlex_split(CLAUDE_CMD) or ["claude"]  # empty / whitespace-only falls back, not a broken argv
@@ -1205,7 +1273,7 @@ def ensure_bubble_home(cfg: Config) -> dict:
 def _uses_claude_credentials(work_model: str) -> bool:
     """Keep Bubble's Claude credential flag and macOS private-seed decision on one predicate."""
     models = {m.strip() for m in work_model.split(",")}
-    known_non_claude = {"codex", "kiro", *OPENROUTER_MODELS}
+    known_non_claude = {"codex", "kiro", "local", *OPENROUTER_MODELS}
     return bool(models & {"claude", "sonnet"}) or not models <= known_non_claude
 
 
@@ -1265,6 +1333,10 @@ def agent_inner_cmd(profile: AuthoringProfile | str) -> str:
             f"{shlex.quote(profile.model)}{effort} -c {summary} -c {raw_reasoning} "
             '--sandbox danger-full-access --skip-git-repo-check "$(cat /opt/round/prompt.txt)"'
         )
+    if profile.provider == "local":
+        # A self-hosted endpoint is typically on a cluster-internal address the Bubble egress proxy
+        # cannot reach, and its key would need its own staging. Host mode only, for now.
+        raise Die("--agent local runs on the host only; it is not supported with --bubble")
     if profile.provider in OPENROUTER_MODELS:
         return (
             'env ANTHROPIC_API_KEY= OPENAI_API_KEY= OPENROUTER_API_KEY="$(cat /opt/round/openrouter.key)" '

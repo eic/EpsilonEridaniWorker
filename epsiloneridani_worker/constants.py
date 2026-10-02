@@ -242,6 +242,7 @@ AGENT_NAMES = {
     "deepseek": "DeepSeek",
     "minimax": "MiniMax",
     "gemini": "Gemini",
+    "local": "Local model",
 }
 
 # Reproducible authoring defaults. Provider selection remains quota-driven; once
@@ -311,4 +312,4 @@ SANDBOX_DEFAULT = {t: True for t in WORK_TASKS}
 SANDBOX_DEFAULT["progress"] = False
 
 
-AGENTS = ["auto", "codex", "claude", "kiro", "deepseek", "minimax", "gemini"]
+AGENTS = ["auto", "codex", "claude", "kiro", "deepseek", "minimax", "gemini", "local"]
