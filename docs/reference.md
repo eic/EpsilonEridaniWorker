@@ -219,6 +219,7 @@ Flags win over these. Most are tuning knobs with sane defaults.
 | `EPSILONERIDANI_CLAUDE_USAGE_SHARE_S` | `300` | How old a sibling worker's Claude usage reading may be and still be reused instead of fetched (see [sharing one usage reading](quota.md#sharing-one-usage-reading)). |
 | `EPSILONERIDANI_ROUND_TIMEOUT` | `5400` | Hard cap per round (seconds). |
 | `EPSILONERIDANI_MAX_OPEN_PRS` | `8` | Open PRs in the selected roadmap scope at which authoring stops (see [roadmap backpressure](#roadmap-backpressure)). |
+| `EPSILONERIDANI_GRACEFUL_RESTART_TIMEOUT` | `ROUND_TIMEOUT` + 600 | Seconds a graceful restart (a changed definition, `workers restart --after-round`) waits for the worker to stop between rounds before stopping it outright. |
 | `EPSILONERIDANI_INTERROUND` | `20` | Minimum gap after a productive round (seconds). |
 | `EPSILONERIDANI_BACKOFF_BASE` / `EPSILONERIDANI_BACKOFF_MAX` | `30` / `900` | The escalating no-progress back-off (seconds). |
 | `EPSILONERIDANI_PROGRESS_GAP` | `28800` | Minimum gap between progress-report attempts (seconds; eight hours by default). |

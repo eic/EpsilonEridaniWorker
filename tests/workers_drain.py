@@ -24,17 +24,30 @@ for key in ("EPSILONERIDANI_CONFIG_HOME", "EPSILONERIDANI_WORKERS_CONFIG", "EPSI
 os.environ["XDG_CONFIG_HOME"] = str(root / "config")
 os.environ["XDG_STATE_HOME"] = str(root / "state")
 os.environ["EPSILONERIDANI_RUNTIME_DIR"] = str(root / "run")
+# A graceful restart a worker never honours is forced after this; the stand-in "rounds" take 1s.
+os.environ["EPSILONERIDANI_GRACEFUL_RESTART_TIMEOUT"] = "4"
 # Stands in for `work --loop`: run until a drain is requested, then take a moment to "finish the round
 # in flight" before exiting 0, as the real loop does. If the manager killed it instead, the runner would
 # record the stop ("stopped") rather than the clean exit ("exited").
+# It logs how each run ended, beside its status file: "graceful" after finishing its round, "killed"
+# when it was stopped, which tells a graceful restart from a kill.
 os.environ["EPSILONERIDANI_MANAGER_TEST_COMMAND"] = shlex.join(
     [
         sys.executable,
         "-c",
-        "import os, pathlib, time\n"
-        "marker = pathlib.Path(os.environ['EPSILONERIDANI_RUNTIME_STATUS']).with_suffix('.drain')\n"
+        "import os, pathlib, signal, sys, time\n"
+        "status = pathlib.Path(os.environ['EPSILONERIDANI_RUNTIME_STATUS'])\n"
+        "def note(event):\n"
+        "    with open(status.with_suffix('.events'), 'a') as out: out.write(event + '\\n')\n"
+        "def killed(*_):\n"
+        "    note('killed'); sys.exit(143)\n"
+        "signal.signal(signal.SIGTERM, killed)\n"
+        "note('start')\n"
+        "while os.environ.get('STANDIN_IGNORES_DRAIN'): time.sleep(0.05)\n"  # a worker that cannot drain
+        "marker = status.with_suffix('.drain')\n"
         "while not marker.exists(): time.sleep(0.05)\n"
-        "time.sleep(1)\n",
+        "time.sleep(1)\n"
+        "note('graceful')\n",
     ]
 )
 
@@ -216,6 +229,68 @@ try:
     wm.resume_workers(config, ["off"], every=False)
     record = wm.read_json(wm.status_path("off"))
     check("resume leaves a failed worker's record alone", (record.get("state"), record.get("exit_code")), ("failed", 1))
+
+    # --- graceful restarts: one worker at a time, the round in flight finished first ------------------
+    def events(w):
+        try:
+            return wm.status_path(w).with_suffix(".events").read_text().split()
+        except FileNotFoundError:
+            return []
+
+    def wrapper(w):
+        return wm.runner_status(w).get("wrapper_pid")
+
+    def restarted(w, before):
+        return lambda: wm.runner_status(w).get("alive") and wrapper(w) not in (None, before)
+
+    check("both are running again", bool(wait_for(both_alive)), True)
+    before, seen = wrapper("w1"), len(events("w1"))
+    other = wrapper("w2")
+    wm.cmd_workers(SimpleNamespace(workers_action="restart", config=config, worker_id="w1", after_round=True))
+    check("restart --after-round relaunches the worker", bool(wait_for(restarted("w1", before))), True)
+    new = events("w1")[seen:]
+    check("...after it finished its round, without being killed", ("graceful" in new, "killed" in new), (True, False))
+    check("...and leaves its sibling alone", wrapper("w2"), other)
+    check("...and clears its request", wm.drain_path("w1").exists(), False)
+
+    # Rolling out a new definition to one worker: it takes effect after that worker's round, not mid-round.
+    before, seen = wrapper("w1"), len(events("w1"))
+    config.write_text(config.read_text().replace('id = "w1"\n', 'id = "w1"\n\n[workers.env]\nROLLOUT = "2"\n', 1))
+    new_hash = {s.id: s for s in wm.load_worker_specs(config)}["w1"].fingerprint()
+    check("a changed definition restarts the worker", bool(wait_for(restarted("w1", before))), True)
+    new = events("w1")[seen:]
+    check("...after its round, without being killed", ("graceful" in new, "killed" in new), (True, False))
+    check("...running the new definition", wm.runner_status("w1").get("spec_hash"), new_hash)
+    check("...while its sibling keeps running", wrapper("w2"), other)
+
+    # A drained worker whose definition changes stays down until resumed.
+    check("drain w2", wm.drain_workers(config, ["w2"], every=False, wait=True, timeout=20), 0)
+    config.write_text(config.read_text().replace('id = "w2"\n', 'id = "w2"\n\n[workers.env]\nROLLOUT = "2"\n', 1))
+    time.sleep(1.0)
+    check("a drained worker is not relaunched by a definition change", wm.runner_status("w2").get("alive"), False)
+    wm.resume_workers(config, ["w2"], every=False)
+    check("...until resumed", bool(wait_for(lambda: wm.runner_status("w2").get("alive"))), True)
+
+    # Disabling is still immediate: the worker is stopped, round and all.
+    seen = len(events("w1"))
+    wm._mutate_enabled(config, "w1", False)
+    check("disable still stops a worker at once", bool(wait_for(lambda: not wm.runner_status("w1").get("alive"))), True)
+    check("...killing it rather than waiting for its round", events("w1")[seen:], ["killed"])
+
+    # A worker that cannot drain (older than drain support, or hung) must not hold a restart up for ever.
+    config.write_text(
+        config.read_text() + '\n[[workers]]\nid = "stubborn"\n\n[workers.env]\nSTANDIN_IGNORES_DRAIN = "1"\n'
+    )
+    check(
+        "a worker that ignores drains starts", bool(wait_for(lambda: wm.runner_status("stubborn").get("alive"))), True
+    )
+    before, seen = wrapper("stubborn"), len(events("stubborn"))
+    asked = time.monotonic()
+    wm.request_drain("stubborn", restart=True)
+    check("its graceful restart is forced after the timeout", bool(wait_for(restarted("stubborn", before), 20)), True)
+    check("...not before it", time.monotonic() - asked >= 4, True)
+    check("...by stopping it", "killed" in events("stubborn")[seen:], True)
+    check("...and the request is cleared", wm.drain_path("stubborn").exists(), False)
 finally:
     if manager is not None:
         wm.manager_request("shutdown", stop_workers=True)

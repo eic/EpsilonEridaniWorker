@@ -29,7 +29,7 @@ import uuid
 from pathlib import Path
 from typing import NoReturn
 
-from .constants import AGENTS, ALLOWED_TASKS
+from .constants import AGENTS, ALLOWED_TASKS, ROUND_TIMEOUT
 from .paths import HERE, ensure_ssl_cert_file, entry_cmd, self_argv, self_env
 from .quota import parse_pace_curve
 from .round import signal_group
@@ -37,6 +37,10 @@ from .runtime_status import STATUS_ENV, drain_marker, read_json, update_status
 
 CONFIG_VERSION = 1
 DEFAULT_INTERVAL = 2.0
+# How long a graceful restart (a changed definition, `restart --after-round`) waits for the worker to stop
+# between rounds before it is stopped outright. A healthy round ends within ROUND_TIMEOUT, so this only
+# catches a worker that cannot drain: one older than drain support (0.9.0), or a loop that has hung.
+GRACEFUL_RESTART_TIMEOUT_S = int(os.environ.get("EPSILONERIDANI_GRACEFUL_RESTART_TIMEOUT") or ROUND_TIMEOUT + 600)
 TMUX_SESSION = "epsiloneridani-workers"
 _WORKER_KEYS = {
     "id",
@@ -525,6 +529,24 @@ def drain_path(worker_id: str, state_dir: Path | None = None) -> Path:
     return drain_marker(status_path(worker_id, state_dir))
 
 
+def request_drain(worker_id: str, *, restart: bool, state_dir: Path | None = None) -> None:
+    """Ask a worker to stop between rounds. With `restart`, the manager launches it again as soon as it
+    has: a graceful restart, which is how a changed definition reaches a worker without killing the
+    round it is in. Without, it stays down until `resume`. A plain drain wins over a pending restart,
+    since it is the more conservative request."""
+    marker = drain_path(worker_id, state_dir)
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    request: dict = {"requested_at": time.time()}
+    if restart:
+        request["restart"] = True
+    marker.write_text(json.dumps(request) + "\n")
+
+
+def drain_restarts(worker_id: str, state_dir: Path | None = None) -> bool:
+    """Whether the worker's drain marker asks for a relaunch after the round (see request_drain)."""
+    return bool(read_json(drain_path(worker_id, state_dir)).get("restart"))
+
+
 def runner_socket(worker_id: str, runtime_dir: Path | None = None) -> Path:
     return (runtime_dir or workers_runtime_dir()) / f"w-{worker_id}.sock"
 
@@ -606,9 +628,10 @@ def worker_snapshots(specs: list[WorkerSpec] | None = None, config: Path | None 
             elif actual.get("spec_hash") != spec.fingerprint():
                 state_name = "restarting"
             elif draining:
-                state_name = "draining"
+                state_name = "restarting" if drain_restarts(wid) else "draining"
         elif spec and spec.enabled and draining:
-            state_name = "drained"
+            # A graceful restart is relaunched on the manager's next pass, not left down.
+            state_name = "restarting" if drain_restarts(wid) else "drained"
         elif spec and spec.enabled:
             state_name = "missing" if not actual else str(actual.get("state") or "stale")
         else:
@@ -961,9 +984,40 @@ def run_manager(config: Path, interval: float = DEFAULT_INTERVAL) -> int:
                     ):
                         update_status(status_path(wid, state_dir), restart_count=0)
                         launch_failures.pop(wid, None)
-                    if is_live and (not should_run or changed or wid in restart_ids):
+                    # Disabling, removing and an explicit `workers restart` stop a live worker at once.
+                    if is_live and (not should_run or wid in restart_ids):
                         _stop_runner(wid, runtime_dir)
                         continue
+                    # A changed definition does not: the worker finishes the round it is in, and the
+                    # new definition starts after it (a graceful restart, launched below once it has
+                    # exited). That is what lets one worker at a time take a new configuration without
+                    # discarding work. A drain already in place is left as the operator asked.
+                    # A graceful restart the worker has not honoured in time is forced: it cannot drain
+                    # (it predates drain support, or its loop has hung), and the restart must still land.
+                    if is_live and draining and drain_restarts(wid, state_dir):
+                        asked = read_json(drain_path(wid, state_dir)).get("requested_at")
+                        if isinstance(asked, (int, float)) and time.time() - asked > GRACEFUL_RESTART_TIMEOUT_S:
+                            _stop_runner(wid, runtime_dir)  # relaunched below once it is down
+                            continue
+                    if is_live and changed:
+                        if not draining:
+                            request_drain(wid, restart=True, state_dir=state_dir)
+                        continue
+                    # The worker stopped for a graceful restart: clear the request and launch it again.
+                    # It is forced, because a clean exit is otherwise terminal for `on-failure`/`never`.
+                    if (
+                        not is_live
+                        and draining
+                        and should_run
+                        and wid not in children
+                        and drain_restarts(wid, state_dir)
+                    ):
+                        try:
+                            drain_path(wid, state_dir).unlink()
+                        except FileNotFoundError:
+                            pass
+                        draining = False
+                        restart_ids.add(wid)
                     if is_live or not should_run or draining or wid in children:
                         if not is_live and spec is None and live.get("managed"):
                             for stale in (
@@ -1415,6 +1469,7 @@ def _worker_status_lines(config: Path, snapshots: list[dict], online: bool, *, w
             "waiting-quota": "waiting for quota",
             "draining": "draining (stops after its current round)",
             "drained": f"drained (resume with `epsiloneridani workers resume {item['id']}`)",
+            "restarting": "restarting after its current round",
         }.get(state, state)
         heading = f"{item['id']} — {display_state}"
         if item["desired"] == "stopped" or state in {"missing", "restarting", "stale", "stopped", "stopping"}:
@@ -1491,9 +1546,7 @@ def drain_workers(config: Path, worker_ids: list[str], *, every: bool, wait: boo
     does not need the manager to be running, and it survives a manager or service restart."""
     targets = _drain_targets(config, worker_ids, every)
     for spec in targets:
-        marker = drain_path(spec.id)
-        marker.parent.mkdir(parents=True, exist_ok=True)
-        marker.write_text(json.dumps({"requested_at": time.time()}) + "\n")
+        request_drain(spec.id, restart=False)
     ids = [spec.id for spec in targets]
     print(f"drain requested: {', '.join(ids) or '(no enabled workers)'}")
     if not wait:
@@ -1941,6 +1994,12 @@ def add_workers_parser(subparsers) -> None:
     for action in ("enable", "disable", "restart", "remove"):
         item = actions.add_parser(action, help=descriptions[action])
         item.add_argument("worker_id", help="worker id")
+        if action == "restart":
+            item.add_argument(
+                "--after-round",
+                action="store_true",
+                help="let the worker finish the round it is in, then restart it (by default it restarts at once)",
+            )
     drain = actions.add_parser(
         "drain",
         help="stop workers between rounds: each finishes its current round, then stays down until `resume`",
@@ -2094,6 +2153,13 @@ def cmd_workers(args) -> int:
         if action == "resume":
             return resume_workers(config, args.worker_ids, every=args.all_workers)
         if action == "restart":
+            if args.after_round:
+                if not any(spec.id == args.worker_id for spec in load_worker_specs(config)):
+                    raise WorkersError(f"unknown worker: {args.worker_id}")
+                request_drain(args.worker_id, restart=True)
+                ensure_manager(config)
+                print(f"restart requested: {args.worker_id} restarts after its current round")
+                return 0
             restart_worker(config, args.worker_id)
             return 0
         if action == "logs":
