@@ -80,6 +80,22 @@ try:
     wm.save_worker_specs(config, specs)
     assert wm.load_worker_specs(config) == specs
 
+    # `workers add/enable/disable/remove` rewrite the file, so a definition with an `env` table must
+    # survive the writer. It used to raise "cannot encode TOML value of type dict" instead.
+    with_env = [
+        *specs,
+        wm.WorkerSpec.from_dict(
+            {"id": "worker4", "agent": "claude", "env": {"LAKE_CACHE_DIR": '/scratch/a b/"c"', "A_1": "x"}}, 3
+        ),
+    ]
+    wm.save_worker_specs(config, with_env)
+    assert "[workers.env]" in config.read_text(), "written as a sub-table, as documented"
+    assert wm.load_worker_specs(config) == with_env, "an env table round-trips through the writer"
+    wm._mutate_enabled(config, "worker4", False)
+    disabled = {spec.id: spec for spec in wm.load_worker_specs(config)}["worker4"]
+    assert disabled.enabled is False and disabled.env == with_env[-1].env, "disable keeps the env table"
+    wm.save_worker_specs(config, specs)
+
     # Bare `epsiloneridani workers` is the documented shorthand for `workers status`.
     bare_workers = build_parser().parse_args(["workers"])
     assert bare_workers.workers_action is None
