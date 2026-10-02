@@ -121,7 +121,19 @@ def cmd_loop(args, cfg: Config, *, only: list[str], agent: str, prs: tuple[int, 
             # while a window of it is reset-but-unopened: the round is authorized to spend ONE small
             # request to open it, but only once it has found work (see work_units.dispatch).
             pending_init = False
-            if unpaced:
+            if agent == "local":
+                # No subscription to pace against: availability is reachability. A serving job that
+                # ended or is still queued leaves an address nobody answers on — wait for the next
+                # one rather than launch a round that fails at its first request.
+                live, detail = local_agent_available(getattr(args, "author_model", None))
+                if not live:
+                    log(f"local endpoint: {detail} — sleeping {POLL}s")
+                    report_runtime("waiting-quota", detail=detail, next_action_at=time.time() + POLL)
+                    _sleep(POLL)
+                    continue
+                log(f"local endpoint: serving {detail}")
+                model = agent
+            elif unpaced:
                 model = agent  # explicit unpaced provider; no subscription quota wait
             elif ignore_quota and not quota_cmd:
                 # --ignore-quota overrides PACING (the soft over-pace throttle), not AVAILABILITY. We
@@ -223,11 +235,19 @@ def cmd_loop(args, cfg: Config, *, only: list[str], agent: str, prs: tuple[int, 
                 # spends the request. The GitHub preflight above has already passed at this point.
                 tail.append("--claude-bootstrap")
             if model:
-                profile = resolve_authoring_profile(
-                    model,
-                    cli_model=getattr(args, "author_model", None),
-                    cli_effort=getattr(args, "author_effort", None),
-                )
+                try:
+                    profile = resolve_authoring_profile(
+                        model,
+                        cli_model=getattr(args, "author_model", None),
+                        cli_effort=getattr(args, "author_effort", None),
+                    )
+                except NoProgress as e:
+                    # Only the local agent raises this here: its endpoint file vanished between the
+                    # availability gate above and now (the serving job ended). Same wait as the gate's.
+                    log(f"{e} — sleeping {POLL}s")
+                    report_runtime("waiting-quota", detail=str(e), next_action_at=time.time() + POLL)
+                    _sleep(POLL)
+                    continue
                 # Pin the exact parent-resolved profile into the isolated child. The
                 # child must not re-read a different HOME or upstream CLI default. Preserve fallback
                 # provenance separately: --author-model alone looks like an operator pin to the child.
@@ -335,6 +355,21 @@ def choose_model(
     return Quota(cfg).choose(None if agent == "auto" else agent, refresh=refresh, renew=renew)
 
 
+def local_agent_available(author_model: str | None = None) -> tuple[bool, str]:
+    """(live, detail) for `--agent local`: re-read the endpoint file and probe it. An absent file (no
+    serving job) or an endpoint that does not answer is a wait; an unset setting or a malformed file
+    is a configuration error and stops the worker (Die). The probe asks for the model the round will
+    actually launch: `author_model` (--author-model) when given, else the authoring profile's."""
+    from . import local_endpoint
+    from .agents import resolve_authoring_profile
+
+    try:
+        ep = local_endpoint.read_endpoint()
+    except local_endpoint.EndpointDown as e:
+        return False, str(e)
+    return local_endpoint.probe(ep, resolve_authoring_profile("local", cli_model=author_model).model)
+
+
 def _credential_hint(agent: str, prov: Provider | None) -> str:
     """What to do about a provider that refused the credential, or "" when that is not what happened.
 
@@ -397,7 +432,14 @@ def claude_pending_init(snap: dict) -> bool:
 
 
 def resolve_work_model(
-    cfg: Config, agent: str, *, dry: bool, ignore_quota: bool, quota_cmd: str | None = None, fresh: bool = False
+    cfg: Config,
+    agent: str,
+    *,
+    dry: bool,
+    ignore_quota: bool,
+    quota_cmd: str | None = None,
+    fresh: bool = False,
+    author_model: str | None = None,
 ) -> tuple[str, bool]:
     """Turn the --agent dial into (concrete model, needs-launch-stage-bootstrap). 'auto' consults the
     pacer (or --quota-cmd); codex preferred, opus fallback. Kiro and OpenRouter agents are explicit
@@ -416,6 +458,11 @@ def resolve_work_model(
     if dry:
         return agent, False
     if agent in OPENROUTER_MODELS or agent == "kiro":
+        return agent, False
+    if agent == "local":
+        live, detail = local_agent_available(author_model)
+        if not live:
+            raise NoProgress(f"local endpoint: {detail}")
         return agent, False
     if ignore_quota and not quota_cmd and agent == "auto":
         raise SystemExit(

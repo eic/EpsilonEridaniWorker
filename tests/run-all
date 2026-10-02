@@ -57,6 +57,7 @@ RUN_STDLIB=(
   isolate_home_paths.py
   kiro.py
   ledger_blocking.py
+  local_agent.py
   loop_sigterm.py
   mirror_creds.py
   mirror_creds_macos.py

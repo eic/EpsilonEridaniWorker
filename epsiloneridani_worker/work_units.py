@@ -592,6 +592,11 @@ def _host_agent_binary(stage: str, model: str) -> str | None:
         if model in OPENROUTER_MODELS:
             return "pi"
         return {"codex": "codex", "claude": "claude", "kiro": "kiro-cli"}.get(model)
+    if model == "local":
+        # The launcher may be `node <pi>`; the executable worth gating on is pi itself.
+        from .agents import _pi_executable
+
+        return _pi_executable()
     argv, _ = host_agent_argv("", model)
     return argv[0] if argv else None
 

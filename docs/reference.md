@@ -12,7 +12,7 @@ list is in `epsiloneridani work -h`. For persistent workers, see
 | `--only TASKS` | Restrict the round to a comma list of `rebase,bump,progress,fix-ci,fix,review,roadmap,lint-repair` (default: the whole cascade). |
 | `--skip TASKS` | Drop a comma list of tasks from the cascade. Combines with `--only` by subtraction. |
 | `--pr N[,N...]` | Work only on these pull requests (comma list or repeated flag; a leading `#` is accepted). A filter over what the round would already have done: it can never make a PR actionable that the survey passed over, and never bypasses branch claims, attempt budgets, the daily review cap, or a peer's in-progress review. Intersects with `--only`; `progress` and `roadmap` name no existing PR, so a targeted round drops them rather than falling through to unrelated work, and it makes no GitHub writes about PRs you did not name. When none of the named PRs are actionable the round reports why for each one and exits without progress. An empty or unreadable value (`--pr ""`, `--pr ,,`) is an error rather than silently no targeting. |
-| `--agent AGENT` | `auto` (default), `codex`, `claude`, `kiro`, `deepseek`, or `minimax`. Kiro and OpenRouter providers are explicit-only and unpaced. |
+| `--agent AGENT` | `auto` (default), `codex`, `claude`, `kiro`, `deepseek`, `minimax`, `gemini`, or `local`. Kiro, OpenRouter and local providers are explicit-only and unpaced. |
 | `--author-model MODEL` | Exact authoring model for an explicit provider (CLI > provider environment > committed default). |
 | `--author-effort EFFORT` | Authoring reasoning effort for an explicit Codex, Claude, or Kiro provider. |
 | `--account EMAIL_OR_ID` | Require the Codex credential to be this account (email, or the workspace UUID `epsiloneridani doctor` prints) and refuse to run otherwise. Checks only; never switches. Needs an explicit `--agent codex`. |
@@ -132,6 +132,51 @@ Reviews use the independent `EPSILONERIDANI_REVIEW_KIRO_MODEL` pin, defaulting t
 same exact Sol ID. Use `KIRO_API_KEY` for headless authentication or
 `kiro-cli login` for a persisted browser login.
 
+## Local models
+
+`--agent local` runs [`pi`](https://github.com/badlogic/pi-mono) against a
+self-hosted, OpenAI-compatible endpoint, such as vLLM behind a LiteLLM proxy
+on a cluster node. The endpoint is described by an env file that the serving
+side rewrites whenever it moves. Point `$EPSILONERIDANI_LOCAL_ENDPOINT_FILE` at it:
+
+```sh
+export OPENAI_BASE_URL="http://10.0.33.174:4000/v1"   # or OPENAI_API_BASE
+export OPENAI_API_KEY="sk-..."
+export OPENAI_MODEL="my-local-model"                  # the alias the proxy serves
+```
+
+The worker parses the file without running it, and re-reads it every round,
+so a serving job that lands on another node is picked up without a restart.
+
+There is no subscription to pace against. Before each round the loop probes
+`/v1/models`. While the file is absent (the serving job removes it when it
+ends), the endpoint does not answer, or it does not list the model, the worker
+waits instead of launching a round. Only an unset
+`$EPSILONERIDANI_LOCAL_ENDPOINT_FILE` or a file without a base URL stops it. When the proxy is LiteLLM, the
+log also names the weights behind the alias (for example
+`my-local-model → Qwen/Qwen3-Coder-Next`), so it is clear which model wrote
+a change even when the alias is reused for different weights.
+
+Each round gets a private pi config directory with a generated `models.json`.
+The key reaches pi only through `$EPSILONERIDANI_LOCAL_API_KEY` in its
+environment, never in a file, and `OPENAI_API_KEY`/`ANTHROPIC_API_KEY` are
+removed. `--author-model` (or `$EPSILONERIDANI_AUTHORING_LOCAL_MODEL`)
+overrides the file's alias. Effort is not supported.
+
+Limits, for now:
+
+- **Authoring only.** Reviews go through the review engine, which has no local
+  provider, so `--agent local` needs an explicit `--only` without `review`
+  (e.g. `--only fix-ci,lint-repair` or `--only roadmap`).
+- **Host only.** `--bubble` is refused: the endpoint is usually on an internal
+  address the sandbox's egress proxy cannot reach.
+
+`pi` and Node can live in the worker's own venv (`pip install nodeenv`,
+`nodeenv -p --prebuilt`, then `npm install -g @mariozechner/pi-coding-agent`).
+The worker then finds `pi` beside its interpreter and launches it with that
+venv's `node`, without putting the venv's `bin/` on the agent's `PATH`.
+`$EPSILONERIDANI_PI` names another `pi`.
+
 ## Credit usage
 
 `epsiloneridani usage [--provider kiro|openrouter] [--json]` is a prompt-free,
@@ -213,6 +258,9 @@ Flags win over these. Most are tuning knobs with sane defaults.
 | `EPSILONERIDANI_KIRO_HOME` / `EPSILONERIDANI_KIRO_DATA_DIR` | per-worker when isolated | Internal redirects for Kiro settings and its platform-native browser-auth SQLite store. |
 | `EPSILONERIDANI_KIRO_BURN_RATE` / `EPSILONERIDANI_OPENROUTER_BURN_RATE` | _(unset)_ | Observability-only default burn rates for `epsiloneridani usage`; never used by the loop pacer. |
 | `PI_RUN` | `~/.claude/skills/pi/scripts/run.sh` | The `pi` runner for OpenRouter agents on the host. |
+| `EPSILONERIDANI_LOCAL_ENDPOINT_FILE` | — | Required for `--agent local`: the env file describing the endpoint (`OPENAI_BASE_URL`, `OPENAI_API_KEY`, `OPENAI_MODEL`). See [local models](#local-models). |
+| `EPSILONERIDANI_PI` | `pi` on `PATH`, else beside the worker's interpreter | The `pi` executable for `--agent local`. |
+| `EPSILONERIDANI_LOCAL_CONTEXT` / `EPSILONERIDANI_LOCAL_MAX_TOKENS` | `131072` / `16384` | Context window and output limit declared to pi for the local model. |
 | `EPSILONERIDANI_BUBBLE` | `bubble` (else `uvx` for dry-run probes only) | Override the Bubble executable. |
 | `EPSILONERIDANI_BUBBLE_HOME` | per-worker cache dir | Override the private bubble home. |
 | `EPSILONERIDANI_REVIEW_ENGINE_DIR` | — | Use a local `epsiloneridani-review` checkout instead of fetching the engine. |
