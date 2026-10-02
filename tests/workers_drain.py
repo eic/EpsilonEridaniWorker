@@ -291,6 +291,28 @@ try:
     check("...not before it", time.monotonic() - asked >= 4, True)
     check("...by stopping it", "killed" in events("stubborn")[seen:], True)
     check("...and the request is cleared", wm.drain_path("stubborn").exists(), False)
+
+    # A runner holds its slot (lock, socket) before it publishes its own status, so for a moment the
+    # manager reads the previous run's record. Its stale fingerprint is not a changed definition: taking
+    # it for one restarted a worker that had just started on the current definition, which made the
+    # manager tests flaky. The hook widens that window to 2s, about twenty manager passes.
+    wm.update_status(
+        wm.status_path("racer"),
+        spec_hash="from-an-earlier-generation",
+        wrapper_pid=1,
+        state="stopped",
+        stopped_at=time.time() - 60,
+    )
+    config.write_text(
+        config.read_text()
+        + '\n[[workers]]\nid = "racer"\n\n[workers.env]\nEPSILONERIDANI_TEST_RUNNER_STARTUP_DELAY = "2"\n'
+    )
+    check("a slowly starting worker comes up", bool(wait_for(lambda: events("racer"))), True)
+    first = wrapper("racer")
+    time.sleep(2.5)  # long enough for a spurious graceful restart (1s "round") to have happened
+    check("...is not restarted over its previous run's record", events("racer"), ["start"])
+    check("...nor asked to restart", wm.drain_path("racer").exists(), False)
+    check("...and keeps running", wrapper("racer"), first)
 finally:
     if manager is not None:
         wm.manager_request("shutdown", stop_workers=True)
