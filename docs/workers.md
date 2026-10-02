@@ -119,8 +119,9 @@ other top-level key is an error, as is any unrecognized field inside a
 | `env` | table of strings | `{}` | Extra environment for this worker's process tree, for settings with no flag of their own. Values must be quoted strings, names POSIX-portable, and the table at most 16 KB. The variables the worker sets itself (`EPSILONERIDANI_MANAGED`, `EPSILONERIDANI_LOG_FILE`, `EPSILONERIDANI_PARENT_PIPE_FD`, `EPSILONERIDANI_DATA_HOME`, and the runtime-status path) are rejected. **Not a secret store** — see below |
 
 The manager fingerprints each definition. It stops a worker when `enabled`
-becomes false and restarts an enabled worker when any other field changes,
-without disturbing unchanged workers.
+becomes false. When any other field changes, it restarts that worker **after its
+current round**, without disturbing unchanged workers. See
+[rolling out a change](#rolling-out-a-change-one-worker-at-a-time).
 
 `env` exists for running one worker differently from its peers when the
 difference has no flag: an A/B of a build setting, for instance. It is part of
@@ -186,7 +187,7 @@ always writes `enabled = true`. Use `workers edit` for those.
 | `apply [--check]` | Validate the TOML schema and manager-level rules, then reconcile. `--check` validates only |
 | `add [ID] [flags]` | Append an enabled definition and reconcile |
 | `enable ID` / `disable ID` | Persist desired running or stopped state |
-| `restart ID` | Request a restart without changing desired state; a disabled worker stays stopped |
+| `restart ID [--after-round]` | Request a restart without changing desired state; a disabled worker stays stopped. Immediate by default, which stops the round in flight. `--after-round` lets the worker finish its round first |
 | `drain ID... \| --all [--wait] [--timeout S]` | Stop workers between rounds: each finishes the round it is in, then stays down until `resume`. `--wait` returns once all have stopped, or exits 1 after `--timeout` (default 7200s). See [draining for a restart](#draining-for-a-restart) |
 | `resume ID... \| --all` | Clear a drain. A worker still finishing its round carries on; a stopped one is launched again |
 | `remove ID` | Drop the definition and stop the worker |
@@ -268,6 +269,33 @@ they finish and `drained` once stopped, and counts a drained worker as healthy,
 as it does a disabled one. `resume` clears the file. A worker that already
 stopped is launched again, even one with `restart = "on-failure"` or `"never"`,
 whose clean exit would otherwise be final.
+
+## Rolling out a change one worker at a time
+
+A changed definition reaches a worker gracefully. Edit one worker's entry in
+`workers.toml` (its `env`, model, phases or login), and the manager asks that
+worker to finish the round it is in. Once it has, the manager starts the new
+definition. The other workers keep running. To roll a change across the fleet,
+edit one worker, watch it come back in `workers status` (`restarting after its
+current round` until then), and carry on with the next.
+
+`workers restart ID --after-round` does the same without a definition change,
+for example to pick up a new install after an upgrade. Plain `workers restart ID`
+still restarts at once. Disabling or removing a worker still stops it at once.
+A worker that is drained when its definition changes stays down until `resume`,
+as the drain asked.
+
+A graceful restart uses the same between-rounds stop as `drain`. A worker that
+cannot honour it (one older than drain support, 0.9.0, or a hung loop) is stopped
+outright once the restart has waited `ROUND_TIMEOUT` plus ten minutes, and then
+restarted. So a rollout never stalls, and no healthy round is cut short, since
+every round ends within `ROUND_TIMEOUT`. `$EPSILONERIDANI_GRACEFUL_RESTART_TIMEOUT`
+sets that wait in seconds.
+
+Settings in the service's own environment (a systemd drop-in, say) are not part
+of any worker's definition. A change there reaches workers only when the manager
+restarts, which is what `workers drain --all --wait` is for. To roll such a
+setting out gradually instead, put it in each worker's `env` table.
 
 ## Worker ids and credential isolation
 

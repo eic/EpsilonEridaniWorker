@@ -27,8 +27,18 @@ for key in (
 os.environ["XDG_CONFIG_HOME"] = str(root / "config")
 os.environ["XDG_STATE_HOME"] = str(root / "state")
 os.environ["EPSILONERIDANI_RUNTIME_DIR"] = str(root / "run")
+# Stands in for `work --loop`: runs until its runner goes away, or until asked to drain, when it exits
+# between "rounds" as the real loop does. A changed definition restarts a worker through that drain.
 os.environ["EPSILONERIDANI_MANAGER_TEST_COMMAND"] = shlex.join(
-    [sys.executable, "-c", "import os; os.read(int(os.environ['EPSILONERIDANI_PARENT_PIPE_FD']), 1)"]
+    [
+        sys.executable,
+        "-c",
+        "import os, pathlib, select\n"
+        "fd = int(os.environ['EPSILONERIDANI_PARENT_PIPE_FD'])\n"
+        "marker = pathlib.Path(os.environ['EPSILONERIDANI_RUNTIME_STATUS']).with_suffix('.drain')\n"
+        "while not marker.exists() and not select.select([fd], [], [], 0.05)[0]:\n"
+        "    pass\n",
+    ]
 )
 
 import epsiloneridani_worker.paths as worker_paths
