@@ -1285,6 +1285,15 @@ def _claude_login_lines(item: dict, peers: dict[str, list[str]], width: int) -> 
     return lines
 
 
+def _login_session_dir(worker_id: str) -> Path:
+    """Where `workers login` runs its `claude` session: the worker's own EpsilonEridani checkout when it
+    has one (the path Config.resolve gives it), else the worker's install directory. Never ~ or the
+    directory the command was started from, so the folder Claude Code asks the operator to trust is
+    the worker's, not their whole home."""
+    checkout = HERE / "checkouts" / worker_id / "EpsilonEridani"
+    return checkout if (checkout / ".git").is_dir() else HERE
+
+
 def claude_login(config: Path, worker_id: str) -> int:
     """Run an interactive `claude` against a worker's own config dir, so the operator can /login into it."""
     spec = next((spec for spec in load_worker_specs(config) if spec.id == worker_id), None)
@@ -1304,8 +1313,9 @@ def claude_login(config: Path, worker_id: str) -> int:
         raise WorkersError("`claude` is not on PATH")
     directory = Path(spec.claude_config_dir)
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    where = _login_session_dir(worker_id)
     print(
-        f"Logging worker {worker_id} into its own Claude login in {directory}.\n"
+        f"Logging worker {worker_id} into its own Claude login in {directory} (session in {where}).\n"
         "In the Claude session that opens, run /login, finish the sign-in in your browser, then /exit."
     )
     # An API key or long-lived token in the environment would take precedence over the login being
@@ -1316,7 +1326,7 @@ def claude_login(config: Path, worker_id: str) -> int:
         if name not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN")
     }
     env["CLAUDE_CONFIG_DIR"] = str(directory)
-    subprocess.run([claude], env=env, cwd=Path.home())
+    subprocess.run([claude], env=env, cwd=where)
     ok, _expires = _claude_login_state(directory)
     if not ok:
         print(f"epsiloneridani workers: {directory} holds no renewable Claude login yet", file=sys.stderr)

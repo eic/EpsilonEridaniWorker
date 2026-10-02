@@ -225,5 +225,47 @@ try:
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 
+# --- `workers login`: the session runs in the worker's directory, never ~ ------------------------------
+# The session asks the operator to trust its working directory, so it must be the worker's own checkout
+# (or the worker's install), not their home or wherever the command happened to be started.
+tmp = Path(tempfile.mkdtemp())
+with_checkout, without = f"login-cwd-test-{os.getpid()}-a", f"login-cwd-test-{os.getpid()}-b"
+checkout = tc.HERE / "checkouts" / with_checkout / "EpsilonEridani"
+saved_which, saved_run, saved_cwd, saved_home = shutil.which, subprocess.run, os.getcwd(), os.environ.get("HOME")
+try:
+    os.environ["HOME"] = str(tmp / "home")  # the sections above left $HOME on a deleted isolated home
+    (tmp / "home").mkdir()
+    (checkout / ".git").mkdir(parents=True)
+    config = tmp / "workers.toml"
+    config.write_text(
+        "version = 1\n"
+        + "".join(
+            f'\n[[workers]]\nid = "{wid}"\nagent = "claude"\nclaude_config_dir = "{tmp / wid}"\n'
+            for wid in (with_checkout, without)
+        )
+    )
+    sessions = []
+
+    def fake_claude(argv, env, cwd):
+        sessions.append(Path(cwd))
+        login(Path(env["CLAUDE_CONFIG_DIR"]), "T")  # what a finished /login leaves behind
+        return subprocess.CompletedProcess(argv, 0)
+
+    shutil.which = lambda name: "/usr/bin/claude" if name == "claude" else saved_which(name)
+    subprocess.run = fake_claude
+    os.chdir(Path.home())  # started from ~, which the session must not inherit
+    check("login succeeds for a worker with a checkout", wm.claude_login(config, with_checkout), 0)
+    check("login succeeds for a worker without one", wm.claude_login(config, without), 0)
+    check("...the first session runs in the worker's checkout", sessions[0], checkout)
+    check("...the second in the worker's install directory", sessions[1], tc.HERE)
+    check("...and neither in ~", Path.home() in sessions, False)
+finally:
+    shutil.which, subprocess.run = saved_which, saved_run
+    os.chdir(saved_cwd)
+    if saved_home is not None:
+        os.environ["HOME"] = saved_home
+    shutil.rmtree(tc.HERE / "checkouts" / with_checkout, ignore_errors=True)
+    shutil.rmtree(tmp, ignore_errors=True)
+
 print(f"\n{'PASS' if not fails else 'FAIL'}: {fails} mismatch(es)")
 sys.exit(1 if fails else 0)
