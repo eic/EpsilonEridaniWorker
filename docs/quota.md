@@ -146,11 +146,9 @@ source, so they share nothing with each other.
 
 ## Accounts with no weekly cap: `--claude-no-weekly-cap`
 
-Some Claude seats only ever meter the 5-hour session window — for example the
-[Team Plan for Scientists](https://claude.com/programs/team-plan-for-scientists),
-which carries a 5-hour cap and no weekly one. Their usage endpoint's weekly
-fields (`seven_day` and friends, and any `weekly` entry in the structured
-`limits` array) stay `null` permanently, not just through the post-reset gap
+Some Claude seats only ever meter the 5-hour session window. Their usage
+endpoint's weekly fields (`seven_day` and friends, and any `weekly` entry in
+the structured `limits` array) stay `null` permanently, not just through the post-reset gap
 the bootstrap above is for. A single reading cannot tell "idle, about to open"
 apart from "this account has no weekly window at all", so `epsiloneridani`
 does not try to infer it: left alone, the weekly window reads `idle` forever,
@@ -164,6 +162,14 @@ the worker with `epsiloneridani work --loop --claude-no-weekly-cap` (or
 drops the weekly window from every reading entirely — it is not read, not
 gated on, and never bootstrapped — and availability is decided from the
 session window alone.
+
+Check before you set it: most plans meter both windows. The
+[Team Plan for Scientists](https://claude.com/programs/team-plan-for-scientists),
+for example, has a 5-hour window and a weekly one, and its `seven_day` field
+is a live reading. If `epsiloneridani workers status` (or the usage endpoint)
+shows a non-null weekly percentage, leave the flag off. With the flag set on
+such an account, the worker paces only against the 5-hour window and can use
+up the week's allowance days before it resets.
 
 ## Why "strictly under"
 
