@@ -58,8 +58,13 @@ EPSILONERIDANI_TEST_SLEEP=30 "$PY" ./epsiloneridani _round >/tmp/lc7.log 2>&1 &
 c=$!; sleep 1; kill -INT "$c"; wait "$c"; rc=$?
 (( rc == 130 )) && ok "SIGINT → 130" || no "SIGINT → $rc (expected 130)"
 
-# cleanup the test grandchild from step 2 if still around
-pkill -f "sleep 30" 2>/dev/null || true
+# Clean up the grandchild step 2 leaked on purpose, and only it. A `pkill -f "sleep 30"` here used to
+# kill every process of the user whose command line held that text, which can be anything. The pid comes
+# from the round's own log, and is killed only while it is still that `sleep`, not a reused pid.
+held=$(sed -n "s/.*spawned 'sleep 30' grandchild (pid \([0-9]*\)).*/\1/p" /tmp/lc3.log | head -1)
+if [ -n "$held" ] && [ "$(ps -o comm= -p "$held" 2>/dev/null)" = "sleep" ]; then
+  kill "$held" 2>/dev/null || true
+fi
 echo
 echo "lifecycle: $pass passed, $fail failed"
 exit $(( fail > 0 ))

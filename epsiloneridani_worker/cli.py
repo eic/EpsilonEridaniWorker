@@ -921,8 +921,9 @@ def cmd_work(args, *, only: list[str], agent: str, one_round: bool, prs: tuple[i
             return 0
         hold = os.environ.get("EPSILONERIDANI_TEST_HOLD")
         if hold:
-            subprocess.Popen(["sleep", hold])  # grandchild; close_fds=True ⇒ must NOT inherit the lock fd
-            log(f"[test] spawned 'sleep {hold}' grandchild, round exiting immediately")
+            grandchild = subprocess.Popen(["sleep", hold])  # close_fds=True ⇒ must NOT inherit the lock fd
+            # The pid lets the test clean up exactly this process, rather than every `sleep` the user has.
+            log(f"[test] spawned 'sleep {hold}' grandchild (pid {grandchild.pid}), round exiting immediately")
             return 0
         slp = os.environ.get("EPSILONERIDANI_TEST_SLEEP")
         if slp:
