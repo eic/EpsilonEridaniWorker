@@ -177,6 +177,13 @@ The worker then finds `pi` beside its interpreter and launches it with that
 venv's `node`, without putting the venv's `bin/` on the agent's `PATH`.
 `$EPSILONERIDANI_PI` names another `pi`.
 
+The availability probe also checks that the server accepts tool calls. pi drives every round
+through tools, so a vLLM started without `--enable-auto-tool-choice` and the model's
+`--tool-call-parser` counts as unavailable (the worker waits and logs why) rather than failing
+rounds against PRs. Each round tells pi the server's real context window. vLLM states its
+`max_model_len` when it refuses an impossible `max_tokens`, and the worker reads it from there.
+It falls back to 32768 when the server does not say, and `$EPSILONERIDANI_LOCAL_CONTEXT` pins it.
+
 ## Credit usage
 
 `epsiloneridani usage [--provider kiro|openrouter] [--json]` is a prompt-free,
@@ -260,7 +267,7 @@ Flags win over these. Most are tuning knobs with sane defaults.
 | `PI_RUN` | `~/.claude/skills/pi/scripts/run.sh` | The `pi` runner for OpenRouter agents on the host. |
 | `EPSILONERIDANI_LOCAL_ENDPOINT_FILE` | — | Required for `--agent local`: the env file describing the endpoint (`OPENAI_BASE_URL`, `OPENAI_API_KEY`, `OPENAI_MODEL`). See [local models](#local-models). |
 | `EPSILONERIDANI_PI` | `pi` on `PATH`, else beside the worker's interpreter | The `pi` executable for `--agent local`. |
-| `EPSILONERIDANI_LOCAL_CONTEXT` / `EPSILONERIDANI_LOCAL_MAX_TOKENS` | `131072` / `16384` | Context window and output limit declared to pi for the local model. |
+| `EPSILONERIDANI_LOCAL_CONTEXT` / `EPSILONERIDANI_LOCAL_MAX_TOKENS` | the server's `max_model_len` (else `32768`) / a quarter of the window, at most `16384` | Context window and output limit declared to pi for the local model. By default the window is read from the server each round. |
 | `EPSILONERIDANI_BUBBLE` | `bubble` (else `uvx` for dry-run probes only) | Override the Bubble executable. |
 | `EPSILONERIDANI_BUBBLE_HOME` | per-worker cache dir | Override the private bubble home. |
 | `EPSILONERIDANI_REVIEW_ENGINE_DIR` | — | Use a local `epsiloneridani-review` checkout instead of fetching the engine. |

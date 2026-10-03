@@ -808,7 +808,12 @@ def dispatch(stage: str, w: Worker, sv: Survey, c: Candidate, opts: RoundOpts) -
     log(f"→ {stage.upper()}: {what}   [{detail}]")
     report_runtime("running", phase=stage, target=what, detail=detail, next_action_at=None)
     pre = _progress_snapshot(w, c) if stage in PROGRESS_GUARDED else None
-    pre_head = _checkout_head(w.cfg) if (stage in FILE_CHANGE_STAGES and not bubble) else None
+    # The baseline is what the round STARTS from. For a PR stage that is the PR's head, not whatever the
+    # shared checkout happened to hold before the stage switched it to the PR branch: comparing against
+    # that reported the whole main→PR difference ("174 changed") as this round's commits.
+    pre_head = None
+    if stage in FILE_CHANGE_STAGES and not bubble:
+        pre_head = c.head if (c.pr and c.head) else _checkout_head(w.cfg)
     rc = fn(w, sv, c, opts, bubble)
     if stage in FILE_CHANGE_STAGES and not bubble:
         log_round_file_changes(w.cfg, pre_head)

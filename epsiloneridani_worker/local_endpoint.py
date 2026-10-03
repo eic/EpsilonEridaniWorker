@@ -39,7 +39,10 @@ ENV_FILE_VAR = "EPSILONERIDANI_LOCAL_ENDPOINT_FILE"
 # the key cannot leak into a tool that happens to honour the OpenAI default.
 API_KEY_ENV = "EPSILONERIDANI_LOCAL_API_KEY"
 PI_PROVIDER = "local"
-DEFAULT_CONTEXT_WINDOW = 131072
+# Used only when the server does not reveal its limit (see context_window). Deliberately small: a
+# window declared larger than the server's makes pi overrun it mid-round, while one declared smaller
+# only makes pi compact its history sooner. $EPSILONERIDANI_LOCAL_CONTEXT overrides everything.
+FALLBACK_CONTEXT_WINDOW = 32768
 DEFAULT_MAX_TOKENS = 16384
 PROBE_TIMEOUT_S = 10
 
@@ -110,9 +113,97 @@ def _get_json(url: str, api_key: str, timeout: float) -> dict:
         return json.loads(resp.read().decode("utf-8", "replace"))
 
 
+def _post_json(url: str, api_key: str, body: dict, timeout: float) -> tuple[int, str]:
+    """(HTTP status, response text) for a JSON POST; an HTTP error is a status, not an exception."""
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 — operator-configured URL
+            return resp.status, resp.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        return e.code, (e.read() or b"").decode("utf-8", "replace")
+
+
+# vLLM's refusal when it was started without tool calling. pi drives every round through tools, so a
+# server answering this cannot run one at all, however healthy /models looks.
+TOOLS_DISABLED_RE = re.compile(r"tool choice requires --enable-auto-tool-choice", re.I)
+
+
+def _error_message(text: str) -> str:
+    """The first line of an error body's message (or of the body), at most 200 chars; "" if blank."""
+    try:
+        msg = (json.loads(text).get("error") or {}).get("message")
+    except (ValueError, AttributeError):
+        msg = None
+    lines = str(msg or text or "").strip().splitlines()
+    return lines[0][:200] if lines else ""
+
+
+def tool_calling_problem(ep: Endpoint, model: str, *, timeout: float = PROBE_TIMEOUT_S) -> str | None:
+    """None when `model` accepts a request carrying a tool with tool_choice=auto; otherwise why not.
+    The request asks for one output token, so the cost is a prompt of a few dozen tokens."""
+    body = {
+        "model": model,
+        "messages": [{"role": "user", "content": "ping"}],
+        "tools": [
+            {
+                "type": "function",
+                "function": {
+                    "name": "noop",
+                    "description": "no-op",
+                    "parameters": {"type": "object", "properties": {}},
+                },
+            }
+        ],
+        "tool_choice": "auto",
+        "max_tokens": 1,
+    }
+    try:
+        status, text = _post_json(f"{ep.base_url}/chat/completions", ep.api_key, body, timeout)
+    except (urllib.error.URLError, OSError) as e:
+        return f"tool-calling probe failed ({getattr(e, 'reason', e)})"
+    if status == 200:
+        return None
+    if TOOLS_DISABLED_RE.search(text):
+        return (
+            "the server has tool calling disabled; start vLLM with --enable-auto-tool-choice and the "
+            "model's --tool-call-parser"
+        )
+    return f"tool-calling probe answered HTTP {status}: {_error_message(text)}"
+
+
+_CONTEXT_RES = (
+    re.compile(r"max_model_len(?:=[a-z_]+)*=(\d+)"),  # vLLM: "… greater than max_model_len=max_total_tokens=32768"
+    re.compile(r"maximum context length is (\d+)"),  # vLLM/OpenAI phrasing
+)
+
+
+def context_window(ep: Endpoint, model: str, *, timeout: float = PROBE_TIMEOUT_S) -> int:
+    """The model's context length: $EPSILONERIDANI_LOCAL_CONTEXT, else what the server reveals, else
+    FALLBACK_CONTEXT_WINDOW. A LiteLLM proxy does not report vLLM's max_model_len, but vLLM states it
+    when refusing an impossible max_tokens — a request it rejects before generating anything."""
+    pinned = (os.environ.get("EPSILONERIDANI_LOCAL_CONTEXT") or "").strip()
+    if pinned:
+        return int(pinned)
+    body = {"model": model, "messages": [{"role": "user", "content": "ping"}], "max_tokens": 10**9}
+    try:
+        _status, text = _post_json(f"{ep.base_url}/chat/completions", ep.api_key, body, timeout)
+    except (urllib.error.URLError, OSError):
+        return FALLBACK_CONTEXT_WINDOW
+    for rx in _CONTEXT_RES:
+        m = rx.search(text)
+        if m and int(m.group(1)) > 0:
+            return int(m.group(1))
+    return FALLBACK_CONTEXT_WINDOW
+
+
 def probe(ep: Endpoint, model: str | None = None, *, timeout: float = PROBE_TIMEOUT_S) -> tuple[bool, str]:
-    """(available, detail). Available when `/models` answers and lists `model` (default: the file's
-    alias). `detail` says why not, or names what is being served."""
+    """(available, detail). Available when `/models` answers, lists `model` (default: the file's
+    alias), and the model accepts a tool-carrying request — every pi round needs tools, so a server
+    started without tool calling is a wait, not a round charged to a PR. `detail` says why not, or
+    names what is being served."""
     want = model or ep.model
     try:
         listing = _get_json(f"{ep.base_url}/models", ep.api_key, timeout)
@@ -125,7 +216,11 @@ def probe(ep: Endpoint, model: str | None = None, *, timeout: float = PROBE_TIME
     if want and want not in ids:
         return False, f"local endpoint {ep.base_url} does not serve {want!r} (serves {', '.join(ids) or 'nothing'})"
     backing = backing_model(ep, want, timeout=timeout)
-    return True, f"{want} → {backing}" if backing else (want or "")
+    label = f"{want} → {backing}" if backing else (want or "")
+    problem = tool_calling_problem(ep, want, timeout=timeout)
+    if problem:
+        return False, f"local endpoint serves {label}, but {problem}"
+    return True, label
 
 
 def backing_model(ep: Endpoint, alias: str, *, timeout: float = PROBE_TIMEOUT_S) -> str | None:
@@ -144,10 +239,13 @@ def backing_model(ep: Endpoint, alias: str, *, timeout: float = PROBE_TIMEOUT_S)
     return None
 
 
-def pi_models_json(ep: Endpoint, model: str) -> dict:
+def pi_models_json(ep: Endpoint, model: str, context: int | None = None) -> dict:
     """pi's custom-provider config for this endpoint. `apiKey` names API_KEY_ENV (pi resolves an
     env-var name), so the file holds no secret. vLLM and LiteLLM reject the `developer` role and
-    `reasoning_effort`, hence the compat switches."""
+    `reasoning_effort`, hence the compat switches. `context` is the model's window (see
+    context_window); the output limit is kept to a quarter of it so a long history still fits."""
+    window = context or FALLBACK_CONTEXT_WINDOW
+    max_out = int(os.environ.get("EPSILONERIDANI_LOCAL_MAX_TOKENS") or min(DEFAULT_MAX_TOKENS, window // 4))
     return {
         "providers": {
             PI_PROVIDER: {
@@ -159,8 +257,8 @@ def pi_models_json(ep: Endpoint, model: str) -> dict:
                     {
                         "id": model,
                         "name": f"{model} (local)",
-                        "contextWindow": int(os.environ.get("EPSILONERIDANI_LOCAL_CONTEXT", DEFAULT_CONTEXT_WINDOW)),
-                        "maxTokens": int(os.environ.get("EPSILONERIDANI_LOCAL_MAX_TOKENS", DEFAULT_MAX_TOKENS)),
+                        "contextWindow": window,
+                        "maxTokens": max_out,
                         "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
                     }
                 ],
@@ -169,13 +267,13 @@ def pi_models_json(ep: Endpoint, model: str) -> dict:
     }
 
 
-def write_pi_agent_dir(ep: Endpoint, model: str, agent_dir: Path) -> Path:
+def write_pi_agent_dir(ep: Endpoint, model: str, agent_dir: Path, context: int | None = None) -> Path:
     """Write pi's config dir for one round (atomically, so a concurrent round never reads half a
     file) and return it. A private dir, not ~/.pi/agent: the operator's own pi settings, extensions,
     skills and sessions stay out of an unattended round."""
     agent_dir.mkdir(parents=True, exist_ok=True)
     target = agent_dir / "models.json"
     tmp = agent_dir / f".models.json.{os.getpid()}"
-    tmp.write_text(json.dumps(pi_models_json(ep, model), indent=2) + "\n")
+    tmp.write_text(json.dumps(pi_models_json(ep, model, context), indent=2) + "\n")
     os.replace(tmp, target)
     return agent_dir
