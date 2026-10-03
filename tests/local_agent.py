@@ -282,8 +282,9 @@ check(
 SERVER["tools"] = True
 check("tool probe asks for one token", [b.get("max_tokens") for b in SERVER["post_calls"] if b.get("tools")][-1], 1)
 
-SERVER["max_model_len"] = 32768
-check("context: read from vLLM's refusal", local_endpoint.context_window(ep, "my-local-model"), 32768)
+# 24576, not 32768: the fallback is 32768, so only a distinct value proves the refusal was parsed.
+SERVER["max_model_len"] = 24576
+check("context: read from vLLM's refusal", local_endpoint.context_window(ep, "my-local-model"), 24576)
 SERVER["max_model_len"] = None
 check(
     "context: unreadable falls back small",
@@ -293,10 +294,10 @@ check(
 os.environ["EPSILONERIDANI_LOCAL_CONTEXT"] = "65536"
 check("context: env pin wins", local_endpoint.context_window(ep, "my-local-model"), 65536)
 os.environ.pop("EPSILONERIDANI_LOCAL_CONTEXT")
-SERVER["max_model_len"] = 32768
-m = local_endpoint.pi_models_json(ep, "my-local-model", 32768)["providers"]["local"]["models"][0]
-check("pi gets the real window", m["contextWindow"], 32768)
-check("output limit is a quarter of a small window", m["maxTokens"], 8192)
+SERVER["max_model_len"] = 24576
+m = local_endpoint.pi_models_json(ep, "my-local-model", 24576)["providers"]["local"]["models"][0]
+check("pi gets the real window", m["contextWindow"], 24576)
+check("output limit is a quarter of a small window", m["maxTokens"], 6144)
 m = local_endpoint.pi_models_json(ep, "my-local-model", 131072)["providers"]["local"]["models"][0]
 check("output limit capped for a large window", m["maxTokens"], local_endpoint.DEFAULT_MAX_TOKENS)
 argv, env = agents.host_agent_argv("do the thing", "local")
@@ -304,7 +305,7 @@ written = json.loads((Path(env["PI_CODING_AGENT_DIR"]) / "models.json").read_tex
 check(
     "the round's models.json carries the discovered window",
     written["providers"]["local"]["models"][0]["contextWindow"],
-    32768,
+    24576,
 )
 SERVER["max_model_len"] = 131072
 
@@ -318,6 +319,14 @@ check(
     "classified as infrastructure (refunded)",
     agents.classify_agent_failure(pi_log),
     "the model server has tool calling disabled",
+)
+for body in ("   ", '{"error":{"message":"   "}}', ""):
+    check(f"blank error body {body!r} gives an empty message", local_endpoint._error_message(body), "")
+check("no error.message falls back to the body", local_endpoint._error_message('{"error":{}}'), '{"error":{}}')
+check(
+    "error message is the first line of error.message",
+    local_endpoint._error_message('{"error":{"message":"bad thing\\nmore"}}'),
+    "bad thing",
 )
 check("an ordinary 400 is still the task's", agents.classify_agent_failure("400 Bad Request: prompt too long\n"), None)
 

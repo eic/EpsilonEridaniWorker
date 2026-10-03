@@ -132,11 +132,13 @@ TOOLS_DISABLED_RE = re.compile(r"tool choice requires --enable-auto-tool-choice"
 
 
 def _error_message(text: str) -> str:
+    """The first line of an error body's message (or of the body), at most 200 chars; "" if blank."""
     try:
         msg = (json.loads(text).get("error") or {}).get("message")
     except (ValueError, AttributeError):
         msg = None
-    return str(msg or text).strip().splitlines()[0][:200] if (msg or text) else ""
+    lines = str(msg or text or "").strip().splitlines()
+    return lines[0][:200] if lines else ""
 
 
 def tool_calling_problem(ep: Endpoint, model: str, *, timeout: float = PROBE_TIMEOUT_S) -> str | None:
