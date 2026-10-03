@@ -604,6 +604,40 @@ def _lock_is_held(path: Path) -> bool:
         return False
 
 
+# Status across hosts. The control sockets and runner locks live in a per-host runtime directory
+# ($XDG_RUNTIME_DIR), but the status files live in the state directory, which on a cluster is usually
+# on a home filesystem every node shares. From another node the sockets are unreachable, so without
+# this a running fleet reads as "manager: offline" and every worker as dead. Each status file therefore
+# records its host, the manager keeps a heartbeat beside them, and a fresh heartbeat from another host
+# counts as running there. A heartbeat older than REMOTE_FRESH_S does not: its host may have died.
+REMOTE_FRESH_S = 30.0
+MANAGER_HEARTBEAT_S = 2.0
+
+
+def this_host() -> str:
+    return socket.gethostname()
+
+
+def manager_heartbeat_path(state_dir: Path | None = None) -> Path:
+    # Not *.json: worker_snapshots() treats every *.json in the state directory as a worker.
+    return (state_dir or workers_state_dir()) / "manager.heartbeat"
+
+
+def _fresh_elsewhere(record: dict, now: float | None = None) -> bool:
+    """A status record written by another host, recently, by something that has not stopped."""
+    host, at = record.get("host"), record.get("heartbeat_at")
+    if not host or host == this_host() or record.get("stopped_at") or not isinstance(at, (int, float)):
+        return False
+    age = (time.time() if now is None else now) - at
+    return -REMOTE_FRESH_S <= age <= REMOTE_FRESH_S  # a little clock skew between nodes either way
+
+
+def remote_manager(state_dir: Path | None = None, now: float | None = None) -> dict | None:
+    """The manager's heartbeat record if a manager is running on ANOTHER host right now, else None."""
+    beat = read_json(manager_heartbeat_path(state_dir))
+    return beat if _fresh_elsewhere(beat, now) else None
+
+
 def runner_status(worker_id: str, state_dir: Path | None = None, runtime_dir: Path | None = None) -> dict:
     live = _socket_request(runner_socket(worker_id, runtime_dir), {"action": "status"}, timeout=0.15)
     if live is not None:
@@ -630,6 +664,9 @@ def worker_snapshots(specs: list[WorkerSpec] | None = None, config: Path | None 
         spec = wanted.get(wid)
         actual = runner_status(wid)
         alive = bool(actual.get("alive"))
+        # Not running here, but heartbeating from another host sharing this state directory.
+        remote_host = actual.get("host") if not alive and _fresh_elsewhere(actual) else None
+        alive = alive or bool(remote_host)
         desired = "running" if spec and spec.enabled else "stopped"
         draining = drain_path(wid).exists()
         if alive:
@@ -654,6 +691,7 @@ def worker_snapshots(specs: list[WorkerSpec] | None = None, config: Path | None 
                 "desired": desired,
                 "actual": state_name,
                 "alive": alive,
+                "remote_host": remote_host,
                 "enabled": bool(spec and spec.enabled),
                 "draining": draining,
                 "actual_spec_hash": actual.get("spec_hash"),
@@ -772,6 +810,7 @@ def cmd_managed_runner(args) -> int:
                 child_pid=None,
                 process_group=None,
                 instance=uuid.uuid4().hex,
+                host=this_host(),
                 spec_hash=spec.fingerprint(),
                 agent=spec.agent,
                 only=list(spec.only),
@@ -898,6 +937,33 @@ def run_manager(config: Path, interval: float = DEFAULT_INTERVAL) -> int:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             workers_die("another worker manager is already running")
+        # The lock above is per host. Two managers on two nodes would both launch every worker against
+        # the same shared state: duplicate rounds on the same claims, and status files overwritten by
+        # whichever node wrote last. A fresh heartbeat from another host means it is running there.
+        elsewhere = remote_manager(state_dir)
+        if elsewhere:
+            workers_die(
+                f"a worker manager is already running on {elsewhere['host']} "
+                f"(heartbeat {time.time() - float(elsewhere['heartbeat_at']):.0f}s ago); "
+                f"not starting a second one on {this_host()}"
+            )
+        heartbeat_path = manager_heartbeat_path(state_dir)
+        last_beat = 0.0
+
+        def beat(**extra) -> None:
+            # A shared filesystem hiccup must not take the manager down with it.
+            try:
+                update_status(
+                    heartbeat_path,
+                    host=this_host(),
+                    pid=os.getpid(),
+                    config=str(config),
+                    heartbeat_at=time.time(),
+                    **extra,
+                )
+            except OSError as exc:
+                print(f"epsiloneridani workers: cannot write {heartbeat_path}: {exc}", file=sys.stderr)
+
         server_path = manager_socket(runtime_dir)
         server = _bind_socket(server_path)
         exiting = False
@@ -934,8 +1000,12 @@ def run_manager(config: Path, interval: float = DEFAULT_INTERVAL) -> int:
             return {"ok": False, "error": f"unknown action: {action}"}
 
         print(f"epsiloneridani workers: managing {config} every {interval:g}s", flush=True)
+        beat(started_at=time.time(), stopped_at=None)
         try:
             while not exiting:
+                if time.monotonic() - last_beat >= MANAGER_HEARTBEAT_S:
+                    beat()
+                    last_beat = time.monotonic()
                 try:
                     specs = load_worker_specs(config)
                     last_good = specs
@@ -1102,6 +1172,7 @@ def run_manager(config: Path, interval: float = DEFAULT_INTERVAL) -> int:
                     time.sleep(0.1)
             return 0
         finally:
+            beat(stopped_at=time.time())
             signal.signal(signal.SIGTERM, old_term)
             signal.signal(signal.SIGINT, old_int)
             server.close()
@@ -1132,6 +1203,17 @@ def ensure_manager(config: Path) -> bool:
             _check_manager_config(online, config)
             manager_request("apply")
             return spawned is not None
+        elsewhere = remote_manager()
+        if elsewhere and spawned is None:
+            # Running on another node that shares this state directory: it re-reads the (shared)
+            # configuration on every pass, so there is nothing to apply from here, and starting a
+            # second manager on this node is exactly what must not happen.
+            print(
+                f"epsiloneridani workers: the manager runs on {elsewhere['host']}; "
+                f"it picks up configuration changes within {DEFAULT_INTERVAL:g}s",
+                file=sys.stderr,
+            )
+            return False
         if not _manager_lock_held():
             if spawned is not None and spawned.poll() is not None:
                 raise WorkersError(f"worker manager exited during startup with status {spawned.returncode}")
@@ -1481,8 +1563,19 @@ def _worker_configuration_lines(item: dict, width: int) -> list[str]:
     return lines
 
 
-def _worker_status_lines(config: Path, snapshots: list[dict], online: bool, *, width: int) -> list[str]:
-    lines = [f"manager: {'running' if online else 'offline'}", f"config:  {config}"]
+def _manager_line(online: bool, remote: dict | None) -> str:
+    if online:
+        return "manager: running"
+    if remote:
+        age = max(0.0, time.time() - float(remote["heartbeat_at"]))
+        return f"manager: running on {remote['host']} (heartbeat {age:.0f}s ago; live details and control only there)"
+    return "manager: offline"
+
+
+def _worker_status_lines(
+    config: Path, snapshots: list[dict], online: bool, *, width: int, remote: dict | None = None
+) -> list[str]:
+    lines = [_manager_line(online, remote), f"config:  {config}"]
     if not snapshots:
         return [*lines, "", "workers: none"]
 
@@ -1499,6 +1592,8 @@ def _worker_status_lines(config: Path, snapshots: list[dict], online: bool, *, w
             "restarting": "restarting after its current round",
         }.get(state, state)
         heading = f"{item['id']} — {display_state}"
+        if item.get("remote_host"):
+            heading += f" (on {item['remote_host']})"
         if item["desired"] == "stopped" or state in {"missing", "restarting", "stale", "stopped", "stopping"}:
             heading += f" (desired: {item['desired']})"
         lines.extend(["", heading])
@@ -1537,13 +1632,19 @@ def print_worker_status(config: Path, *, as_json: bool = False) -> bool:
     specs = load_worker_specs(config)
     snapshots = worker_snapshots(specs)
     online = manager_request("ping")
+    remote = None if online else remote_manager()
     if as_json:
-        print(json.dumps({"manager": online, "config": str(config), "workers": snapshots}, indent=2))
+        print(
+            json.dumps(
+                {"manager": online, "remote_manager": remote, "config": str(config), "workers": snapshots},
+                indent=2,
+            )
+        )
     else:
         width = shutil.get_terminal_size(fallback=(100, 24)).columns
-        print("\n".join(_worker_status_lines(config, snapshots, bool(online), width=width)))
+        print("\n".join(_worker_status_lines(config, snapshots, bool(online), width=width, remote=remote)))
     # A drained worker is down on purpose, exactly like a disabled one.
-    healthy = bool(online) and all(
+    healthy = bool(online or remote) and all(
         item["desired"] == "stopped" or item.get("alive") or item.get("actual") == "drained" for item in snapshots
     )
     return healthy

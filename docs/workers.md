@@ -419,7 +419,8 @@ the config directory.
 
 | Path | Contents |
 | --- | --- |
-| `<state>/<id>.json` | Per-worker status, heartbeated every two seconds |
+| `<state>/<id>.json` | Per-worker status, including its host, heartbeated every two seconds |
+| `<state>/manager.heartbeat` | The manager's host and a heartbeat, every two seconds |
 | `<state>/manager.log` | The detached manager's own console |
 | `<state>/logs/<id>/work-*.log` | Durable per-run console logs |
 | `<runtime>/manager.sock`, `w-<id>.sock` | Control sockets, mode 0600 |
@@ -434,6 +435,24 @@ Each managed worker publishes a structured state such as `waiting-quota`,
 `surveying`, `running`, or `backoff`, along with its current phase and target and
 the path to its logfile. That is what `epsiloneridani workers status` and the
 dashboard's workers view read.
+
+### Several nodes, one shared home
+
+On a cluster, `<state>` is usually on a home filesystem that every node mounts, while
+`<runtime>` is per node. The status files therefore reach every node, but the
+control sockets do not. Seen from another node, `epsiloneridani workers status`
+shows
+`manager: running on <host> (heartbeat 3s ago; live details and control only there)`,
+and each worker as `(on <host>)` with the state it last reported. A heartbeat older
+than 30 seconds does not count, because its node may have gone down.
+
+The same heartbeat prevents a second manager. `epsiloneridani workers manager` refuses
+to start while another node's manager is heartbeating. A command that would start one,
+such as `workers add` or `resume`, instead notes where the manager runs. That
+manager re-reads the shared `workers.toml` on every pass, so nothing needs
+applying from here. Drain and resume markers are files in `<state>`, so they work
+from any node. Starting, stopping or restarting the service itself still has to
+happen on its own node.
 
 ## tmux is a viewer, not the supervisor
 

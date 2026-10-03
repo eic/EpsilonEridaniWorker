@@ -107,6 +107,7 @@ RUN_STDLIB=(
   worker_claude_config.py
   worker_manager.py
   workers_drain.py
+  workers_remote_host.py
 )
 # special-cased python tests (handled explicitly below)
 RUN_SPECIAL=(parity_selectors.py dashboard.py)
