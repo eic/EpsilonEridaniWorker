@@ -650,6 +650,9 @@ def _local_agent_argv(prompt: str, model: str, env: dict) -> tuple[list[str], di
         ep,
         model,
         Path(os.environ.get("EPSILONERIDANI_DATA_HOME") or Path.home()) / ".cache" / "epsiloneridani" / "pi-local",
+        # The server's real window, not an assumed one: a job serving the same alias with a shorter
+        # max_model_len would otherwise be overrun mid-round.
+        context=local_endpoint.context_window(ep, model),
     )
     env = {k: v for k, v in env.items() if k not in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OPENROUTER_API_KEY")}
     env.update(
@@ -781,6 +784,12 @@ def classify_agent_failure(text: str) -> str | None:
     if not lines or len(lines) > _INFRA_MAX_LINES:
         return None  # the agent produced a transcript, so it ran; whatever failed is its own
     hay = "\n".join(lines)
+    # A server started without tool calling refuses every tool-driven request with a 400 that says so.
+    # The PR played no part in it, and the next PR would fail identically: a server fault, not a task
+    # one. (The local agent's availability probe normally catches this before a round starts; this is
+    # the backstop when the serving job changes between the probe and the launch.)
+    if local_endpoint.TOOLS_DISABLED_RE.search(hay):
+        return "the model server has tool calling disabled"
     # The LAST status is the terminal one. Taking the first would refund a run that saw a 529, retried
     # past it, and then died of a 401 — and would charge the reverse. Only the outcome counts.
     status = None

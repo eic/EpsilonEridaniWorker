@@ -15,7 +15,11 @@ Properties under test (no network; the endpoint is stubbed):
   - a preflight (empty prompt) neither reads the endpoint file nor writes the config;
   - the authoring model defaults to the file's alias, and effort is refused;
   - Bubble is refused, and the CLI refuses a local worker whose stages include review;
-  - the loop's availability gate re-reads the file every call, so a moved job is picked up.
+  - the loop's availability gate re-reads the file every call, so a moved job is picked up;
+  - a server without tool calling is unavailable (a wait), and if one slips past the gate its 400 is
+    classified as infrastructure, so it is not charged to the PR;
+  - pi is told the server's real context window (read from vLLM's own refusal of an impossible
+    max_tokens), falling back small when the server does not say.
 """
 
 import json
@@ -70,6 +74,32 @@ os.environ[local_endpoint.ENV_FILE_VAR] = str(env_file)
 os.environ["EPSILONERIDANI_DATA_HOME"] = str(tmp / "data")
 for k in ("EPSILONERIDANI_AUTHORING_LOCAL_MODEL", "EPSILONERIDANI_AUTHORING_LOCAL_EFFORT", "EPSILONERIDANI_PI"):
     os.environ.pop(k, None)
+
+# A fake vLLM-behind-LiteLLM for every POST the module makes, so no test can reach a real server. The
+# texts are the ones a live LiteLLM → vLLM endpoint returned (only the numbers vary).
+SERVER = {"tools": True, "max_model_len": 131072, "post_calls": []}
+TOOLS_OFF = (
+    '{"error":{"message":"litellm.BadRequestError: OpenAIException - \\"auto\\" tool choice requires '
+    '--enable-auto-tool-choice and --tool-call-parser to be set. Received Model Group=my-local-model","code":"400"}}'
+)
+
+
+def fake_post(url, api_key, body, timeout):
+    SERVER["post_calls"].append(body)
+    if body.get("tools"):
+        return (200, '{"choices":[]}') if SERVER["tools"] else (400, TOOLS_OFF)
+    if body.get("max_tokens", 0) > 10**6:
+        n = SERVER["max_model_len"]
+        if n is None:
+            return 400, '{"error":{"message":"bad request"}}'
+        return 400, (
+            f'{{"error":{{"message":"litellm.BadRequestError: OpenAIException - max_tokens={body["max_tokens"]} '
+            f'cannot be greater than max_model_len=max_total_tokens={n}. Please request fewer output tokens."}}}}'
+        )
+    return 200, "{}"
+
+
+local_endpoint._post_json = fake_post
 
 # --- 1. parsing -----------------------------------------------------------------------------------
 write_env()
@@ -241,7 +271,57 @@ with patch.object(local_endpoint, "_get_json", side_effect=served(models=("leans
     check("gate: without the pin, the file's alias is missing", loop.local_agent_available()[0], False)
 write_env()
 
-# --- 10. CLI refuses review for a local worker ----------------------------------------------------
+# --- 10. tool calling and context window ----------------------------------------------------------
+SERVER["tools"] = False
+with patch.object(local_endpoint, "_get_json", side_effect=served()):
+    live, why = local_endpoint.probe(ep)
+check("tools disabled: unavailable even though /models answers", live, False)
+check(
+    "tools disabled: says how to fix the server", "--enable-auto-tool-choice" in why and "Qwen3-Coder-Next" in why, True
+)
+SERVER["tools"] = True
+check("tool probe asks for one token", [b.get("max_tokens") for b in SERVER["post_calls"] if b.get("tools")][-1], 1)
+
+SERVER["max_model_len"] = 32768
+check("context: read from vLLM's refusal", local_endpoint.context_window(ep, "my-local-model"), 32768)
+SERVER["max_model_len"] = None
+check(
+    "context: unreadable falls back small",
+    local_endpoint.context_window(ep, "my-local-model"),
+    local_endpoint.FALLBACK_CONTEXT_WINDOW,
+)
+os.environ["EPSILONERIDANI_LOCAL_CONTEXT"] = "65536"
+check("context: env pin wins", local_endpoint.context_window(ep, "my-local-model"), 65536)
+os.environ.pop("EPSILONERIDANI_LOCAL_CONTEXT")
+SERVER["max_model_len"] = 32768
+m = local_endpoint.pi_models_json(ep, "my-local-model", 32768)["providers"]["local"]["models"][0]
+check("pi gets the real window", m["contextWindow"], 32768)
+check("output limit is a quarter of a small window", m["maxTokens"], 8192)
+m = local_endpoint.pi_models_json(ep, "my-local-model", 131072)["providers"]["local"]["models"][0]
+check("output limit capped for a large window", m["maxTokens"], local_endpoint.DEFAULT_MAX_TOKENS)
+argv, env = agents.host_agent_argv("do the thing", "local")
+written = json.loads((Path(env["PI_CODING_AGENT_DIR"]) / "models.json").read_text())
+check(
+    "the round's models.json carries the discovered window",
+    written["providers"]["local"]["models"][0]["contextWindow"],
+    32768,
+)
+SERVER["max_model_len"] = 131072
+
+# --- 11. a tools-disabled 400 is the server's fault, not the PR's ---------------------------------
+pi_log = (
+    '400 litellm.BadRequestError: OpenAIException - "auto" tool choice requires --enable-auto-tool-choice '
+    "and --tool-call-parser to be set. Received Model Group=my-local-model\n"
+    "Available Model Group Fallbacks=None\n"
+)
+check(
+    "classified as infrastructure (refunded)",
+    agents.classify_agent_failure(pi_log),
+    "the model server has tool calling disabled",
+)
+check("an ordinary 400 is still the task's", agents.classify_agent_failure("400 Bad Request: prompt too long\n"), None)
+
+# --- 12. CLI refuses review for a local worker ----------------------------------------------------
 for extra in ([], ["--only", "review"], ["--only", "fix-ci,review"]):
     r = subprocess.run(
         [sys.executable, "-m", "epsiloneridani_worker", "work", "--agent", "local", "--dry-run", *extra],

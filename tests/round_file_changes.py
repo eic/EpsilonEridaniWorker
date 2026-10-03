@@ -17,6 +17,9 @@ Pinned here:
   4. A clean round says nothing, so the log does not grow a line per round for no reason.
   5. Output is bounded, and says how many it elided.
   6. Every git failure is silent: this is a log line and must never fail a round that succeeded.
+  7. A PR stage measures from the PR's head, not from whatever the shared checkout held before it
+     switched to the PR branch: a round that only checked a PR out (and, say, failed at its first
+     model request) committed nothing, and must not report the whole main→PR difference.
 
 Exit 0 = all assertions hold; 1 = a mismatch.
 """
@@ -119,6 +122,22 @@ def main():
         check("the file list is bounded", len(body) <= tc.work_units._MAX_CHANGED_FILES)
         check("...and says how many it elided", "more" in out)
 
+        # 7) checking a PR out is not committing it. The checkout sits on main; the PR branch carries
+        # commits main does not. A round that switched to the branch and then failed committed nothing.
+        main_head = git(repo, "rev-parse", "HEAD").stdout.strip()
+        git(repo, "checkout", "-qb", "pr-branch")
+        for i in range(3):
+            (repo / f"pr{i}.txt").write_text(f"{i}\n")
+            git(repo, "add", "-A")
+            git(repo, "commit", "-qm", f"pr commit {i}")
+        pr_head = git(repo, "rev-parse", "HEAD").stdout.strip()
+        check("measured from the PR head, a checkout-only round logs nothing", run(repo, pr_head) == "")
+        check(
+            "(the old baseline, the pre-switch main head, would have claimed the PR's commits)",
+            "files committed" in run(repo, main_head),
+        )
+        git(repo, "checkout", "-q", "-")
+
         # 6) failures are silent, never raised.
         try:
             check("a missing checkout logs nothing", run(root / "does-not-exist", head) == "")
@@ -142,6 +161,10 @@ def main():
         {"roadmap", "fix", "fix-ci", "rebase", "bump", "lint-repair"} == tc.work_units.FILE_CHANGE_STAGES,
     )
     check("a bubble round is skipped", "stage in FILE_CHANGE_STAGES and not bubble" in src)
+    check(
+        "a PR stage's baseline is the PR head",
+        "pre_head = c.head if (c.pr and c.head) else _checkout_head(w.cfg)" in src,
+    )
 
     print("FAIL" if fails else "PASS")
     return 1 if fails else 0
