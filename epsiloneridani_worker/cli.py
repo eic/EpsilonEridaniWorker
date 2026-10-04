@@ -116,6 +116,7 @@ examples:
   epsiloneridani work --loop --skip roadmap    the whole cascade except authoring new PRs
   epsiloneridani work --pr 412                 whatever the cascade wants to do to PR #412
   epsiloneridani work --pr 412,415 --only review,fix   only those two PRs, only those two units
+  epsiloneridani work --loop --pr 412 --until-done     keep tending PR #412 until it merges or closes
   epsiloneridani work --only roadmap --roadmap-only ReductiveGroups
   epsiloneridani work --loop --roadmap-skip OneParameterSemigroups   leave that area to other workers
   epsiloneridani work --only review --agent claude --bubble
@@ -157,6 +158,12 @@ def add_work_flags(p: argparse.ArgumentParser) -> None:
         action="store_true",
         help="run the driver: keep doing rounds (pacing against quota between them) "
         "instead of the default single round",
+    )
+    p.add_argument(
+        "--until-done",
+        action="store_true",
+        help="with --loop and --pr: stop (exit 0) once every named PR has merged or closed, instead of "
+        "polling it for ever. Checked before each round; a failed GitHub lookup never stops the loop",
     )
     p.add_argument(
         "--only",
@@ -659,6 +666,8 @@ def main(argv: list[str] | None = None) -> int:
         only = resolve_tasks(getattr(args, "only", []), getattr(args, "skip", []))
         prs = resolve_pr_targets(getattr(args, "pr", []))
         raise_on_untargetable_tasks(prs, only)
+        if getattr(args, "until_done", False) and not (cmd == "work" and args.loop and prs):
+            raise SystemExit("--until-done needs --loop and --pr: it ends a loop once the named PRs are done")
         agent = resolve_agent(args)
         # --account names a CODEX account, so the round must be committed to Codex before it starts.
         # Under `auto` the pacer may legitimately land on Claude, and there is no honest answer then:
@@ -918,7 +927,7 @@ def cmd_work(args, *, only: list[str], agent: str, one_round: bool, prs: tuple[i
         # its children get theirs. Check here too, so a wrong --account costs one command rather than a
         # full survey, and so the operator sees the message before the loop's own output buries it.
         raise_on_account_mismatch(cfg, getattr(args, "account", None), agent, "account")
-        return cmd_loop(args, cfg, only=only, agent=agent, prs=prs)
+        return cmd_loop(args, cfg, only=only, agent=agent, prs=prs, until_done=getattr(args, "until_done", False))
     dry = getattr(args, "dry_run", False)
     ignore_quota = getattr(args, "ignore_quota", False)
     quota_cmd = getattr(args, "quota_cmd", None)

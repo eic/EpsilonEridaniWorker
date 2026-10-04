@@ -12,7 +12,7 @@ import time
 from .agents import resolve_authoring_profile
 from .config import Config, NoProgress, log
 from .constants import BACKOFF_BASE, BACKOFF_MAX, EX_NOPROGRESS, GH_MIN_BUDGET, INTERROUND, OPENROUTER_MODELS, POLL
-from .github import github_budget
+from .github import github_budget, open_prs
 from .quota import Provider, Quota, _glyph, _hours, _pace_reason, _unavail_reason, quota_line
 from .round import run_round_subprocess
 from .runtime_status import STATUS_ENV, drain_requested, report_runtime, runtime_snapshot
@@ -76,19 +76,25 @@ def _wait_quota_line(snap: dict, *, markup: bool = True) -> str:
     return line.replace(old, new, 1)
 
 
-def cmd_loop(args, cfg: Config, *, only: list[str], agent: str, prs: tuple[int, ...] = ()) -> int:
+def cmd_loop(
+    args, cfg: Config, *, only: list[str], agent: str, prs: tuple[int, ...] = (), until_done: bool = False
+) -> int:
     """The driver: pace against quota (codex preferred), run ONE round as a child under a hard timeout,
     then settle (short pause if productive, escalating back-off otherwise). Ctrl-C stops the current
     round and exits. Keeps the escalating back-off that stopped ~700 no-op rounds hammering a
-    rate-limited GitHub."""
+    rate-limited GitHub.
+
+    `until_done` (needs `prs`) makes the loop finite: before each round it looks the targeted PRs up and
+    returns 0 once none is open, i.e. every one has merged or closed. A failed lookup never ends the
+    loop; the round runs as usual and the next check tries again."""
     unpaced = agent in OPENROUTER_MODELS or agent == "kiro"
     ignore_quota = getattr(args, "ignore_quota", False)
     bubble = getattr(args, "bubble", False)
     quota_cmd = getattr(args, "quota_cmd", None)
     targeted = f" pr={','.join(str(n) for n in prs)}" if prs else ""
     log(
-        f"loop start: worker={cfg.wid} only={','.join(only) or '(all)'}{targeted} "
-        f"agent={agent}{' [bubble]' if bubble else ''}"
+        f"loop start: worker={cfg.wid} only={','.join(only) or '(all)'}{targeted}"
+        f"{' until-done' if until_done else ''} agent={agent}{' [bubble]' if bubble else ''}"
     )
     report_runtime("idle", detail="loop started", phase=None, target=None, next_action_at=None)
     streak = 0
@@ -107,6 +113,9 @@ def cmd_loop(args, cfg: Config, *, only: list[str], agent: str, prs: tuple[int, 
             # below wakes early for it. Exiting 0 is what the manager reads as "drained, leave it".
             if drain_requested():
                 log("drain requested — stopping between rounds")
+                return 0
+            if until_done and open_prs(prs) == set():
+                log(f"until-done: PR(s) {', '.join(f'#{n}' for n in prs)} no longer open — stopping")
                 return 0
             report_runtime(
                 "checking-quota",

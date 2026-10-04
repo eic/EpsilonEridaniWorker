@@ -234,6 +234,20 @@ def _parse_iso8601(s: str | None) -> int | None:
 # ============================================================================
 
 
+def open_prs(numbers: tuple[int, ...] | list[int]) -> set[int] | None:
+    """The subset of these EpsilonEridani pull requests that are still open, or None when any lookup
+    failed. A failed lookup is not an answer: a caller deciding that work is finished must not read a
+    rate limit or a network blip as "merged"."""
+    still_open: set[int] = set()
+    for number in numbers:
+        r = gh_run(["gh", "api", f"repos/{EPSILONERIDANI}/pulls/{number}", "--jq", ".state"])
+        if r.returncode != 0:
+            return None
+        if r.stdout.strip() == "open":
+            still_open.add(number)
+    return still_open
+
+
 def _gh_rate_kind(text: str) -> str | None:
     """Classify a failed `gh` call from its combined stdout+stderr: 'secondary' | 'primary' | None.
     Secondary first — its message also contains 'rate limit', so the primary regex would match it too."""
