@@ -60,6 +60,7 @@ RUN_STDLIB=(
   ledger_blocking.py
   local_agent.py
   loop_sigterm.py
+  loop_until_done.py
   mirror_creds.py
   mirror_creds_macos.py
   oauth_refresh_loop.py
