@@ -128,6 +128,21 @@ class RoundOpts:
 
     @property
     def agent_name(self) -> str:
+        """Who authored the round, as the prompts write it into `Co-Authored-By:` and the PR footer.
+
+        A local agent is named by the model it runs (the alias from --author-model, the env, or the
+        endpoint file's OPENAI_MODEL), not the generic "Local model": one endpoint file can serve a
+        different model from one job to the next, and the commit should say which one wrote it."""
+        if self.work_model == "local":
+            try:
+                model = self.effective_authoring_profile.model
+            except (Die, NoProgress):
+                # A model-less file is Die; a missing one reaches us as NoProgress (agents turns the
+                # endpoint's EndpointDown into a back-off). The round resolves its profile before any
+                # prompt, so this is only a guard against naming nothing.
+                model = None
+            if model:
+                return model
         return AGENT_NAMES.get(self.work_model, self.work_model)
 
     @property

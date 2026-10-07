@@ -14,6 +14,7 @@ Properties under test (no network; the endpoint is stubbed):
     private PI_CODING_AGENT_DIR, the key in its own variable, and no OPENAI/ANTHROPIC keys;
   - a preflight (empty prompt) neither reads the endpoint file nor writes the config;
   - the authoring model defaults to the file's alias, and effort is refused;
+  - commits and PRs credit that model by name (`Co-Authored-By: <model>`), not a generic "Local model";
   - Bubble is refused, and the CLI refuses a local worker whose stages include review;
   - the loop's availability gate re-reads the file every call, so a moved job is picked up;
   - a server without tool calling is unavailable (a wait), and if one slips past the gate its 400 is
@@ -245,6 +246,28 @@ check(
     "file default records its source",
     agents.resolve_authoring_profile("local").model_source,
     "endpoint file OPENAI_MODEL",
+)
+
+# The agent name the prompts write into `Co-Authored-By:` and the PR footer is the model, not the
+# generic "Local model", falling back to it only when no model can be resolved.
+local_opts = dict(only=["fix"], agent="local", work_model="local", sandbox_host=True, dry_run=False)
+check("agent name is the file's model", tc.RoundOpts(**local_opts).agent_name, "my-local-model")
+check(
+    "agent name follows a pinned profile",
+    tc.RoundOpts(
+        **local_opts, authoring_profile=agents.resolve_authoring_profile("local", cli_model="leanstral")
+    ).agent_name,
+    "leanstral",
+)
+os.environ[local_endpoint.ENV_FILE_VAR] = str(tmp / "nomodel.env")
+check("agent name falls back without a model", tc.RoundOpts(**local_opts).agent_name, "Local model")
+os.environ[local_endpoint.ENV_FILE_VAR] = str(tmp / "absent.env")
+check("agent name falls back without a file", tc.RoundOpts(**local_opts).agent_name, "Local model")
+os.environ[local_endpoint.ENV_FILE_VAR] = saved
+check(
+    "other agents keep their names",
+    tc.RoundOpts(only=["fix"], agent="claude", work_model="claude", sandbox_host=True, dry_run=False).agent_name,
+    "Claude Code",
 )
 
 # --- 8. bubble refused ----------------------------------------------------------------------------
