@@ -142,6 +142,7 @@ environment (flags win; full reference linked below):
   EPSILONERIDANI_AUTO_REFRESH=1 same as --auto-refresh (renew an expired Claude token; see --auto-refresh)
   EPSILONERIDANI_CLAUDE_NO_WEEKLY_CAP=1 same as --claude-no-weekly-cap (this account has no weekly cap)
   EPSILONERIDANI_CLAUDE_WEEKLY_SCOPE  pace the weekly on this model-scoped cap (e.g. Fable), not the overall
+  EPSILONERIDANI_NO_UPDATE_CHECK=1 never check PyPI for a newer release (workers status, the dashboard)
   EPSILONERIDANI_ACCOUNT        default for --account (require a specific Codex account)
   CLAUDE_CONFIG_DIR      Claude config/credential source (Bubble uses a private macOS handoff)
                          (account switching, where the creds live in a file)
