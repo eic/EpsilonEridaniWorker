@@ -1,8 +1,8 @@
 """Is a newer epsiloneridani on PyPI? A hint for the operator, never an action.
 
-The interactive views (`workers status`, the dashboard) ask `update_notice`, which compares the
-installed version with the newest final release on PyPI and, when PyPI is ahead, returns one line
-naming both versions and how to upgrade this install. Nothing here installs anything: an upgrade
+The interactive views (`workers status`, the dashboard) ask `update_available`, which compares the
+installed version with the newest final release on PyPI and, when PyPI is ahead, returns an
+UpdateInfo whose message() names both versions and how to upgrade this install. Nothing here installs anything: an upgrade
 changes the code that gates real model spend, so it stays the operator's decision.
 
 The PyPI answer is cached for a day (a failed lookup for a few hours), so a `status --watch` or a
