@@ -195,6 +195,38 @@ shows a non-null weekly percentage, leave the flag off. With the flag set on
 such an account, the worker paces only against the 5-hour window and can use
 up the week's allowance days before it resets.
 
+## A model with its own weekly budget: `$EPSILONERIDANI_CLAUDE_WEEKLY_SCOPE`
+
+Some accounts give one model a weekly budget of its own on top of the overall
+weekly one. The usage endpoint reports it as a `weekly_scoped` entry in the
+`limits` array, whose `scope.model` names the model (for example
+`"display_name": "Fable"`). By default the worker skips these scoped caps and
+paces every Claude worker on the overall weekly. A worker authoring on the
+scoped model would then sit held behind spend on the other models while its
+own budget goes unused.
+
+To run one worker on that model and its budget, set both in its environment
+(for a managed worker, its `[workers.env]` table):
+
+```toml
+EPSILONERIDANI_AUTHORING_CLAUDE_MODEL = "claude-fable-5-1"
+EPSILONERIDANI_CLAUDE_WEEKLY_SCOPE = "Fable"
+```
+
+The scope is matched against `scope.model.display_name` or `scope.model.id`,
+case-insensitively. That worker's weekly window is then the scoped cap, paced
+on the same curve; the session window still gates as before, and other
+workers keep the overall weekly. If the usage response carries no entry for
+the named scope, the weekly reads `absent` and the worker holds: it never
+falls back to the flat `seven_day`, which is the overall figure. The
+post-reset bootstrap runs on `EPSILONERIDANI_AUTHORING_CLAUDE_MODEL` when it is
+set, so it opens the window the worker will spend. `--claude-no-weekly-cap`
+still drops the weekly window entirely, scoped or not.
+
+Whether the scoped model's spend also counts against the overall weekly is up
+to the plan. If it does, the scoped worker still draws down the budget the
+other workers pace on.
+
 ## Why "strictly under"
 
 A provider is available while `used%` is strictly under the budget for the

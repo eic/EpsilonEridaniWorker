@@ -21,6 +21,7 @@ FAIL_FAST=0
 # for their real workers). The tests set what each case needs; inherited values only make a local run
 # disagree with CI, as the quota tests did.
 unset EPSILONERIDANI_AUTO_REFRESH EPSILONERIDANI_QUOTA_IGNORE EPSILONERIDANI_CLAUDE_NO_WEEKLY_CAP \
+  EPSILONERIDANI_CLAUDE_WEEKLY_SCOPE EPSILONERIDANI_AUTHORING_CLAUDE_MODEL \
   EPSILONERIDANI_CLAUDE_CONFIG_DIR EPSILONERIDANI_ROUND_TIMEOUT EPSILONERIDANI_MAX_OPEN_PRS \
   EPSILONERIDANI_GEMINI_NO_RENEW EPSILONERIDANI_PACE EPSILONERIDANI_LOCAL_CONTEXT \
   EPSILONERIDANI_LOCAL_MAX_TOKENS \
@@ -78,6 +79,7 @@ RUN_STDLIB=(
   review_sync_failure.py
   quota_claude_bootstrap.py
   quota_claude_no_weekly_cap.py
+  quota_claude_weekly_scope.py
   quota_claude_windows.py
   quota_codex_windows.py
   quota_gemini_renew.py

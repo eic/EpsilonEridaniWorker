@@ -622,11 +622,33 @@ def _claude_reading(window: str, source: str, rec: object, now: float) -> Readin
     return Reading(window, state, used, resets, detail, source)
 
 
+def _claude_weekly_scope() -> str | None:
+    """The model-scoped weekly cap this worker paces against instead of the overall weekly, or None.
+
+    $EPSILONERIDANI_CLAUDE_WEEKLY_SCOPE names it by the `limits` entry's `scope.model.display_name` or
+    `scope.model.id`, case-insensitively (e.g. "Fable"). For a worker whose authoring model carries its
+    own weekly budget on top of the overall one (set EPSILONERIDANI_AUTHORING_CLAUDE_MODEL to match):
+    paced on the overall weekly, it would be held by spend on the other models. Read live from the env,
+    like the other operator dials. Unset (the default): the overall weekly, as always."""
+    v = (os.environ.get("EPSILONERIDANI_CLAUDE_WEEKLY_SCOPE") or "").strip()
+    return v.lower() or None
+
+
+def _claude_scope_matches(lim: dict, want: str) -> bool:
+    """Whether one `limits` entry is the model-scoped cap named `want` (already lower-cased)."""
+    scope = lim.get("scope")
+    model = scope.get("model") if isinstance(scope, dict) else None
+    if not isinstance(model, dict):
+        return False
+    return any(str(model.get(k) or "").strip().lower() == want for k in ("display_name", "id"))
+
+
 def _claude_limits_record(payload: dict, window: str) -> object:
     """This window's entry in the structured `limits` array, or _ABSENT_REC. Each entry carries a
     `group`/`kind` (session | weekly_all | weekly_scoped), a `percent`, a `resets_at` and a `scope`
-    that is non-null for the per-model weekly caps (which don't gate the worker's opus, so they are
-    skipped). Looked up PER WINDOW: an array that carries only the weekly must not cost us the weekly
+    that is non-null for the per-model weekly caps. Those are skipped, unless
+    $EPSILONERIDANI_CLAUDE_WEEKLY_SCOPE names one: then that cap IS the weekly window, and the unscoped
+    overall weekly is skipped instead (see _claude_weekly_scope). Looked up PER WINDOW: an array that carries only the weekly must not cost us the weekly
     just because the session entry is missing."""
     limits = payload.get("limits")
     if not isinstance(limits, list):
@@ -637,8 +659,12 @@ def _claude_limits_record(payload: dict, window: str) -> object:
         group = str(lim.get("group") or lim.get("kind") or "")
         if window == "session" and group == "session":
             return lim
-        if window == "weekly" and group.startswith("weekly") and not lim.get("scope"):
-            return lim  # the unscoped overall weekly (weekly_all); model-scoped caps are skipped
+        if window == "weekly" and group.startswith("weekly"):
+            want = _claude_weekly_scope()
+            if want is None and not lim.get("scope"):
+                return lim  # the unscoped overall weekly (weekly_all); model-scoped caps are skipped
+            if want is not None and _claude_scope_matches(lim, want):
+                return lim  # the operator-named model-scoped weekly (weekly_scoped)
     return _ABSENT_REC
 
 
@@ -666,6 +692,10 @@ def _claude_window_reading(payload: dict, window: str, now: float | None = None)
     rec = _claude_limits_record(payload, window)
     if rec is not _ABSENT_REC:
         return _claude_reading(window, "limits", rec, now)
+    if window == "weekly" and _claude_weekly_scope() is not None:
+        # The flat seven_day is the OVERALL weekly, not the named scope: falling back to it would pace
+        # the scoped worker on the wrong budget. No record for the scope is a missing limit — fail closed.
+        return _claude_reading(window, "limits", _ABSENT_REC, now)
     return _claude_reading(window, _FLAT_KEY[window], _claude_flat_record(payload, window), now)
 
 
@@ -686,7 +716,8 @@ def _claude_unauthorized(prov: Provider) -> bool:
 
 def _claude_readings(payload: dict, now: float | None = None) -> list[Reading]:
     """The session and the overall (unscoped) weekly, each read on its own. These two gate the
-    worker's opus; the per-model weekly caps do not. $EPSILONERIDANI_CLAUDE_NO_WEEKLY_CAP drops the
+    worker's opus; the per-model weekly caps do not, unless $EPSILONERIDANI_CLAUDE_WEEKLY_SCOPE names
+    one to stand in for the overall weekly. $EPSILONERIDANI_CLAUDE_NO_WEEKLY_CAP drops the
     weekly window entirely rather than reading it — see _claude_no_weekly_cap."""
     now = time.time() if now is None else now
     if not isinstance(payload, dict):  # never .get() on a non-object; callers treat both as hard blocks
@@ -2389,6 +2420,12 @@ class Quota:
         import tempfile
 
         argv = [*(shlex.split(CLAUDE_CMD) or ["claude"]), "-p", CLAUDE_BOOTSTRAP_PROMPT]
+        # Open the window this worker will actually spend: a worker paced on a model-scoped weekly
+        # (EPSILONERIDANI_CLAUDE_WEEKLY_SCOPE) needs a turn on THAT model, or the scoped cap stays
+        # idle and the bootstrap retries forever while the default model's window opens instead.
+        model = (os.environ.get("EPSILONERIDANI_AUTHORING_CLAUDE_MODEL") or "").strip()
+        if model:
+            argv += ["--model", model]
         env = {k: v for k, v in os.environ.items() if k not in CLAUDE_BOOTSTRAP_DROP_ENV}
         return argv, env, tempfile.mkdtemp(prefix="epsiloneridani-quota-bootstrap-")
 
