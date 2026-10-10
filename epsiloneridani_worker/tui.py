@@ -26,6 +26,7 @@ from .worker_manager import (
     manager_request,
     restart_worker,
     set_worker_enabled,
+    update_cache_path,
     worker_snapshots,
 )
 
@@ -414,6 +415,7 @@ def _dashboard_app(cfg, loader=None):
             self.worker_error = None
             self.worker_manager_online = False
             self._worker_load_seq = 0
+            self.update_info = None  # an update_check.UpdateInfo once the background check finds one
 
         def compose(self) -> ComposeResult:
             yield Static(id="hdr")
@@ -432,6 +434,29 @@ def _dashboard_app(cfg, loader=None):
             self.set_interval(90, self._refresh)  # keep it live without per-keypress refetches
             self._refresh_workers()
             self.set_interval(2, self._refresh_workers)
+            self._check_update()  # once per session; the answer itself is cached for a day
+
+        # ---- PyPI update check: a background thread, so a slow or absent network never delays the UI --
+        @work(thread=True, exclusive=True, group="update")
+        def _check_update(self) -> None:
+            from .update_check import update_available
+
+            try:
+                info = update_available(update_cache_path())
+            except Exception:  # a hint must never tear the dashboard down
+                info = None
+            if info is not None:
+                self.call_from_thread(self._update_found, info)
+
+        def _update_found(self, info) -> None:
+            self.update_info = info
+            self.notify(info.message(), title="update available", severity="warning", timeout=15)
+            self._render()
+
+        def _update_text(self) -> Text | None:
+            if self.update_info is None:
+                return None
+            return Text("\nupdate: " + self.update_info.message(), style="yellow")
 
         # ---- survey load: a background thread, because gh shells out (this was the old lag) ----------
         def _refresh(self) -> None:
@@ -490,6 +515,8 @@ def _dashboard_app(cfg, loader=None):
                 head.append_text(Text.from_markup(quota_line(self.quota)))
             if sv.github_failed:
                 head.append("\nGitHub fetch failed — survey unavailable", style="red")
+            if (note := self._update_text()) is not None:
+                head.append_text(note)
             self.query_one("#hdr", Static).update(Panel(head, title="epsiloneridani"))
 
         def _render_table(self) -> None:
@@ -579,6 +606,14 @@ def _dashboard_app(cfg, loader=None):
             head.append(
                 f"\nmanager: {'running' if self.worker_manager_online else 'offline'}   config: {self.workers_config}"
             )
+            if (note := self._update_text()) is not None:
+                head.append_text(note)
+            pending = [row["id"] for row in self.worker_rows if row.get("restart_pending")]
+            if pending:
+                head.append(
+                    f"\nrunning older code than installed: {', '.join(pending)} (restart after round to pick it up)",
+                    style="yellow",
+                )
             self.query_one("#hdr", Static).update(Panel(head, title="epsiloneridani — workers"))
 
         def _render_worker_table(self) -> None:

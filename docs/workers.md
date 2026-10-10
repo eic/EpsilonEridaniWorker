@@ -183,11 +183,11 @@ always writes `enabled = true`. Use `workers edit` for those.
 | Action | What it does |
 | --- | --- |
 | _(none)_ | Same as `status` |
-| `status [--json] [--watch]` | Desired and actual state. Exits nonzero if the manager is offline or a wanted worker is not alive |
+| `status [--json] [--watch]` | Desired and actual state, plus a hint when a newer release is on PyPI or a worker still runs older code (see [upgrading](#upgrading)). Exits nonzero if the manager is offline or a wanted worker is not alive |
 | `apply [--check]` | Validate the TOML schema and manager-level rules, then reconcile. `--check` validates only |
 | `add [ID] [flags]` | Append an enabled definition and reconcile |
 | `enable ID` / `disable ID` | Persist desired running or stopped state |
-| `restart ID [--after-round]` | Request a restart without changing desired state; a disabled worker stays stopped. Immediate by default, which stops the round in flight. `--after-round` lets the worker finish its round first |
+| `restart ID \| --all [--after-round]` | Request a restart without changing desired state; a disabled worker stays stopped. `--all` is every enabled worker. Immediate by default, which stops the round in flight. `--after-round` lets the worker finish its round first |
 | `drain ID... \| --all [--wait] [--timeout S]` | Stop workers between rounds: each finishes the round it is in, then stays down until `resume`. `--wait` returns once all have stopped, or exits 1 after `--timeout` (default 7200s). See [draining for a restart](#draining-for-a-restart) |
 | `resume ID... \| --all` | Clear a drain. A worker still finishing its round carries on; a stopped one is launched again |
 | `remove ID` | Drop the definition and stop the worker |
@@ -296,6 +296,35 @@ Settings in the service's own environment (a systemd drop-in, say) are not part
 of any worker's definition. A change there reaches workers only when the manager
 restarts, which is what `workers drain --all --wait` is for. To roll such a
 setting out gradually instead, put it in each worker's `env` table.
+
+## Upgrading
+
+`workers status` and the dashboard check PyPI for a newer `epsiloneridani` at
+most once a day (a failed lookup is retried after six hours) and, when one is
+out, say so:
+
+```text
+update:  epsiloneridani 0.17.0 is available (installed 0.16.0): upgrade with
+         `/path/to/python -m pip install -U epsiloneridani`, then
+         `epsiloneridani workers restart --all --after-round`
+```
+
+The command matches how this copy was installed: pip (including a VCS
+install, which it moves onto the release), `uv tool upgrade`, or
+`pipx upgrade`. An editable checkout is told to update the checkout instead.
+Only final releases are suggested. Nothing is ever installed for you: an
+upgrade changes the code that decides when the workers spend, so it stays your
+call. `EPSILONERIDANI_NO_UPDATE_CHECK=1` turns the check off; a source tree
+that is not installed (the Docker image) is never checked.
+
+Upgrading the package does not touch running workers: each keeps the code it
+started with. Every worker records the version it launched on, and until it
+restarts, `workers status` marks it `(running 0.16.0; restart to pick up
+0.17.0)` and the dashboard lists it. `workers restart --all --after-round`
+lets each finish its round and then starts it on the new code. The manager
+process keeps running the old code too; when a release changes the manager
+itself, restart it the way [draining for a restart](#draining-for-a-restart)
+shows, so no round is cut short.
 
 ## Worker ids and credential isolation
 

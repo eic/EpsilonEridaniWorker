@@ -26,6 +26,9 @@ unset EPSILONERIDANI_AUTO_REFRESH EPSILONERIDANI_QUOTA_IGNORE EPSILONERIDANI_CLA
   EPSILONERIDANI_GEMINI_NO_RENEW EPSILONERIDANI_PACE EPSILONERIDANI_LOCAL_CONTEXT \
   EPSILONERIDANI_LOCAL_MAX_TOKENS \
   CLAUDE_REFRESH_SKEW_S VIRTUAL_ENV
+# Never ask PyPI from a test: `workers status` and the dashboard would otherwise check for an update.
+# tests/update_check.py turns it back on with a stub fetch.
+export EPSILONERIDANI_NO_UPDATE_CHECK=1
 
 # stdlib-only python tests, run with the uv-provided interpreter
 RUN_STDLIB=(
@@ -109,6 +112,7 @@ RUN_STDLIB=(
   tend_bot_permissions.py
   worker_claude_config.py
   worker_manager.py
+  update_check.py
   workers_drain.py
   workers_remote_host.py
 )

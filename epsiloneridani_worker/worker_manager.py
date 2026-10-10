@@ -34,6 +34,7 @@ from .paths import HERE, ensure_ssl_cert_file, entry_cmd, self_argv, self_env
 from .quota import parse_pace_curve
 from .round import signal_group
 from .runtime_status import STATUS_ENV, drain_marker, read_json, update_status
+from .update_check import CACHE_NAME, installed_version, restart_pending, update_available
 
 CONFIG_VERSION = 1
 DEFAULT_INTERVAL = 2.0
@@ -660,6 +661,7 @@ def worker_snapshots(specs: list[WorkerSpec] | None = None, config: Path | None 
     except OSError:
         pass
     snapshots: list[dict] = []
+    installed = installed_version()
     for wid in sorted(ids):
         spec = wanted.get(wid)
         actual = runner_status(wid)
@@ -694,6 +696,11 @@ def worker_snapshots(specs: list[WorkerSpec] | None = None, config: Path | None 
                 "remote_host": remote_host,
                 "enabled": bool(spec and spec.enabled),
                 "draining": draining,
+                # Live here on an older version than the one installed since: it picks the new one up
+                # on its next start (`workers restart ID --after-round`). Not judged for a worker on
+                # another host, whose install may differ.
+                "installed_version": installed,
+                "restart_pending": alive and not remote_host and restart_pending(actual.get("version"), installed),
                 "actual_spec_hash": actual.get("spec_hash"),
                 "spec_hash": spec.fingerprint() if spec else None,
                 "spec": spec.as_dict() if spec else None,
@@ -812,6 +819,9 @@ def cmd_managed_runner(args) -> int:
                 instance=uuid.uuid4().hex,
                 host=this_host(),
                 spec_hash=spec.fingerprint(),
+                # The version on disk as this worker launches, which is what the child imports; status
+                # compares it with the installed one to show a worker still running older code.
+                version=installed_version(),
                 agent=spec.agent,
                 only=list(spec.only),
                 sandbox=spec.sandbox,
@@ -1572,10 +1582,32 @@ def _manager_line(online: bool, remote: dict | None) -> str:
     return "manager: offline"
 
 
+def update_cache_path() -> Path:
+    """Where the PyPI update check caches its answer: one file per machine state directory."""
+    return workers_state_dir() / CACHE_NAME
+
+
 def _worker_status_lines(
-    config: Path, snapshots: list[dict], online: bool, *, width: int, remote: dict | None = None
+    config: Path,
+    snapshots: list[dict],
+    online: bool,
+    *,
+    width: int,
+    remote: dict | None = None,
+    update: str | None = None,
 ) -> list[str]:
     lines = [_manager_line(online, remote), f"config:  {config}"]
+    if update:
+        lines.extend(
+            textwrap.wrap(
+                update,
+                width=max(width, 40),
+                initial_indent="update:  ",
+                subsequent_indent=" " * 9,
+                break_long_words=False,
+                break_on_hyphens=False,
+            )
+        )
     if not snapshots:
         return [*lines, "", "workers: none"]
 
@@ -1596,6 +1628,8 @@ def _worker_status_lines(
             heading += f" (on {item['remote_host']})"
         if item["desired"] == "stopped" or state in {"missing", "restarting", "stale", "stopped", "stopping"}:
             heading += f" (desired: {item['desired']})"
+        if item.get("restart_pending"):
+            heading += f" (running {item.get('version')}; restart to pick up {item.get('installed_version')})"
         lines.extend(["", heading])
         lines.extend(_worker_configuration_lines(item, width))
         lines.extend(_claude_login_lines(item, peers, width))
@@ -1633,16 +1667,26 @@ def print_worker_status(config: Path, *, as_json: bool = False) -> bool:
     snapshots = worker_snapshots(specs)
     online = manager_request("ping")
     remote = None if online else remote_manager()
+    update = update_available(update_cache_path())
     if as_json:
         print(
             json.dumps(
-                {"manager": online, "remote_manager": remote, "config": str(config), "workers": snapshots},
+                {
+                    "manager": online,
+                    "remote_manager": remote,
+                    "config": str(config),
+                    "update": dataclasses.asdict(update) if update else None,
+                    "workers": snapshots,
+                },
                 indent=2,
             )
         )
     else:
         width = shutil.get_terminal_size(fallback=(100, 24)).columns
-        print("\n".join(_worker_status_lines(config, snapshots, bool(online), width=width, remote=remote)))
+        lines = _worker_status_lines(
+            config, snapshots, bool(online), width=width, remote=remote, update=update.message() if update else None
+        )
+        print("\n".join(lines))
     # A drained worker is down on purpose, exactly like a disabled one.
     healthy = bool(online or remote) and all(
         item["desired"] == "stopped" or item.get("alive") or item.get("actual") == "drained" for item in snapshots
@@ -2116,18 +2160,21 @@ def add_workers_parser(subparsers) -> None:
     descriptions = {
         "enable": "persist desired running state",
         "disable": "persist desired stopped state",
-        "restart": "restart one worker without changing desired state",
+        "restart": "restart a worker (or --all) without changing desired state",
         "remove": "remove a worker definition and stop it",
     }
     for action in ("enable", "disable", "restart", "remove"):
         item = actions.add_parser(action, help=descriptions[action])
-        item.add_argument("worker_id", help="worker id")
         if action == "restart":
+            item.add_argument("worker_id", nargs="?", help="worker id")
+            item.add_argument("--all", dest="all_workers", action="store_true", help="restart every enabled worker")
             item.add_argument(
                 "--after-round",
                 action="store_true",
                 help="let the worker finish the round it is in, then restart it (by default it restarts at once)",
             )
+        else:
+            item.add_argument("worker_id", help="worker id")
     drain = actions.add_parser(
         "drain",
         help="stop workers between rounds: each finishes its current round, then stays down until `resume`",
@@ -2281,14 +2328,22 @@ def cmd_workers(args) -> int:
         if action == "resume":
             return resume_workers(config, args.worker_ids, every=args.all_workers)
         if action == "restart":
+            # The same target rules as drain: ids or --all (every enabled worker), not both.
+            targets = _drain_targets(
+                config, [args.worker_id] if args.worker_id else [], getattr(args, "all_workers", False)
+            )
             if args.after_round:
-                if not any(spec.id == args.worker_id for spec in load_worker_specs(config)):
-                    raise WorkersError(f"unknown worker: {args.worker_id}")
-                request_drain(args.worker_id, restart=True)
+                for spec in targets:
+                    request_drain(spec.id, restart=True)
                 ensure_manager(config)
-                print(f"restart requested: {args.worker_id} restarts after its current round")
+                if len(targets) == 1:
+                    print(f"restart requested: {targets[0].id} restarts after its current round")
+                else:
+                    ids = ", ".join(spec.id for spec in targets) or "(no enabled workers)"
+                    print(f"restart requested: {ids} restart after their current rounds")
                 return 0
-            restart_worker(config, args.worker_id)
+            for spec in targets:
+                restart_worker(config, spec.id)
             return 0
         if action == "logs":
             item = next((item for item in worker_snapshots(config=config) if item["id"] == args.worker_id), None)

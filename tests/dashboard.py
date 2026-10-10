@@ -510,8 +510,31 @@ def test_dashboard_migrates_host_pref():
             os.environ["EPSILONERIDANI_ROADMAP_SKIP"] = old_skip
 
 
+async def test_update_notice():
+    """A newer release found by the background PyPI check shows in the header (the check is stubbed:
+    no network)."""
+    import epsiloneridani_worker.update_check as uc
+
+    real = uc.update_available
+    uc.update_available = lambda cache: uc.UpdateInfo("0.16.0", "0.17.0", "pip install -U epsiloneridani")
+    try:
+        app = tc._dashboard_app(CFG, loader=loader)
+        async with app.run_test() as pilot:
+            await await_survey(app, pilot)
+            for _ in range(100):
+                if app.update_info is not None:
+                    break
+                await pilot.pause(0.05)
+            check("update check result reaches the dashboard", app.update_info is not None)
+            note = app._update_text()
+            check("header names the new release", note is not None and "0.17.0 is available" in note.plain)
+    finally:
+        uc.update_available = real
+
+
 async def run_all():
     await test_dashboard()
+    await test_update_notice()
     await test_cursor_before_load()
     await test_sticky_env_focus()
     test_load_token()
