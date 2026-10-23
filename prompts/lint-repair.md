@@ -33,9 +33,9 @@ lake exe cache get Mathlib Physlib TauCeti
 git fetch -q origin main
 shim_args=(--fail-on-available); base_shims="$(mktemp)"; base_root="$(mktemp -d)"; have_base=0
 base_ref="$(git merge-base origin/main HEAD)"
-if git show "$base_ref":EpsilonEridani/mathlib-shims.json > "$base_shims" 2>/dev/null; then git archive "$base_ref" EpsilonEridani | tar -x -C "$base_root"; shim_args+=(--base-manifest "$base_shims" --base-root "$base_root"); have_base=1; fi
+if git show "$base_ref":EpsilonEridani/upstream-shims.json > "$base_shims" 2>/dev/null; then git archive "$base_ref" EpsilonEridani | tar -x -C "$base_root"; shim_args+=(--base-manifest "$base_shims" --base-root "$base_root"); have_base=1; fi
 if [ "$have_base" = 1 ] && git diff --quiet "$base_ref" -- lake-manifest.json lean-toolchain; then shim_args+=(--only-new); fi
-if [ -f scripts/check-expired-mathlib-shims.py ]; then python3 scripts/check-expired-mathlib-shims.py "${shim_args[@]}"; fi
+if [ -f scripts/check-expired-upstream-shims.py ]; then python3 scripts/check-expired-upstream-shims.py "${shim_args[@]}"; fi
 rm -f "$base_shims"; rm -rf "$base_root"
 lake build --iofail
 lake env lean --run scripts/DuplicateDeclarations.lean

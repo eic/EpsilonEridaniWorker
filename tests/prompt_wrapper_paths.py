@@ -109,14 +109,14 @@ def main():
 
     # 4) Shim expiry is an autonomous repair input, not a notification-only dead end. Both workers
     # reproduce and verify the gate, and both know the registry is part of the source-only fix.
-    shim_command = "python3 scripts/check-expired-mathlib-shims.py"
+    shim_command = "python3 scripts/check-expired-upstream-shims.py"
     for name in ("bump.md", "fix-ci.md"):
         prompt = (PROMPTS / name).read_text()
         check(f"{name}: reproduces and verifies shim expiry", prompt.count(shim_command) == 2)
         check(f"{name}: uses strict shim expiry mode", prompt.count("--fail-on-available") == 2)
         check(f"{name}: validates the base registry ratchet", prompt.count("--base-manifest") == 2)
         check(f"{name}: refreshes the base ref", prompt.count("git fetch -q origin main") == 2)
-        check(f"{name}: migrates the AI-owned registry", "EpsilonEridani/mathlib-shims.json" in prompt)
+        check(f"{name}: migrates the AI-owned registry", "EpsilonEridani/upstream-shims.json" in prompt)
         check(f"{name}: forbids weakening exact targets", "never make the check green" in prompt)
     check(
         "fix-ci.md: source PRs probe only changed obligations",
@@ -126,7 +126,7 @@ def main():
         prompt = (PROMPTS / name).read_text()
         check(
             f"{name}: shim baseline is the PR merge base",
-            prompt.count('git show "$base_ref":EpsilonEridani/mathlib-shims.json') == 2,
+            prompt.count('git show "$base_ref":EpsilonEridani/upstream-shims.json') == 2,
         )
         check(
             f"{name}: shim ratchet reads merge-base sources",
