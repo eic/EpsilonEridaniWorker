@@ -1700,8 +1700,9 @@ def review_in_bubble(w: Worker, pr: int, head: str, reviewers: str, opts: RoundO
     store = cfg.store_dir
     store.mkdir(parents=True, exist_ok=True)
     mounts = [f"{engine_dir}:/opt/engine:ro", f"{roadmap_dir}:/opt/roadmap:ro", f"{store}:/opt/review-store:rw"]
-    # No --rubrics-sha/--shadow (they'd re-fetch EpsilonEridaniReview). --no-mathlib for now; wiring
-    # --mathlib-dir at the bubble's vendored .lake/packages/mathlib is the reuse-rubric refinement.
+    # No --rubrics-sha/--shadow (they'd re-fetch EpsilonEridaniReview). --no-upstream for now; wiring
+    # --upstream-dir NAME=PATH at the bubble's vendored .lake/packages/<name> trees (mathlib, Physlib,
+    # TauCeti) is the reuse-rubric refinement.
     # run_in_bubble prefixes `env PATH=… `, so the inner command must start with an executable, not the
     # `cd` shell builtin — carry the engine on PYTHONPATH instead of cwd (cwd is irrelevant: the engine
     # uses --repo-dir for its files and an absolute temp workdir).
@@ -1714,7 +1715,7 @@ def review_in_bubble(w: Worker, pr: int, head: str, reviewers: str, opts: RoundO
     inner = (
         "env PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/opt/engine python3 -m runner.cli "
         f"{pr} --repo {EPSILONERIDANI} --repo-dir /opt/engine --roadmap-dir /opt/roadmap "
-        f"--no-mathlib --no-sync --store /opt/review-store --post "
+        f"--no-upstream --no-sync --store /opt/review-store --post "
         f"--max-rounds-per-day {REVIEW_DAILY_CAP} "  # one value drives the survey prefilter + engine
         f"--reviewer {reviewers} --expect-head {head} --submitted-by {me()}{codex_flag}{kiro_flag}"
     )
