@@ -10,14 +10,14 @@ lake exe cache get Mathlib Physlib TauCeti
 git fetch -q origin main
 shim_args=(--fail-on-available); base_shims="$(mktemp)"; base_root="$(mktemp -d)"
 base_ref="$(git merge-base origin/main HEAD)"
-if git show "$base_ref":EpsilonEridani/mathlib-shims.json > "$base_shims" 2>/dev/null; then git archive "$base_ref" EpsilonEridani | tar -x -C "$base_root"; shim_args+=(--base-manifest "$base_shims" --base-root "$base_root"); fi
-if [ -f scripts/check-expired-mathlib-shims.py ]; then python3 scripts/check-expired-mathlib-shims.py "${shim_args[@]}"; fi
+if git show "$base_ref":EpsilonEridani/upstream-shims.json > "$base_shims" 2>/dev/null; then git archive "$base_ref" EpsilonEridani | tar -x -C "$base_root"; shim_args+=(--base-manifest "$base_shims" --base-root "$base_root"); fi
+if [ -f scripts/check-expired-upstream-shims.py ]; then python3 scripts/check-expired-upstream-shims.py "${shim_args[@]}"; fi
 rm -f "$base_shims"; rm -rf "$base_root"
 lake build
 lake exe axioms
 ```
 - Read the build failures. The usual cause is a renamed or moved upstream module (every Physlib bump adaptation so far), or a renamed/retyped upstream lemma or changed signature (the usual Mathlib case). Fix each by updating the `EpsilonEridani/` import, proof or statement to the new upstream API. Prefer the smallest correct change. Repo policy forbids keeping a forwarding import module or alias for the old name: update every use and delete the obsolete path.
-- The shim-expiry command may be the only failing check even when `lake build` succeeds. Its annotations name exact Mathlib replacements and affected sources. Migrate only the superseded declarations/imports, preserve or re-home source-only API, and update `EpsilonEridani/mathlib-shims.json` in the same source-only change. The checker derives each inherited source's declaration surface from the PR merge base and ratchets its probes until that surface is migrated, deleted, or re-homed under an entry preserving those probes, so never make the check green by merely deleting probes or changing an exact target to a speculative/landing sentinel.
+- The shim-expiry command may be the only failing check even when `lake build` succeeds. Its annotations name exact upstream replacements (in Mathlib, Physlib, PhyslibAlpha or TauCeti) and affected sources. Migrate only the superseded declarations/imports, preserve or re-home source-only API, and update `EpsilonEridani/upstream-shims.json` in the same source-only change. The checker derives each inherited source's declaration surface from the PR merge base and ratchets its probes until that surface is migrated, deleted, or re-homed under an entry preserving those probes, so never make the check green by merely deleting probes or changing an exact target to a speculative/landing sentinel.
 - For a failing check's logs: `gh pr checks __PR__ --repo eic/EpsilonEridani`, then `gh run view <run-id> --repo eic/EpsilonEridani --log-failed`.
 - If the failure is genuinely transient infra (e.g. a cache fetch timeout), both `lake build` and the shim-expiry command succeed locally, and the failed logs contain no actionable migration, push an empty commit to re-trigger CI (`git commit --allow-empty -m "chore: re-trigger CI"`) and say so.
 
@@ -33,8 +33,8 @@ lake exe cache get Mathlib Physlib TauCeti
 git fetch -q origin main
 shim_args=(--fail-on-available); base_shims="$(mktemp)"; base_root="$(mktemp -d)"
 base_ref="$(git merge-base origin/main HEAD)"
-if git show "$base_ref":EpsilonEridani/mathlib-shims.json > "$base_shims" 2>/dev/null; then git archive "$base_ref" EpsilonEridani | tar -x -C "$base_root"; shim_args+=(--base-manifest "$base_shims" --base-root "$base_root"); fi
-if [ -f scripts/check-expired-mathlib-shims.py ]; then python3 scripts/check-expired-mathlib-shims.py "${shim_args[@]}"; fi
+if git show "$base_ref":EpsilonEridani/upstream-shims.json > "$base_shims" 2>/dev/null; then git archive "$base_ref" EpsilonEridani | tar -x -C "$base_root"; shim_args+=(--base-manifest "$base_shims" --base-root "$base_root"); fi
+if [ -f scripts/check-expired-upstream-shims.py ]; then python3 scripts/check-expired-upstream-shims.py "${shim_args[@]}"; fi
 rm -f "$base_shims"; rm -rf "$base_root"
 lake build
 lake exe axioms
