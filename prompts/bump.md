@@ -1,8 +1,8 @@
-You are adapting eic/EpsilonEridani, an AIs-welcome Lean 4 library downstream of Mathlib, to a Mathlib bump on pull request #__PR__. You are in a checkout of the repo, already on the PR's branch. A bot opened this PR to move the Lake pins (`lake-manifest.json` and/or `lean-toolchain`) forward to a newer Mathlib, and the `build` check is red because `EpsilonEridani/` has not caught up to the Mathlib API at the new pin. Work autonomously to completion: make CI green by adapting `EpsilonEridani/`, without reverting the bump and without weakening the library.
+You are adapting eic/EpsilonEridani, an AIs-welcome Lean 4 library downstream of Mathlib, Physlib and TauCeti, to a dependency bump on pull request #__PR__. You are in a checkout of the repo, already on the PR's branch. A bot opened this PR to move the Lake pins (`lake-manifest.json` and/or `lean-toolchain`) forward: to a newer Mathlib, Physlib and/or TauCeti (and, with Mathlib, a newer Lean toolchain). The `build` check is red because `EpsilonEridani/` has not caught up to the API of the bumped dependencies at the new pins. Work autonomously to completion: make CI green by adapting `EpsilonEridani/`, without reverting the bump and without weakening the library.
 
 ## The pins are the point — keep them
-- The bumped `lake-manifest.json` / `lean-toolchain` on this branch ARE the change under review. Do NOT revert them, do NOT re-pin to an older Mathlib, do NOT touch the lakefile. Your job is to make `EpsilonEridani/` build against the Mathlib the bot pinned.
-- If the new pin is genuinely unworkable (e.g. a Mathlib change that can't be adapted without a redesign), stop and report that, rather than reverting the bump or gutting the library.
+- The bumped `lake-manifest.json` / `lean-toolchain` on this branch ARE the change under review. Do NOT revert them, do NOT re-pin any dependency to an older commit, do NOT touch the lakefile. Your job is to make `EpsilonEridani/` build against the dependencies the bot pinned.
+- If a new pin is genuinely unworkable (e.g. an upstream change that can't be adapted without a redesign), stop and report that, rather than reverting the bump or gutting the library.
 
 ## Reproduce and adapt
 ```
@@ -16,7 +16,7 @@ rm -f "$base_shims"; rm -rf "$base_root"
 lake build
 lake exe axioms
 ```
-- Read the build failures. The usual cause is a renamed/moved/retyped Mathlib lemma or a changed signature. Fix each by updating the `EpsilonEridani/` proof or statement to the new Mathlib API. Prefer the smallest correct change.
+- Read the build failures. The usual cause is a renamed or moved upstream module (every Physlib bump adaptation so far), or a renamed/retyped upstream lemma or changed signature (the usual Mathlib case). Fix each by updating the `EpsilonEridani/` import, proof or statement to the new upstream API. Prefer the smallest correct change. Repo policy forbids keeping a forwarding import module or alias for the old name: update every use and delete the obsolete path.
 - The shim-expiry command may be the only failing check even when `lake build` succeeds. Its annotations name exact Mathlib replacements and affected sources. Migrate only the superseded declarations/imports, preserve or re-home source-only API, and update `EpsilonEridani/mathlib-shims.json` in the same source-only change. The checker derives each inherited source's declaration surface from the PR merge base and ratchets its probes until that surface is migrated, deleted, or re-homed under an entry preserving those probes, so never make the check green by merely deleting probes or changing an exact target to a speculative/landing sentinel.
 - For a failing check's logs: `gh pr checks __PR__ --repo eic/EpsilonEridani`, then `gh run view <run-id> --repo eic/EpsilonEridani --log-failed`.
 - If the failure is genuinely transient infra (e.g. a cache fetch timeout), both `lake build` and the shim-expiry command succeed locally, and the failed logs contain no actionable migration, push an empty commit to re-trigger CI (`git commit --allow-empty -m "chore: re-trigger CI"`) and say so.
@@ -53,4 +53,4 @@ Iterate until green. Never push red.
 - Do NOT open a new PR; do NOT touch files outside `EpsilonEridani/` (and the already-bumped pins).
 
 ## Report
-End with a concise summary: which Mathlib changes broke or superseded `EpsilonEridani/`, how you adapted each, and the exact shim-expiry / `lake build` / `lake exe axioms` result lines proving green + axiom-clean. Do not claim green unless you saw it.
+End with a concise summary: which upstream changes (Mathlib, Physlib or TauCeti) broke or superseded `EpsilonEridani/`, how you adapted each, and the exact shim-expiry / `lake build` / `lake exe axioms` result lines proving green + axiom-clean. Do not claim green unless you saw it.
