@@ -34,8 +34,20 @@ PROMPTS = tc.paths.HERE / "prompts"
 ENV = agents.BUILD_PREFIX_ENV
 HEAVY = re.compile(r"lake (?:build|env lean|exe axioms|exe module-system)\b")
 NEVER = re.compile(r"lake (?:exe )?cache get|\bgit |\bgh ")
-SUBS = dict(PR=7, AGENT="Claude Code", BIN="/bin", ONLY="A", SKIP="none", CLAIMED="none", FORK="f",
-            WORKERID="w", ROADMAP_DIR="/r", REVIEW_DIR="/v", RUBRICS="/u", SOURCE_GUIDANCE="")
+SUBS = dict(
+    PR=7,
+    AGENT="Claude Code",
+    BIN="/bin",
+    ONLY="A",
+    SKIP="none",
+    CLAIMED="none",
+    FORK="f",
+    WORKERID="w",
+    ROADMAP_DIR="/r",
+    REVIEW_DIR="/v",
+    RUBRICS="/u",
+    SOURCE_GUIDANCE="",
+)
 
 fails = 0
 
@@ -70,13 +82,21 @@ def main():
     for p in prompts:
         out = render(p, prefix)
         lines = [ln.strip() for ln in out.splitlines()]
-        heavy = [ln for ln in lines if HEAVY.match(ln.removeprefix(prefix + " "))
-                 and not ln.startswith(("**", "-", "If", "Iterate"))]
+        heavy = [
+            ln
+            for ln in lines
+            if HEAVY.match(ln.removeprefix(prefix + " ")) and not ln.startswith(("**", "-", "If", "Iterate"))
+        ]
         check(f"{p.name} has compile lines", bool(heavy))
-        check(f"{p.name} every compile line is prefixed", all(ln.startswith(prefix + " lake ") for ln in heavy),
-              [ln for ln in heavy if not ln.startswith(prefix)])
-        check(f"{p.name} no cache/git/gh line is prefixed",
-              not any(ln.startswith(prefix) and NEVER.search(ln) for ln in lines))
+        check(
+            f"{p.name} every compile line is prefixed",
+            all(ln.startswith(prefix + " lake ") for ln in heavy),
+            [ln for ln in heavy if not ln.startswith(prefix)],
+        )
+        check(
+            f"{p.name} no cache/git/gh line is prefixed",
+            not any(ln.startswith(prefix) and NEVER.search(ln) for ln in lines),
+        )
         check(f"{p.name} explains the rule", f"**Builds run through `{prefix}`.**" in out)
 
     print("3) quoting")
