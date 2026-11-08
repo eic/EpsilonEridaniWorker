@@ -53,6 +53,8 @@ bash scripts/lint-env.sh
 Iterate until every one is green. A green `lake build` alone is NOT enough — the `build` check also
 fails on an axiom-audit, module-system, or lint-env violation (e.g. a missing docstring). Never push red.__BUILD_NOTE__
 
+While iterating, rebuild only the modules you changed (`__BUILD__lake build EpsilonEridani.Some.Module`, plus anything downstream if you changed an API) and keep only the lines you need from each log, e.g. `... 2>&1 | grep -E 'error|✖' | head -40`: everything a command prints stays in your context, and is re-read, for the rest of the round. Run the full commands above once, at the end, before pushing.
+
 **Do this synchronously, in this one turn.** Run these commands in the FOREGROUND and wait for each to finish — do NOT background the build and then end your turn expecting to be resumed. You are running non-interactively; nothing will resume you, so a build left running in the background is abandoned and the round ends with nothing committed or pushed. Do not yield, stop, or end your turn until you have committed and pushed (below). Pushing is the only thing that preserves your work.
 
 ## Submit

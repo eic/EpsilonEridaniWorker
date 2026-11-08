@@ -25,6 +25,7 @@ from .agents import (
     fetch_ref,
     fill_prompt,
     host_agent_argv,
+    prefetch_build_caches,
     prepare_checkout,
     resolve_authoring_profile,
     resolve_codex_model_access,
@@ -1136,6 +1137,7 @@ def _do_fixlike(
         checked = rev.stdout.strip() or head
         os.environ["EPSILONERIDANI_PUSH_EXPECT"] = checked  # CAS against what we actually checked out
         log(f"  {label} #{pr}: checked out @ {checked[:12]}")
+        prefetch_build_caches(co)
         rc = run_agent_host(co, prompt, _effective_authoring_profile(opts), w.cfg.logdir)
     if rc == 0:
         w.rs.bust(pr)
@@ -1619,4 +1621,5 @@ def do_roadmap(w, sv, c, opts, bubble) -> int:
         BIN=wrapper_bin(),
         **build_prompt_subs(),
     )
+    prefetch_build_caches(w.cfg.checkout)
     return run_agent_host(w.cfg.checkout, prompt, _effective_authoring_profile(opts), w.cfg.logdir)

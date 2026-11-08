@@ -101,6 +101,7 @@ RUN_STDLIB=(
   roadmap_claims.py
   round_file_changes.py
   round_group_sweep.py
+  build_efficiency.py
   build_prefix.py
   fix_context.py
   rubric_bundle.py
