@@ -110,11 +110,22 @@ def main():
 
     print("2) both host call sites fetch before the agent")
     src = (REPO / "epsiloneridani_worker" / "work_units.py").read_text()
-    for marker in (
-        "prefetch_build_caches(co)\n        rc = run_agent_host(co,",
-        "prefetch_build_caches(w.cfg.checkout)\n    return run_agent_host(w.cfg.checkout,",
-    ):
-        check(f"call site: {marker.split(chr(10))[0].strip()}", marker in src)
+
+    def fetched_before_launch(fetch, launch):
+        # By position, not exact text: the fetch is called, and the launch that follows it is the
+        # next run_agent_host in the source, so a reformat cannot break this and a reorder can.
+        f = src.find(fetch)
+        nxt = src.find("run_agent_host(", f) if f >= 0 else -1
+        return f >= 0 and nxt >= 0 and src.startswith(launch, nxt)
+
+    check(
+        "fix-like rounds fetch before the agent",
+        fetched_before_launch("prefetch_build_caches(co)", "run_agent_host(co"),
+    )
+    check(
+        "roadmap rounds fetch before the agent",
+        fetched_before_launch("prefetch_build_caches(w.cfg.checkout)", "run_agent_host(w.cfg.checkout"),
+    )
 
     print("1b) the dependencies' cache, as in Bubble")
     calls, logs = [], []
