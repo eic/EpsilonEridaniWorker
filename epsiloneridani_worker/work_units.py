@@ -36,6 +36,7 @@ from .agents import (
     validate_kiro_model_access,
     wrapper_bin,
 )
+from .bump_triage import dependency_failure
 from .config import (
     Config,
     Die,
@@ -55,6 +56,7 @@ from .constants import (
     CONTEST_CLAIM_TTL,
     EPSILONERIDANI,
     EX_NOPROGRESS,
+    MAX_BUMP_ATTEMPTS,
     MAX_INFRA_REFUNDS,
     MAX_OPEN_PRS,
     OPENROUTER_MODELS,
@@ -1169,6 +1171,17 @@ def do_bump(w, sv, c, opts, bubble) -> int | None:
     """Adapt a red bump-mathlib PR (the bot bumped mathlib; EpsilonEridani/ needs to catch up). Same
     shape as a fix: claim the branch, check the PR out, drive the agent on prompts/bump.md to green it."""
     pr, head = c.pr, c.head
+    # A build that fails only inside a dependency is not EpsilonEridani's to adapt (bump_triage). Spend this
+    # head's budget so the survey stops offering it, and leave the PR-wide budget alone: the bot's next
+    # refresh is a new head, judged afresh.
+    broken = dependency_failure(EPSILONERIDANI, head)
+    if broken:
+        shown = ", ".join(broken[:3]) + (", …" if len(broken) > 3 else "")
+        log(
+            f"  bump #{pr}: the build fails only inside dependencies ({shown}); EpsilonEridani/ cannot fix that — skipping this head"
+        )
+        w.counters.write(f"bump-{pr}-{head[:12]}", MAX_BUMP_ATTEMPTS)
+        return None
     keys = (f"bump-{pr}-{head[:12]}", f"bump-pr-{pr}")  # count up front so an un-checkout-able PR can't loop
     for key in keys:
         w.counters.incr(key)

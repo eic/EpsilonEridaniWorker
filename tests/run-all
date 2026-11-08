@@ -102,6 +102,7 @@ RUN_STDLIB=(
   round_file_changes.py
   round_group_sweep.py
   build_prefix.py
+  bump_triage.py
   fix_context.py
   rubric_bundle.py
   safe_exists.py
