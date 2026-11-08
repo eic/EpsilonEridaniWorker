@@ -47,6 +47,8 @@ SUBS = dict(
     REVIEW_DIR="/v",
     RUBRICS="/u",
     SOURCE_GUIDANCE="",
+    REVIEW_DIGEST="",
+    LOCAL_REVIEW="",
 )
 
 fails = 0

@@ -1,7 +1,9 @@
 You are addressing AI code review on pull request #__PR__ of eic/EpsilonEridani, an AIs-welcome Lean 4 library downstream of Mathlib. You are in a checkout of the repo, already on the PR's branch. Work autonomously to completion.
 
 ## Read the review
-- The review is posted as a sticky scoreboard comment plus one thread per flagged rubric. Read them:
+__REVIEW_DIGEST__
+
+- The review is posted as a sticky scoreboard comment plus one thread per flagged rubric. The worker reproduced it above; read it on the PR too when you need a newer reply or the scoreboard itself:
   - `gh pr view __PR__ --repo eic/EpsilonEridani --json comments`
   - `gh api "/repos/eic/EpsilonEridani/pulls/__PR__/comments?per_page=100"` (the per-rubric review threads; each root carries a `<!--epsiloneridani-rubric:NAME-->` marker, and the finding text + suggested fix).
 - The blocking rubrics are the ones marked ⛔ (block) or 🟡 (changes requested) on the scoreboard. The other rubrics are already ✅ approved — note which ones.
@@ -9,7 +11,7 @@ You are addressing AI code review on pull request #__PR__ of eic/EpsilonEridani,
 ## Do not regress what is already green
 The scoreboard shows several rubrics already approved (✅). A re-review re-runs the rubrics you touched, so a change that fixes one blocker but degrades an approved rubric will turn that rubric red and the PR will not converge — this is the single most common reason a nearly-done PR is eventually abandoned. So:
 - Make the SMALLEST change that clears each blocker; do not refactor or restructure beyond what the finding requires.
-- Before pushing, re-read the approved rubrics (scope, reuse, generality, api-design, placement, naming, documentation, proof-quality, …) and confirm your change does not undermine any of them — e.g. don't add a less-general lemma (generality), a duplicate of Mathlib (reuse), an unexposed/ misplaced declaration (placement/api-design), or an undocumented public def (documentation).
+- Before pushing, re-read the approved rubrics (their full text is above when the worker could read it; scope, reuse, generality, api-design, placement, naming, documentation, proof-quality, …) and confirm your change does not undermine any of them — e.g. don't add a less-general lemma (generality), a duplicate of Mathlib (reuse), an unexposed/ misplaced declaration (placement/api-design), or an undocumented public def (documentation).
 - If clearing a blocker would genuinely force a regression of an approved rubric, that tension is a sign the finding may be wrong — contest it (below) with that trade-off as evidence, rather than pushing a change that just moves the redness around.
 
 ## Decide, per finding, on its merits
@@ -34,7 +36,7 @@ __BUILD__lake exe axioms
 Iterate until green. Never push red.__BUILD_NOTE__
 
 **Do this synchronously, in this one turn.** Run these commands in the FOREGROUND and wait for each to finish — do NOT background the build and then end your turn expecting to be resumed. You are running non-interactively; nothing will resume you, so a build left running in the background is abandoned and the round ends with nothing committed or pushed. Do not yield, stop, or end your turn until you have committed and pushed (below). Pushing is the only thing that preserves your work.
-
+__LOCAL_REVIEW__
 ## Submit
 - Commit the fixes (message `<type>: <subject>`, imperative present; end the body with `Co-Authored-By: __AGENT__ <noreply@github.com>`).
 - Push with the project's safe wrapper — and ONLY the wrapper:

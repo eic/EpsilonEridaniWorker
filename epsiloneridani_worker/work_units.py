@@ -68,6 +68,7 @@ from .constants import (
     ROADMAP,
     SANDBOX_DEFAULT,
 )
+from .fix_context import fix_round_subs
 from .github import GitHub, GitHubError, claims_repo, ensure_fork, gh_run, me
 from .intentions import administrative_hold_avoid_list, claimed_avoid_list
 from .paths import CLAIM_SH, HERE
@@ -1101,12 +1102,15 @@ def _do_fixlike(
         return None
     if not w.claims.begin_branch_work(pr, head, p.head_ref, p.head_owner, p.head_repo):
         return None  # claimed elsewhere → caller tries the next candidate
+    # The review itself, and the pre-push local review of the blocking rubrics (fix_context).
+    extra = fix_round_subs(w, pr, bubble, wrapper_bin(bubble)) if prompt_file == "fix.md" else {}
     prompt = fill_prompt(
         HERE / "prompts" / prompt_file,
         PR=pr,
         AGENT=opts.agent_name,
         BIN=wrapper_bin(bubble),
         **build_prompt_subs(bubble),
+        **extra,
     )
     if bubble:
         # The PR's head repo (its own fork, for a fork-PR) gets git fetch/push in the bubble. bubble also

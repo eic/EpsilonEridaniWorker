@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# review-local — review the agent's COMMITTED HEAD against the rubrics it was asked to clear, before
+# it pushes. A fix round's prompt tells the agent to run this once its build is green (fix_context.py).
+#
+#   review-local <pr> <rubric[,rubric...]>
+#
+# Runs EpsilonEridaniReview's `--local` mode on the git checkout containing the current directory: it
+# reviews the local commit against its merge base with the PR's base, posts nothing, touches no
+# shared review state, and ends with `LOCAL-REVIEW: PASS (...)` or `LOCAL-REVIEW: FAIL (...)`.
+#
+# Environment:
+#   EPSILONERIDANI_LOCAL_REVIEWER   reviewer(s) for --reviewer (default: claude)
+#   EPSILONERIDANI_REVIEW_FROM      uvx --from source of the engine (default: the EpsilonEridaniReview repo)
+#   EPSILONERIDANI_CLAUDE_MODEL     honoured by the engine, as for the worker's own reviews
+set -euo pipefail
+
+usage() { echo "usage: review-local <pr> <rubric[,rubric...]>" >&2; exit 2; }
+PR="${1:-}"
+RUBRICS="${2:-}"
+[[ "$PR" =~ ^[0-9]+$ ]] || usage
+[[ "$RUBRICS" =~ ^[a-z0-9-]+(,[a-z0-9-]+)*$ ]] || usage
+
+TOP="$(git rev-parse --show-toplevel)"
+REVIEWER="${EPSILONERIDANI_LOCAL_REVIEWER:-claude}"
+FROM="${EPSILONERIDANI_REVIEW_FROM:-git+https://github.com/eic/EpsilonEridaniReview}"
+
+exec uvx --from "$FROM" epsiloneridani-review "$PR" --local "$TOP" --rubrics "$RUBRICS" --reviewer "$REVIEWER"
