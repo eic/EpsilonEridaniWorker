@@ -12,6 +12,8 @@ default of 10 merged PRs per area was more than any area had. This pins:
 Exit 0 = all assertions hold; 1 = a mismatch.
 """
 
+import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -56,7 +58,48 @@ def drive(docgen_rc=0):
         rc = wu._do_progress_inner(w, SimpleNamespace())
     finally:
         wu.subprocess.run, wu.prepare_checkout, wu.bust_progress_cache, wu.log = saved
+        shutil.rmtree(state, ignore_errors=True)
     return rc, calls, logs
+
+
+def min_prs_in_fresh_interpreter(value):
+    """PROGRESS_MIN_PRS as a fresh import sees it, with the variable unset (None) or set: the
+    constant is read at import, so only a new interpreter tests the default deterministically."""
+    env = {k: v for k, v in os.environ.items() if k != "EPSILONERIDANI_PROGRESS_MIN_PRS"}
+    if value is not None:
+        env["EPSILONERIDANI_PROGRESS_MIN_PRS"] = value
+    code = f"import sys; sys.path.insert(0, {str(REPO)!r}); from epsiloneridani_worker import constants as c; print(c.PROGRESS_MIN_PRS)"
+    r = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True)
+    return r.stdout.strip()
+
+
+def drive_timeout():
+    state = Path(tempfile.mkdtemp(prefix="progress-plan-"))
+    (state / "progress" / "roadmap" / ".git").mkdir(parents=True)
+    calls, logs = [], []
+
+    def fake_run(cmd, **kw):
+        calls.append([str(c) for c in cmd])
+        if "refs/heads/docgen:refs/remotes/origin/docgen" in " ".join(map(str, cmd)):
+            assert kw.get("timeout") and kw.get("errors") == "replace", kw
+            raise subprocess.TimeoutExpired(cmd, kw["timeout"])
+        if "plan" in cmd:
+            return subprocess.CompletedProcess(cmd, wu.EX_NOPROGRESS, "", "not due: test")
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    w = SimpleNamespace(
+        cfg=SimpleNamespace(state=state, checkout=state / "co"),
+        counters=SimpleNamespace(write=lambda *a: None, incr=lambda *a: None),
+    )
+    saved = (wu.subprocess.run, wu.prepare_checkout, wu.bust_progress_cache, wu.log)
+    wu.subprocess.run, wu.prepare_checkout = fake_run, lambda cfg: True
+    wu.bust_progress_cache, wu.log = (lambda cfg: None), logs.append
+    try:
+        wu._do_progress_inner(w, SimpleNamespace())
+    finally:
+        wu.subprocess.run, wu.prepare_checkout, wu.bust_progress_cache, wu.log = saved
+        shutil.rmtree(state, ignore_errors=True)
+    return calls, logs
 
 
 def main():
@@ -74,12 +117,17 @@ def main():
     check("before plan", docgen is not None and plan is not None and docgen < plan, (docgen, plan))
     pc = calls[plan] if plan is not None else []
     check("plan gets --min-prs", "--min-prs" in pc and pc[pc.index("--min-prs") + 1] == str(wu.PROGRESS_MIN_PRS), pc)
-    check(
-        "the default is 5",
-        tc.constants.PROGRESS_MIN_PRS == 5 or "EPSILONERIDANI_PROGRESS_MIN_PRS" in __import__("os").environ,
-    )
+    check("the default is 5", min_prs_in_fresh_interpreter(None) == "5", min_prs_in_fresh_interpreter(None))
+    check("the variable overrides it", min_prs_in_fresh_interpreter("7") == "7", min_prs_in_fresh_interpreter("7"))
 
     print("3) a failed docgen fetch does not stop the decision")
+    calls_t, logs_t = drive_timeout()
+    check(
+        "a hung fetch is bounded and logged",
+        any("could not refresh origin/docgen (TimeoutExpired)" in m for m in logs_t),
+        logs_t,
+    )
+    check("plan still runs after it", any("plan" in c for c in calls_t))
     rc, calls, logs = drive(docgen_rc=1)
     check("plan still runs", any("plan" in c for c in calls))
     check("the failure is logged", any("could not refresh origin/docgen" in m for m in logs), logs)

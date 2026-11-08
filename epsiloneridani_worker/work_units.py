@@ -1372,13 +1372,27 @@ def _do_progress_inner(w, opts) -> int | None:
     # `plan` reads the docs-tracking ref (`origin/docgen`) and refuses when the documentation was built
     # from a commit that ref does not reach, so a stale copy of it reads as "not due". Refresh exactly
     # that ref; a failure is logged and `plan` decides with what is there.
-    fetched = subprocess.run(
-        ["git", "-C", str(w.cfg.checkout), "fetch", "-q", "origin", "+refs/heads/docgen:refs/remotes/origin/docgen"],
-        capture_output=True,
-        text=True,
-    )
-    if fetched.returncode != 0:
-        log(f"  progress: could not refresh origin/docgen ({_clip(fetched.stderr.strip() or 'no output')})")
+    try:
+        fetched = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(w.cfg.checkout),
+                "fetch",
+                "-q",
+                "origin",
+                "+refs/heads/docgen:refs/remotes/origin/docgen",
+            ],
+            capture_output=True,
+            text=True,
+            errors="replace",
+            timeout=300,
+        )
+        failure = "" if fetched.returncode == 0 else (fetched.stderr.strip() or "no output")
+    except (OSError, subprocess.TimeoutExpired) as e:
+        failure = type(e).__name__
+    if failure:
+        log(f"  progress: could not refresh origin/docgen ({_clip(failure)})")
 
     # 1) The decision, re-run from FRESH state now that the claim is held — never from the survey's
     #    cached verdict, which is up to PROGRESS_TTL old and says nothing about which area won.
