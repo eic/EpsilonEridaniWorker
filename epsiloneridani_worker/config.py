@@ -116,11 +116,17 @@ def acquire_slot(wid: str) -> bool:
     return True
 
 
+def worker_id(n: int) -> str:
+    """The id of worker number `n`, zero-padded to two digits (worker01 ... worker99, then worker100),
+    so ids sort the way they count in listings, state directories and logs."""
+    return f"worker{n:02d}"
+
+
 def auto_assign_wid(limit: int = 64) -> str:
-    """Pick the lowest-numbered free worker slot (worker1, worker2, ...) and hold it, so several
+    """Pick the lowest-numbered free worker slot (worker01, worker02, ...) and hold it, so several
     `work --loop` terminals on one host get distinct ids without the operator hand-numbering them."""
     for n in range(1, limit + 1):
-        wid = f"worker{n}"
+        wid = worker_id(n)
         if acquire_slot(wid):
             return wid
     raise Die(f"all {limit} worker slots are busy — pass an explicit --worker-id")

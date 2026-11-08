@@ -29,6 +29,7 @@ import uuid
 from pathlib import Path
 from typing import NoReturn
 
+from .config import worker_id
 from .constants import AGENTS, ALLOWED_TASKS, ROUND_TIMEOUT
 from .paths import HERE, ensure_ssl_cert_file, entry_cmd, self_argv, self_env
 from .quota import parse_pace_curve
@@ -513,12 +514,16 @@ def save_worker_specs(path: Path, specs: list[WorkerSpec]) -> None:
 
 
 def next_worker_id(specs: list[WorkerSpec]) -> str:
+    """The lowest free worker number, as a zero-padded id (worker01, ...). A number counts as taken by
+    any `worker<digits>` id, padded or not, so a config that still has a `worker1` does not get a
+    `worker01` beside it."""
     used = {spec.id for spec in specs}
+    taken = {int(m.group(1)) for wid in used if (m := re.fullmatch(r"worker(\d+)", wid))}
     for number in range(1, 1000):
-        candidate = f"worker{number}"
-        if candidate not in used:
+        candidate = worker_id(number)
+        if number not in taken and candidate not in used:
             return candidate
-    raise WorkersError("no free workerN id below worker1000")
+    raise WorkersError("no free worker number below 1000")
 
 
 def status_path(worker_id: str, state_dir: Path | None = None) -> Path:

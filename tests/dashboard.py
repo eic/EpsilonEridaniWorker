@@ -475,7 +475,7 @@ async def test_persistent_workers_view():
             await pilot.press("l")
             await pilot.pause(0.05)
             specs = tc.load_worker_specs(config)
-            check("loop action adds a persistent worker", len(specs) == 3 and specs[-1].id == "worker3")
+            check("loop action adds a persistent worker", len(specs) == 3 and specs[-1].id == "worker03")
             check("persistent launch carries dashboard model", specs[-1].agent == app.model_dial)
     finally:
         tc.worker_manager.ensure_manager = old_ensure
