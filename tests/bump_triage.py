@@ -59,15 +59,20 @@ def main():
     check("an EpsilonEridani failure is ours to adapt", not bt.dependency_only(mixed))
     check("nothing parsed is not dependency only", not bt.dependency_only(bt.failing_modules("error: build failed")))
     check("a lookalike prefix is not ours", bt.dependency_only(["EpsilonEridaniX.Foo"]))
+    uni = bt.failing_modules("✖ [1/2] Building Physlib.Ωmega.«weird name» (1.0s)\n✖ [2/2] Building Λ.Basic\n")
+    check("non-ASCII and guillemet names parse", uni == ["Physlib.Ωmega.«weird name»", "Λ.Basic"], uni)
 
     print("3) the run behind the newest build status")
     statuses = [
         {"context": "bump-guard", "target_url": "https://github.com/o/r/actions/runs/1"},
-        {"context": "build", "target_url": "https://github.com/o/r/actions/runs/222/job/9"},
-        {"context": "build", "target_url": "https://github.com/o/r/actions/runs/111"},
+        {"context": "build", "state": "failure", "target_url": "https://github.com/o/r/actions/runs/222/job/9"},
+        {"context": "build", "state": "failure", "target_url": "https://github.com/o/r/actions/runs/111"},
     ]
     check("newest build status wins", bt.build_run_id(statuses) == "222", bt.build_run_id(statuses))
     check("no build status, no run", bt.build_run_id(statuses[:1]) is None)
+    green = [{"context": "build", "state": "success", "target_url": "https://github.com/o/r/actions/runs/5"}]
+    check("a green head has no run to read", bt.build_run_id(green) is None)
+    check("an errored build is read", bt.build_run_id([{**green[0], "state": "error"}]) == "5")
 
     print("4) reading GitHub")
 
@@ -92,8 +97,20 @@ def main():
         check("unreadable statuses run the round", bt.dependency_failure("o/r", "h") is None)
         bt.gh_run = gh_stub(log_rc=1)
         check("unreadable log runs the round", bt.dependency_failure("o/r", "h") is None)
-        bt.gh_run = gh_stub(statuses_json=[{"context": "build", "target_url": ""}])
+        bt.gh_run = gh_stub(statuses_json=[{"context": "build", "state": "failure", "target_url": ""}])
         check("a status without a run runs the round", bt.dependency_failure("o/r", "h") is None)
+        fetched = []
+
+        def no_log_for_green(argv, **kw):
+            if argv[:2] == ["gh", "api"]:
+                return subprocess.CompletedProcess(
+                    argv, 0, json.dumps([{"context": "build", "state": "success", "target_url": "/actions/runs/9"}]), ""
+                )
+            fetched.append(argv)
+            return subprocess.CompletedProcess(argv, 0, PHYSLIB_ONLY, "")
+
+        bt.gh_run = no_log_for_green
+        check("a green head fetches no log", bt.dependency_failure("o/r", "h") is None and not fetched, fetched)
     finally:
         bt.gh_run = saved
 

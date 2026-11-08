@@ -20,7 +20,10 @@ from .github import gh_run
 OWN_PREFIX = "EpsilonEridani"
 # Lake's failure lines: `✖ [9292/9383] Building Physlib.Relativity.Tensors.RealTensor.Velocity.Basic (5.7s)`
 # and `✖ [9264/9358] Running Physlib.Relativity.Tensors...` (a missing file, a bad import).
-_FAILED = re.compile(r"✖ \[\d+/\d+\] (?:Building|Running|Compiling) ([A-Za-z_][\w.'«»]*)")
+# The module is whatever token Lake prints there, up to the next whitespace (before the timing), with
+# a «guillemet-quoted» component kept whole even if it contains spaces: Lean names may start with
+# non-ASCII letters, so no identifier syntax is assumed.
+_FAILED = re.compile(r"✖ \[\d+/\d+\] (?:Building|Running|Compiling) ((?:«[^»]*»|[^\s«])+)")
 _RUN_ID = re.compile(r"/actions/runs/(\d+)")
 
 
@@ -38,9 +41,13 @@ def dependency_only(modules: list[str]) -> bool:
 
 
 def build_run_id(statuses: list[dict]) -> str | None:
-    """The workflow run behind the newest `build` commit status (the trusted sandboxed build)."""
+    """The workflow run behind the newest `build` commit status (the trusted sandboxed build), when
+    that status is a failure or an error: a green or pending head has no failure to triage, and no
+    log is worth fetching for it."""
     for s in statuses or []:  # the REST API lists a commit's statuses newest first
         if isinstance(s, dict) and s.get("context") == "build":
+            if s.get("state") not in ("failure", "error"):
+                return None
             m = _RUN_ID.search(s.get("target_url") or "")
             return m.group(1) if m else None
     return None
