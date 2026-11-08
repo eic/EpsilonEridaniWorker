@@ -3,6 +3,7 @@ argv path and the repo-scoped bubble sandbox path (plus per-worker $HOME isolati
 
 from __future__ import annotations
 
+import contextlib
 import functools
 import json
 import os
@@ -495,6 +496,65 @@ def build_prompt_subs(bubble: bool = False) -> dict[str, str]:
         "build in the foreground and wait for it to finish."
     )
     return {"BUILD": prefix + " ", "BUILD_NOTE": note}
+
+
+def prefetch_own_outputs(checkout: Path) -> None:
+    """Fetch EpsilonEridani's own main-built outputs into a host checkout before the agent starts.
+
+    A host round otherwise compiles every EpsilonEridani module the agent's first `lake build`
+    needs, including the ones nobody touched; on the worker host two of them never finish at all
+    (the 36 GiB address-space cap), which is how a full local build came to be red in 56 of 61
+    sessions. CI and Bubble rounds already fetch these outputs. `--max-revs` walks back from HEAD to
+    the newest revision main published outputs for, so a PR branch finds its merge base's.
+
+    Best effort and bounded: a miss, a timeout or a missing `lake` leaves the agent to build as
+    before. $EPSILONERIDANI_OWN_CACHE=0 turns it off."""
+    if os.environ.get(OWN_CACHE_ENV, "1").strip() == "0" or not shutil.which("lake"):
+        return
+    with tempfile.NamedTemporaryFile("w", suffix=".toml", prefix="lake-cache-", delete=False) as f:
+        f.write(
+            f'cache.defaultService = "{EPSILONERIDANI_CACHE_SERVICE}"\n'
+            "[[cache.service]]\n"
+            f'name = "{EPSILONERIDANI_CACHE_SERVICE}"\n'
+            'kind = "s3"\n'
+            f'artifactEndpoint = "{EPSILONERIDANI_CACHE_ARTIFACT_ENDPOINT}"\n'
+            f'revisionEndpoint = "{EPSILONERIDANI_CACHE_REVISION_ENDPOINT}"\n'
+        )
+        config = f.name
+    cmd = [
+        "lake",
+        "cache",
+        "get",
+        "--service",
+        EPSILONERIDANI_CACHE_SERVICE,
+        "--repo",
+        EPSILONERIDANI,
+        f"--max-revs={OWN_CACHE_MAX_REVS}",
+    ]
+    try:
+        r = subprocess.run(
+            cmd,
+            cwd=checkout,
+            env={**os.environ, "LAKE_CONFIG": config},
+            capture_output=True,
+            text=True,
+            timeout=OWN_CACHE_TIMEOUT_S,
+        )
+        out = (r.stdout + r.stderr).strip()
+        if r.returncode == 0:
+            log("  build cache: fetched EpsilonEridani's own outputs from the Lake cache")
+        elif "no outputs found" in out:
+            log("  build cache: no published EpsilonEridani outputs near this revision; the agent builds them")
+        else:
+            last = out.splitlines()[-1] if out else f"exit {r.returncode}"
+            log(f"  build cache: EpsilonEridani Lake cache fetch failed ({last[:200]}); the agent builds from source")
+    except (OSError, subprocess.TimeoutExpired) as e:
+        log(
+            f"  build cache: EpsilonEridani Lake cache fetch did not finish ({type(e).__name__}); the agent builds from source"
+        )
+    finally:
+        with contextlib.suppress(OSError):
+            os.unlink(config)
 
 
 def sync_mathlib_pool(cfg: Config) -> None:
@@ -1013,6 +1073,14 @@ KIRO_BUBBLE_MIN_VERSION = "0.7.31"
 # through (the LAKE_CACHE_*_PUBLIC repo variables). Keep the two in step.
 EPSILONERIDANI_CACHE_DOMAIN = "cache.epsiloneridaniproject.org"
 EPSILONERIDANI_CACHE_SERVICE = "epsiloneridani-public"
+# The public endpoints of that service, as EpsilonEridani's scripts/lake-cache-get.sh names them. A
+# host round writes its own Lake config from these rather than run that script from the checkout,
+# which on a fix round is the PR's branch, possibly a contributor's fork.
+EPSILONERIDANI_CACHE_ARTIFACT_ENDPOINT = "https://s3-central.nrp-nautilus.io/epsiloneridani-cache/artifacts"
+EPSILONERIDANI_CACHE_REVISION_ENDPOINT = "https://s3-central.nrp-nautilus.io/epsiloneridani-cache/revisions"
+OWN_CACHE_ENV = "EPSILONERIDANI_OWN_CACHE"
+OWN_CACHE_MAX_REVS = 100
+OWN_CACHE_TIMEOUT_S = 600
 EPSILONERIDANI_CACHE_ARTIFACT_URL = f"https://{EPSILONERIDANI_CACHE_DOMAIN}/artifacts"
 EPSILONERIDANI_CACHE_REVISION_URL = f"https://{EPSILONERIDANI_CACHE_DOMAIN}/revisions"
 
