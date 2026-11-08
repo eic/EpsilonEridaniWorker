@@ -20,6 +20,7 @@ from .agents import (
     AuthoringProfile,
     _codex_review_model_override,
     _kiro_review_model,
+    build_prompt_subs,
     fetch_git_source,
     fetch_ref,
     fill_prompt,
@@ -1100,7 +1101,13 @@ def _do_fixlike(
         return None
     if not w.claims.begin_branch_work(pr, head, p.head_ref, p.head_owner, p.head_repo):
         return None  # claimed elsewhere → caller tries the next candidate
-    prompt = fill_prompt(HERE / "prompts" / prompt_file, PR=pr, AGENT=opts.agent_name, BIN=wrapper_bin(bubble))
+    prompt = fill_prompt(
+        HERE / "prompts" / prompt_file,
+        PR=pr,
+        AGENT=opts.agent_name,
+        BIN=wrapper_bin(bubble),
+        **build_prompt_subs(bubble),
+    )
     if bubble:
         # The PR's head repo (its own fork, for a fork-PR) gets git fetch/push in the bubble. bubble also
         # auto-derives this from a PR target, so it's explicit/testable belt-and-suspenders (kim-em/bubble#320).
@@ -1577,6 +1584,7 @@ def do_roadmap(w, sv, c, opts, bubble) -> int:
                 FORK=fork_owner,
                 WORKERID=w.cfg.wid,
                 ROADMAP_DIR="/opt/roadmap/EpsilonEridaniRoadmap",
+                **build_prompt_subs(bubble=True),
                 REVIEW_DIR="/opt/review",
                 RUBRICS=(
                     f"/opt/rubrics/{RUBRIC_BUNDLE}"
@@ -1605,5 +1613,6 @@ def do_roadmap(w, sv, c, opts, bubble) -> int:
         RUBRICS=(str(bundle) if bundle is not None else f"{refs / 'review' / 'rubrics'} (read every .md file in it)"),
         SOURCE_GUIDANCE=source_guidance,
         BIN=wrapper_bin(),
+        **build_prompt_subs(),
     )
     return run_agent_host(w.cfg.checkout, prompt, _effective_authoring_profile(opts), w.cfg.logdir)

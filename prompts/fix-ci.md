@@ -15,9 +15,9 @@ You are fixing FAILING CI on pull request #__PR__ of eic/EpsilonEridani, an AIs-
   if [ "$have_base" = 1 ] && git diff --quiet "$base_ref" -- lake-manifest.json lean-toolchain; then shim_args+=(--only-new); fi
   if [ -f scripts/check-expired-upstream-shims.py ]; then python3 scripts/check-expired-upstream-shims.py "${shim_args[@]}"; fi
   rm -f "$base_shims"; rm -rf "$base_root"
-  lake build
-  lake exe axioms
-  lake exe module-system
+  __BUILD__lake build
+  __BUILD__lake exe axioms
+  __BUILD__lake exe module-system
   bash scripts/lint-env.sh
   ```
   If `lint-env` flags a declaration that is NOT in your diff, your branch is likely behind main (CI
@@ -45,13 +45,13 @@ if git show "$base_ref":EpsilonEridani/upstream-shims.json > "$base_shims" 2>/de
 if [ "$have_base" = 1 ] && git diff --quiet "$base_ref" -- lake-manifest.json lean-toolchain; then shim_args+=(--only-new); fi
 if [ -f scripts/check-expired-upstream-shims.py ]; then python3 scripts/check-expired-upstream-shims.py "${shim_args[@]}"; fi
 rm -f "$base_shims"; rm -rf "$base_root"
-lake build
-lake exe axioms
-lake exe module-system
+__BUILD__lake build
+__BUILD__lake exe axioms
+__BUILD__lake exe module-system
 bash scripts/lint-env.sh
 ```
 Iterate until every one is green. A green `lake build` alone is NOT enough — the `build` check also
-fails on an axiom-audit, module-system, or lint-env violation (e.g. a missing docstring). Never push red.
+fails on an axiom-audit, module-system, or lint-env violation (e.g. a missing docstring). Never push red.__BUILD_NOTE__
 
 **Do this synchronously, in this one turn.** Run these commands in the FOREGROUND and wait for each to finish — do NOT background the build and then end your turn expecting to be resumed. You are running non-interactively; nothing will resume you, so a build left running in the background is abandoned and the round ends with nothing committed or pushed. Do not yield, stop, or end your turn until you have committed and pushed (below). Pushing is the only thing that preserves your work.
 

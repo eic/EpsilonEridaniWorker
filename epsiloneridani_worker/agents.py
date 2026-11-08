@@ -7,6 +7,7 @@ import functools
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -456,6 +457,44 @@ def fill_prompt(path: Path, **subs) -> str:
     # A function replacement is taken literally, so a value containing a backslash escape or a
     # `\g<name>` group reference cannot be reinterpreted either.
     return _PLACEHOLDER_RE.sub(lambda m: str(subs.get(m.group(0)[2:-2], m.group(0))), text)
+
+
+# Shell words to put in front of every compile-heavy command a shipped prompt tells the agent to run
+# (`lake build`, `lake env lean`, `lake exe axioms`, `lake exe module-system`): typically a batch
+# scheduler, e.g. `srun --account=def-x --mem=64G --cpus-per-task=32 --time=1:00:00`, so a worker on
+# a cluster login node builds on a compute node with more memory and cores than the login node's
+# limits allow. Cache downloads, git and gh are never prefixed: compute nodes often have no network.
+# The build node must see the checkout and its `.lake` at the same paths, so a `.lake` on the login
+# node's local disk does not work with a prefix that leaves the machine. Host rounds only: a Bubble
+# round builds inside its sandbox, where the prefix means nothing.
+BUILD_PREFIX_ENV = "EPSILONERIDANI_BUILD_PREFIX"
+
+
+def build_prompt_subs(bubble: bool = False) -> dict[str, str]:
+    """`__BUILD__` and `__BUILD_NOTE__` for the shipped prompts.
+
+    Both are empty without $EPSILONERIDANI_BUILD_PREFIX, so the rendered prompts are byte-identical
+    to what they were before the prefix existed. With it, `__BUILD__` is the prefix plus one space,
+    written in front of each compile-heavy command, and `__BUILD_NOTE__` tells the agent the rule for
+    the commands it composes itself. A prefix that is not a valid shell word list fails the round
+    here, with the reason, rather than as an agent's baffling `unexpected EOF` mid-build."""
+    raw = "" if bubble else os.environ.get(BUILD_PREFIX_ENV, "").strip()
+    if not raw:
+        return {"BUILD": "", "BUILD_NOTE": ""}
+    try:
+        words = shlex.split(raw)
+    except ValueError as e:
+        raise Die(f"${BUILD_PREFIX_ENV} is not a valid shell word list ({e}): {raw!r}") from None
+    prefix = shlex.join(words)
+    note = (
+        f"\n\n**Builds run through `{prefix}`.** On this host, run every compile-heavy command through "
+        f"that prefix, as written above: `lake build` (also a single module), `lake env lean`, `lake exe "
+        f"axioms`, `lake exe module-system`, e.g. `{prefix} lake build`. It runs them on a machine with "
+        "more memory and cores than this one allows. Keep `lake exe cache get`, `lake cache get`, `git` and "
+        "`gh` on this host, without the prefix: the build machine may have no network. Still run every "
+        "build in the foreground and wait for it to finish."
+    )
+    return {"BUILD": prefix + " ", "BUILD_NOTE": note}
 
 
 def sync_mathlib_pool(cfg: Config) -> None:

@@ -24,10 +24,10 @@ Merging upstream workflow or pin changes as part of bringing in `main` is expect
 ## Verify before pushing (all three MUST pass, after the merge/rebase)
 ```
 lake exe cache get Mathlib Physlib TauCeti
-lake build
-lake exe axioms
+__BUILD__lake build
+__BUILD__lake exe axioms
 ```
-Iterate until green. Never push red — a botched conflict resolution that builds red is worse than the conflict.
+Iterate until green. Never push red — a botched conflict resolution that builds red is worse than the conflict.__BUILD_NOTE__
 
 **Do this synchronously, in this one turn.** Run these commands in the FOREGROUND and wait for each to finish — do NOT background the build and then end your turn expecting to be resumed. You are running non-interactively; nothing will resume you, so a build left running in the background is abandoned and the round ends with nothing committed or pushed. When a repair is needed, do not yield, stop, or end your turn until you have committed and pushed (below). Pushing is the only thing that preserves your work.
 
