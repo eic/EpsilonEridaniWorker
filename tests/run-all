@@ -113,6 +113,7 @@ RUN_STDLIB=(
   source_argument.py
   spread_candidates.py
   ssl_cert_file.py
+  status_dead_runner.py
   status_labels.py
   tend_bot_permissions.py
   worker_claude_config.py

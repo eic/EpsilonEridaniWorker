@@ -651,6 +651,25 @@ def runner_status(worker_id: str, state_dir: Path | None = None, runtime_dir: Pa
     return value
 
 
+# The states a runner records when it ends on its own terms (see the wrapper's exit path). Anything else
+# in the status file of a runner that is no longer alive is what it last said before it was killed
+# without a chance to write a final state.
+_TERMINAL_STATES = frozenset({"stopped", "exited", "failed"})
+
+
+def _dead_runner_state(actual: dict, fallback: str) -> str:
+    """The state to show for a worker whose runner is not alive (no control socket, no slot lock).
+
+    A runner that exits normally records stopped/exited/failed, and that record is kept. One killed
+    outright (SIGKILL, a wiped venv, a lost host) leaves whatever it last wrote, e.g. `running` or
+    `backoff`, and repeating that would report a disabled worker as running for as long as its file
+    exists: on bison, six disabled workers read `running (desired: stopped)` for a month after the
+    2026-10-09 incident. Such a record yields `fallback` instead: `stopped` for a disabled worker,
+    `stale` for an enabled one the manager is about to relaunch."""
+    recorded = str(actual.get("state") or "")
+    return recorded if recorded in _TERMINAL_STATES else fallback
+
+
 def worker_snapshots(specs: list[WorkerSpec] | None = None, config: Path | None = None) -> list[dict]:
     specs = load_worker_specs(config or default_workers_config()) if specs is None else specs
     wanted = {spec.id: spec for spec in specs}
@@ -683,9 +702,9 @@ def worker_snapshots(specs: list[WorkerSpec] | None = None, config: Path | None 
             # A graceful restart is relaunched on the manager's next pass, not left down.
             state_name = "restarting" if drain_restarts(wid) else "drained"
         elif spec and spec.enabled:
-            state_name = "missing" if not actual else str(actual.get("state") or "stale")
+            state_name = "missing" if not actual else _dead_runner_state(actual, "stale")
         else:
-            state_name = str(actual.get("state") or "stopped")
+            state_name = _dead_runner_state(actual, "stopped")
         snapshots.append(
             {
                 **actual,
