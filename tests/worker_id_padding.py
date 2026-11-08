@@ -44,7 +44,8 @@ def main():
     saved = cfg.acquire_slot
     cfg.acquire_slot = lambda wid: wid not in held
     try:
-        check("lowest free padded slot", cfg.auto_assign_wid() == "worker03", cfg.auto_assign_wid())
+        got = cfg.auto_assign_wid()  # once: it claims a slot when not stubbed
+        check("lowest free padded slot", got == "worker03", got)
     finally:
         cfg.acquire_slot = saved
 
@@ -52,11 +53,8 @@ def main():
     spec = lambda *ids: [wm.WorkerSpec(id=i) for i in ids]  # noqa: E731
     check("first is worker01", wm.next_worker_id([]) == "worker01")
     check("fills a gap", wm.next_worker_id(spec("worker01", "worker03")) == "worker02")
-    check(
-        "a legacy worker1 takes number 1",
-        wm.next_worker_id(spec("worker1", "worker03")) == "worker02",
-        wm.next_worker_id(spec("worker1", "worker03")),
-    )
+    legacy = wm.next_worker_id(spec("worker1", "worker03"))
+    check("a legacy worker1 takes number 1", legacy == "worker02", legacy)
     check("other ids do not count", wm.next_worker_id(spec("update-check", "workerX")) == "worker01")
 
     print(f"\n{'PASS' if not fails else 'FAIL'}: {fails} failure(s)")
