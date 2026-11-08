@@ -49,6 +49,10 @@ REVIEW_PROVIDER_DOWN_EXIT = 3
 # not recognise and every report wedges. Bump this together with the two pins in
 # EpsilonEridaniRoadmap/.github/workflows/progress-*.yml.
 PROGRESS_TTL = int(os.environ.get("EPSILONERIDANI_PROGRESS_TTL", "600"))  # seconds a `due` verdict stays fresh
+# The fewest merged PRs a roadmap area needs in its window before a progress report is worth writing
+# (`epsiloneridani-progress plan --min-prs`). The tool defaults to 10, which no area had reached by
+# 2026-11-08, so no report had ever landed; 5 lets the busier areas report.
+PROGRESS_MIN_PRS = int(os.environ.get("EPSILONERIDANI_PROGRESS_MIN_PRS", "5"))
 MAX_PROGRESS_ERRORS = 3  # consecutive failed progress rounds before backing off
 PROGRESS_ATTEMPT_GAP = int(os.environ.get("EPSILONERIDANI_PROGRESS_GAP", "28800"))  # min seconds between attempts
 # Lines of a failing `epsiloneridani-progress` subcommand echoed into the main log. The whole output is
