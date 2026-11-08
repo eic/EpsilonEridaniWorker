@@ -229,7 +229,7 @@ Flags win over these. Most are tuning knobs with sane defaults.
 | `EPSILONERIDANI_AGENT` | `auto` | Default for `--agent`. |
 | `EPSILONERIDANI_ACCOUNT` | _(unset)_ | Default for `--account`. |
 | `CODEX_HOME` | `~/.codex` | Codex config/credential source. Point it at a private directory to give EpsilonEridani its own Codex account without disturbing the one your interactive `codex` uses. |
-| `EPSILONERIDANI_WORKER_ID` | _(unset)_ | Pin the id; when unset, `work` takes the lowest free `workerN`. |
+| `EPSILONERIDANI_WORKER_ID` | _(unset)_ | Pin the id; when unset, `work` takes the lowest free slot, zero-padded (`worker01`, `worker02`, …). |
 | `EPSILONERIDANI_FORK` | auto-created | Point at an existing fork instead of the one the worker creates. |
 | `EPSILONERIDANI_ROADMAP_ONLY` | _(unset)_ | The single roadmap area for `--roadmap-only`. Unset = a fresh random area each round (falls back to all areas if the list can't be fetched); `""` = all areas. |
 | `EPSILONERIDANI_ROADMAP_SKIP` | _(unset)_ | Comma-separated roadmap areas to exclude, for `--roadmap-skip`. |

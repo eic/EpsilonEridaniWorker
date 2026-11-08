@@ -117,6 +117,7 @@ RUN_STDLIB=(
   status_labels.py
   tend_bot_permissions.py
   worker_claude_config.py
+  worker_id_padding.py
   worker_manager.py
   update_check.py
   workers_drain.py
