@@ -60,6 +60,7 @@ from .constants import (
     MAX_OPEN_PRS,
     OPENROUTER_MODELS,
     PR_TASKS,
+    PROGRESS_MIN_PRS,
     PROGRESS_TOOL_LINE,
     PROGRESS_TOOL_TAIL,
     REVIEW,
@@ -1370,6 +1371,31 @@ def _do_progress_inner(w, opts) -> int | None:
             timeout=1800,
         )
 
+    # `plan` reads the docs-tracking ref (`origin/docgen`) and refuses when the documentation was built
+    # from a commit that ref does not reach, so a stale copy of it reads as "not due". Refresh exactly
+    # that ref; a failure is logged and `plan` decides with what is there.
+    try:
+        fetched = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(w.cfg.checkout),
+                "fetch",
+                "-q",
+                "origin",
+                "+refs/heads/docgen:refs/remotes/origin/docgen",
+            ],
+            capture_output=True,
+            text=True,
+            errors="replace",
+            timeout=300,
+        )
+        failure = "" if fetched.returncode == 0 else (fetched.stderr.strip() or "no output")
+    except (OSError, subprocess.TimeoutExpired) as e:
+        failure = type(e).__name__
+    if failure:
+        log(f"  progress: could not refresh origin/docgen ({_clip(failure)})")
+
     # 1) The decision, re-run from FRESH state now that the claim is held — never from the survey's
     #    cached verdict, which is up to PROGRESS_TTL old and says nothing about which area won.
     proc = run_tool(
@@ -1378,6 +1404,8 @@ def _do_progress_inner(w, opts) -> int | None:
         str(roadmap_dir),
         "--code-dir",
         str(w.cfg.checkout),
+        "--min-prs",
+        str(PROGRESS_MIN_PRS),
         "--out",
         str(plan_file),
         capture=True,
