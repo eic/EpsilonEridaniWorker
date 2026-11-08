@@ -13,8 +13,8 @@ base_ref="$(git merge-base origin/main HEAD)"
 if git show "$base_ref":EpsilonEridani/upstream-shims.json > "$base_shims" 2>/dev/null; then git archive "$base_ref" EpsilonEridani | tar -x -C "$base_root"; shim_args+=(--base-manifest "$base_shims" --base-root "$base_root"); fi
 if [ -f scripts/check-expired-upstream-shims.py ]; then python3 scripts/check-expired-upstream-shims.py "${shim_args[@]}"; fi
 rm -f "$base_shims"; rm -rf "$base_root"
-lake build
-lake exe axioms
+__BUILD__lake build
+__BUILD__lake exe axioms
 ```
 - Read the build failures. The usual cause is a renamed or moved upstream module (every Physlib bump adaptation so far), or a renamed/retyped upstream lemma or changed signature (the usual Mathlib case). Fix each by updating the `EpsilonEridani/` import, proof or statement to the new upstream API. Prefer the smallest correct change. Repo policy forbids keeping a forwarding import module or alias for the old name: update every use and delete the obsolete path.
 - The shim-expiry command may be the only failing check even when `lake build` succeeds. Its annotations name exact upstream replacements (in Mathlib, Physlib, PhyslibAlpha or TauCeti) and affected sources. Migrate only the superseded declarations/imports, preserve or re-home source-only API, and update `EpsilonEridani/upstream-shims.json` in the same source-only change. The checker derives each inherited source's declaration surface from the PR merge base and ratchets its probes until that surface is migrated, deleted, or re-homed under an entry preserving those probes, so never make the check green by merely deleting probes or changing an exact target to a speculative/landing sentinel.
@@ -36,10 +36,10 @@ base_ref="$(git merge-base origin/main HEAD)"
 if git show "$base_ref":EpsilonEridani/upstream-shims.json > "$base_shims" 2>/dev/null; then git archive "$base_ref" EpsilonEridani | tar -x -C "$base_root"; shim_args+=(--base-manifest "$base_shims" --base-root "$base_root"); fi
 if [ -f scripts/check-expired-upstream-shims.py ]; then python3 scripts/check-expired-upstream-shims.py "${shim_args[@]}"; fi
 rm -f "$base_shims"; rm -rf "$base_root"
-lake build
-lake exe axioms
+__BUILD__lake build
+__BUILD__lake exe axioms
 ```
-Iterate until green. Never push red.
+Iterate until green. Never push red.__BUILD_NOTE__
 
 **Do this synchronously, in this one turn.** Run these commands in the FOREGROUND and wait for each to finish — do NOT background the build and then end your turn expecting to be resumed. You are running non-interactively; nothing will resume you, so a build left running in the background is abandoned and the round ends with nothing committed or pushed. Do not yield, stop, or end your turn until you have committed and pushed (below). Pushing is the only thing that preserves your work.
 

@@ -41,11 +41,11 @@ WRAPPERS = ("git-safe-push", "gh-safe-pr-create", "claim.sh")
 # The keys each call site passes, so a prompt that grows a placeholder without a substitution fails
 # here rather than reaching an agent. Mirrors work_units._do_fixlike / do_roadmap.
 CALL_SITES = {
-    "fix.md": dict(PR=123, AGENT="Claude Code", BIN="/bin"),
-    "fix-ci.md": dict(PR=123, AGENT="Claude Code", BIN="/bin"),
-    "rebase.md": dict(PR=123, AGENT="Claude Code", BIN="/bin"),
-    "bump.md": dict(PR=123, AGENT="Claude Code", BIN="/bin"),
-    "lint-repair.md": dict(PR=123, AGENT="Claude Code", BIN="/bin"),
+    "fix.md": dict(PR=123, AGENT="Claude Code", BIN="/bin", BUILD="", BUILD_NOTE=""),
+    "fix-ci.md": dict(PR=123, AGENT="Claude Code", BIN="/bin", BUILD="", BUILD_NOTE=""),
+    "rebase.md": dict(PR=123, AGENT="Claude Code", BIN="/bin", BUILD="", BUILD_NOTE=""),
+    "bump.md": dict(PR=123, AGENT="Claude Code", BIN="/bin", BUILD="", BUILD_NOTE=""),
+    "lint-repair.md": dict(PR=123, AGENT="Claude Code", BIN="/bin", BUILD="", BUILD_NOTE=""),
     "roadmap.md": dict(
         ONLY="CFSGStatement",
         SKIP="none",
@@ -58,6 +58,8 @@ CALL_SITES = {
         RUBRICS="/opt/rubrics/rubrics.md",
         SOURCE_GUIDANCE="",
         BIN="/bin",
+        BUILD="",
+        BUILD_NOTE="",
     ),
 }
 

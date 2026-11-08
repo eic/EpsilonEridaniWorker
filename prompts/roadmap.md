@@ -70,10 +70,10 @@ beats a padded one. If nothing needs changing, say so and move on. Then verify, 
 ## Verify before pushing (all three MUST pass)
 ```
 lake exe cache get Mathlib Physlib TauCeti
-lake build
-lake exe axioms
+__BUILD__lake build
+__BUILD__lake exe axioms
 ```
-If `lake build` is red, FIX IT or retreat (below). Never push red.
+If `lake build` is red, FIX IT or retreat (below). Never push red.__BUILD_NOTE__
 
 
 **Do this synchronously, in this one turn.** Run the three commands in the FOREGROUND and wait for each to finish — do NOT background the build and then end your turn expecting to be resumed. You are running non-interactively; nothing will resume you, so a build left running in the background is abandoned and the round ends with nothing committed or pushed. Do not yield, stop, or end your turn until you have committed, pushed, and opened the PR (below). Pushing is the only thing that preserves your work.

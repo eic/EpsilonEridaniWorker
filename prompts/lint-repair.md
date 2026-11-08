@@ -37,14 +37,14 @@ if git show "$base_ref":EpsilonEridani/upstream-shims.json > "$base_shims" 2>/de
 if [ "$have_base" = 1 ] && git diff --quiet "$base_ref" -- lake-manifest.json lean-toolchain; then shim_args+=(--only-new); fi
 if [ -f scripts/check-expired-upstream-shims.py ]; then python3 scripts/check-expired-upstream-shims.py "${shim_args[@]}"; fi
 rm -f "$base_shims"; rm -rf "$base_root"
-lake build --iofail
-lake env lean --run scripts/DuplicateDeclarations.lean
-lake exe axioms
-lake exe module-system
+__BUILD__lake build --iofail
+__BUILD__lake env lean --run scripts/DuplicateDeclarations.lean
+__BUILD__lake exe axioms
+__BUILD__lake exe module-system
 bash scripts/lint-env.sh
 bash scripts/lint-style.sh
 ```
-Iterate until every one is green, and `lint-env.sh` prints `LINT-ENV: PASS`. Never push red.
+Iterate until every one is green, and `lint-env.sh` prints `LINT-ENV: PASS`. Never push red.__BUILD_NOTE__
 
 **Do this synchronously, in this one turn.** Run these commands in the FOREGROUND and wait for each to finish — do NOT background the build and then end your turn expecting to be resumed. You are running non-interactively; nothing will resume you, so a build left running in the background is abandoned and the round ends with nothing committed or pushed. Do not yield, stop, or end your turn until you have committed and pushed (below). Pushing is the only thing that preserves your work.
 
