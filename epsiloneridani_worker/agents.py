@@ -498,6 +498,40 @@ def build_prompt_subs(bubble: bool = False) -> dict[str, str]:
     return {"BUILD": prefix + " ", "BUILD_NOTE": note}
 
 
+def prefetch_deps_cache(checkout: Path) -> None:
+    """Fetch the dependencies' build cache into a host checkout before the agent starts: the same
+    `lake exe cache get Mathlib Physlib TauCeti`, with the same one retry, that bubble_work_cmd runs
+    first in a Bubble round, so the agent does not spend its opening turns (and context) on it.
+
+    Unlike in Bubble it is not fatal: every prompt's verification still starts with this command, so
+    an agent whose fetch failed here tries again itself. Bounded, logged, and off with the same
+    $EPSILONERIDANI_OWN_CACHE=0 as the own-outputs fetch."""
+    if os.environ.get(OWN_CACHE_ENV, "1").strip() == "0" or not shutil.which("lake"):
+        return
+    last = ""
+    for _attempt in (1, 2):
+        try:
+            r = subprocess.run(
+                list(DEPS_CACHE_CMD), cwd=checkout, capture_output=True, text=True, timeout=DEPS_CACHE_TIMEOUT_S
+            )
+        except (OSError, subprocess.TimeoutExpired) as e:
+            last = type(e).__name__
+            continue
+        if r.returncode == 0:
+            log("  build cache: fetched the Mathlib/Physlib/TauCeti cache")
+            return
+        out = (r.stdout + r.stderr).strip()
+        last = out.splitlines()[-1][:200] if out else f"exit {r.returncode}"
+    log(f"  build cache: the Mathlib/Physlib/TauCeti cache fetch failed twice ({last}); the agent's prompt retries it")
+
+
+def prefetch_build_caches(checkout: Path) -> None:
+    """Everything a host round fetches before the agent, in bubble_work_cmd's order: the dependencies'
+    cache, then EpsilonEridani's own outputs."""
+    prefetch_deps_cache(checkout)
+    prefetch_own_outputs(checkout)
+
+
 def prefetch_own_outputs(checkout: Path) -> None:
     """Fetch EpsilonEridani's own main-built outputs into a host checkout before the agent starts.
 
@@ -1081,6 +1115,10 @@ EPSILONERIDANI_CACHE_REVISION_ENDPOINT = "https://s3-central.nrp-nautilus.io/eps
 OWN_CACHE_ENV = "EPSILONERIDANI_OWN_CACHE"
 OWN_CACHE_MAX_REVS = 100
 OWN_CACHE_TIMEOUT_S = 600
+# The dependencies' cache (Mathlib's `cache` tool, which also serves Physlib and TauCeti): the command
+# every prompt's verification starts with, run by the worker first as bubble_work_cmd does.
+DEPS_CACHE_CMD = ("lake", "exe", "cache", "get", "Mathlib", "Physlib", "TauCeti")
+DEPS_CACHE_TIMEOUT_S = 1200
 EPSILONERIDANI_CACHE_ARTIFACT_URL = f"https://{EPSILONERIDANI_CACHE_DOMAIN}/artifacts"
 EPSILONERIDANI_CACHE_REVISION_URL = f"https://{EPSILONERIDANI_CACHE_DOMAIN}/revisions"
 

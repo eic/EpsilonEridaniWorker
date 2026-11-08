@@ -111,10 +111,71 @@ def main():
     print("2) both host call sites fetch before the agent")
     src = (REPO / "epsiloneridani_worker" / "work_units.py").read_text()
     for marker in (
-        "prefetch_own_outputs(co)\n        rc = run_agent_host(co,",
-        "prefetch_own_outputs(w.cfg.checkout)\n    return run_agent_host(w.cfg.checkout,",
+        "prefetch_build_caches(co)\n        rc = run_agent_host(co,",
+        "prefetch_build_caches(w.cfg.checkout)\n    return run_agent_host(w.cfg.checkout,",
     ):
         check(f"call site: {marker.split(chr(10))[0].strip()}", marker in src)
+
+    print("1b) the dependencies' cache, as in Bubble")
+    calls, logs = [], []
+
+    def deps(results, env=None):
+        calls.clear()
+        logs.clear()
+        pending = list(results)
+
+        def fake(cmd, **kw):
+            calls.append((cmd, kw))
+            r = pending.pop(0)
+            if isinstance(r, BaseException):
+                raise r
+            return r
+
+        saved = (agents.subprocess.run, agents.shutil.which, agents.log)
+        agents.subprocess.run, agents.shutil.which, agents.log = fake, (lambda n: "/usr/bin/lake"), logs.append
+        old = os.environ.pop(agents.OWN_CACHE_ENV, None)
+        if env is not None:
+            os.environ[agents.OWN_CACHE_ENV] = env
+        try:
+            agents.prefetch_deps_cache(Path(tempfile.gettempdir()))
+        finally:
+            agents.subprocess.run, agents.shutil.which, agents.log = saved
+            os.environ.pop(agents.OWN_CACHE_ENV, None)
+            if old is not None:
+                os.environ[agents.OWN_CACHE_ENV] = old
+
+    deps([ok])
+    check("runs Bubble's command", calls and calls[0][0] == list(agents.DEPS_CACHE_CMD), calls)
+    check(
+        "the command is the one prompts start with",
+        agents.DEPS_CACHE_CMD == ("lake", "exe", "cache", "get", "Mathlib", "Physlib", "TauCeti"),
+    )
+    check(
+        "bounded, in the checkout",
+        calls[0][1].get("timeout") == agents.DEPS_CACHE_TIMEOUT_S
+        and calls[0][1].get("cwd") == Path(tempfile.gettempdir()),
+    )
+    check("a hit is logged", any("fetched the Mathlib/Physlib/TauCeti cache" in m for m in logs), logs)
+    deps([subprocess.CompletedProcess([], 1, "", "x"), ok])
+    check("one retry", len(calls) == 2 and any("fetched" in m for m in logs), (len(calls), logs))
+    deps([subprocess.CompletedProcess([], 1, "", "error: build failed"), subprocess.TimeoutExpired(["lake"], 1)])
+    check(
+        "two failures log, never raise",
+        len(calls) == 2 and any("failed twice (TimeoutExpired)" in m for m in logs),
+        logs,
+    )
+    deps([ok], env="0")
+    check("off with EPSILONERIDANI_OWN_CACHE=0", not calls)
+
+    order = []
+    saved = (agents.prefetch_deps_cache, agents.prefetch_own_outputs)
+    agents.prefetch_deps_cache = lambda c: order.append("deps")
+    agents.prefetch_own_outputs = lambda c: order.append("own")
+    try:
+        agents.prefetch_build_caches(Path("."))
+    finally:
+        agents.prefetch_deps_cache, agents.prefetch_own_outputs = saved
+    check("dependencies first, then EpsilonEridani's own", order == ["deps", "own"], order)
 
     print("3) every prompt teaches the iteration loop")
     for p in sorted((tc.paths.HERE / "prompts").glob("*.md")):
