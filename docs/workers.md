@@ -378,6 +378,38 @@ Setting any of the three yourself overrides this. `scripts/share-build-caches`
 folds the private copies an already-running fleet accumulated into the pool
 without re-downloading them.
 
+### Where `.lake` lives
+
+Each checkout's own `.lake` (its dependency checkouts and build outputs) is the
+largest thing a worker writes: a full EpsilonEridani build leaves a few hundred
+thousand files there. By default it sits inside the checkout. On a cluster whose
+project filesystem limits the number of files per user, one new worker building
+there can exhaust the limit, after which every worker's writes fail with
+"Disk quota exceeded". Set `EPSILONERIDANI_LAKE_ROOT` (in the service
+environment, or per worker under `[workers.env]`) to a directory without that
+limit, such as node-local scratch:
+
+```toml
+[workers.env]
+EPSILONERIDANI_LAKE_ROOT = "/scratch/me/epsiloneridani"
+```
+
+Before each host round the worker makes `checkouts/<id>/EpsilonEridani/.lake` a
+symlink to `$EPSILONERIDANI_LAKE_ROOT/<id>/dot-lake`. That includes a worker's
+first round, before anything has been built. An existing real `.lake` is moved
+into an empty target once, so its builds are kept. If the target already has
+contents, the worker leaves both alone and fails the round with a message naming
+them. A `.lake` that is already a symlink is left as it is, wherever it points.
+The worker also adds `/.lake` to the checkout's `.git/info/exclude`, because
+EpsilonEridani's `.gitignore` entry `/.lake/` does not match a symlink.
+
+Each worker gets its own directory: a `.lake` cannot be shared, because
+checkouts on different PRs pin different dependency revisions and would
+overwrite each other's packages mid-build. The Mathlib download pool above is
+what workers share. A node-local root and an `EPSILONERIDANI_BUILD_PREFIX` that
+runs builds on another node do not combine: the build node must see `.lake` at
+the same path.
+
 On macOS, `$HOME` stays unchanged because both Claude Code and GitHub CLI use the
 login Keychain. `epsiloneridani` redirects `$CLAUDE_CONFIG_DIR` and `$CODEX_HOME`, which
 isolates Codex, but host workers still share the login user's Claude account.

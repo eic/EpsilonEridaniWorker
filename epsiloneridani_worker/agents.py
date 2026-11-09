@@ -677,6 +677,82 @@ def clean_lake_cache_after_toolchain_bump(cfg: Config) -> None:
         log(f"Lake artifact cache: cleanup completed but could not update toolchain marker ({e})")
 
 
+LAKE_ROOT_ENV = "EPSILONERIDANI_LAKE_ROOT"
+
+
+def _git_exclude(checkout: Path, pattern: str) -> None:
+    """Add `pattern` to the checkout's .git/info/exclude once. EpsilonEridani's .gitignore names `.lake/`,
+    which matches a directory but not a symlink, so a linked `.lake` would otherwise show as untracked
+    and could be swept into an agent's `git add -A`."""
+    exclude = checkout / ".git" / "info" / "exclude"
+    try:
+        lines = exclude.read_text().splitlines() if exclude.is_file() else []
+        if pattern not in lines:
+            exclude.parent.mkdir(parents=True, exist_ok=True)
+            with exclude.open("a") as f:
+                f.write(("\n" if lines and lines[-1] else "") + pattern + "\n")
+    except OSError as e:
+        log(f"{LAKE_ROOT_ENV}: could not add {pattern} to {exclude} ({e})")
+
+
+def place_lake(cfg: Config) -> bool:
+    """With $EPSILONERIDANI_LAKE_ROOT set, make the checkout's `.lake` a symlink to
+    `$EPSILONERIDANI_LAKE_ROOT/<worker id>/dot-lake`.
+
+    A `.lake` holds the dependency checkouts and build outputs: hundreds of thousands of files. On a
+    cluster whose shared filesystem has a file-count quota, one worker's `.lake` there can exhaust it
+    and fail every worker's writes. The root names a disk without that limit (a node-local scratch).
+    Each worker gets its own directory under it: two checkouts on different PRs cannot share one
+    `.lake`, since each rewrites the packages and build outputs the other is using.
+
+    - No `.lake` yet (a new worker's first clone): create the link.
+    - Already a link: kept as is, even when it points elsewhere (an operator's choice).
+    - A real directory: moved into the empty target, so its builds are kept. When the target already
+      has contents, nothing is touched and the round fails with a message naming both paths.
+    Unset, nothing changes. Returns False only when the round must not build."""
+    root = os.environ.get(LAKE_ROOT_ENV, "").strip()
+    if not root:
+        return True
+    co = cfg.checkout
+    lake = co / ".lake"
+    target = Path(root).expanduser() / cfg.wid / "dot-lake"
+    try:
+        target.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        log(f"{LAKE_ROOT_ENV}: cannot create {target} ({e})")
+        return False
+    if lake.is_symlink():
+        if os.path.realpath(lake) != os.path.realpath(target):
+            log(f"{LAKE_ROOT_ENV}: {lake} links to {os.readlink(lake)}, not {target}; leaving it")
+        _git_exclude(co, "/.lake")
+        return True
+    if lake.exists():
+        if not lake.is_dir():
+            log(f"{LAKE_ROOT_ENV}: {lake} is not a directory or symlink; remove it")
+            return False
+        if any(target.iterdir()):
+            log(
+                f"{LAKE_ROOT_ENV}: {lake} is a real directory and {target} is not empty; "
+                "delete or move one of them (both hold rebuildable Lake output)"
+            )
+            return False
+        log(f"{LAKE_ROOT_ENV}: moving {lake} → {target} (one-time; may take a while across filesystems)")
+        try:
+            target.rmdir()
+            shutil.move(str(lake), str(target))
+        except OSError as e:
+            log(f"{LAKE_ROOT_ENV}: moving {lake} failed ({e})")
+            return False
+    try:
+        lake.symlink_to(target, target_is_directory=True)
+    except OSError as e:
+        log(f"{LAKE_ROOT_ENV}: cannot link {lake} → {target} ({e})")
+        return False
+    _git_exclude(co, "/.lake")
+    log(f"{LAKE_ROOT_ENV}: {lake} → {target}")
+    return True
+
+
 def prepare_checkout(cfg: Config) -> bool:
     """Clean checkout of EpsilonEridani main; keep .lake for fast rebuilds, drop every other leftover."""
     sync_mathlib_pool(cfg)
@@ -686,6 +762,10 @@ def prepare_checkout(cfg: Config) -> bool:
         log(f"cloning {EPSILONERIDANI} → {co} (first run)")
         if subprocess.run(["git", "clone", "-q", f"https://github.com/{EPSILONERIDANI}", str(co)]).returncode:
             return False
+    # Before anything can build into it: a fresh clone has no .lake yet, and the first build would put
+    # one wherever the checkout lives.
+    if not place_lake(cfg):
+        return False
 
     def g(*a) -> int:
         return subprocess.run(["git", "-C", str(co), *a]).returncode
