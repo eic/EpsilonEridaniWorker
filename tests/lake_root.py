@@ -12,7 +12,10 @@ a fixed list of worker ids at service start, which no worker added later got. Th
      is a no-op.
   3. A real `.lake` is moved into an empty target, contents kept, and replaced by the link.
   4. A real `.lake` with a non-empty target is left alone and the round refuses to build.
-  5. A link the operator pointed elsewhere is kept.
+  5. A link the operator pointed elsewhere is kept, creating nothing under the root, so an unwritable
+     root does not fail it; a link to our own deleted target gets the target back; an unreadable
+     target fails the round with a message instead of an exception; the exclude file gains no blank
+     lines.
   6. prepare_checkout links `.lake` on a fresh checkout before the clean, and the clean keeps it.
 
 Exit 0 = all assertions hold; 1 = a mismatch.
@@ -118,6 +121,53 @@ def main() -> int:
     cfg = SimpleNamespace(wid="w5", checkout=co)
     check("returns True", agents.place_lake(cfg))
     check("link unchanged", os.path.realpath(co / ".lake") == os.path.realpath(elsewhere))
+    check("nothing created under the root", not (root / "w5").exists())
+    os.environ[ENV] = str(tmp / "unwritable" / "root")
+    (tmp / "unwritable").mkdir()
+    (tmp / "unwritable").chmod(0o500)
+    try:
+        check("an unwritable root does not fail it", agents.place_lake(cfg))
+    finally:
+        (tmp / "unwritable").chmod(0o700)
+        os.environ[ENV] = str(root)
+
+    print("5b) a link to a deleted target gets its target back")
+    co = make_checkout(tmp / "g")
+    target = root / "w7" / "dot-lake"
+    target.mkdir(parents=True)
+    (co / ".lake").symlink_to(target)
+    target.rmdir()
+    cfg = SimpleNamespace(wid="w7", checkout=co)
+    check("returns True", agents.place_lake(cfg))
+    check("target re-created", target.is_dir() and (co / ".lake").is_dir())
+
+    print("5c) an unreadable target fails the round cleanly")
+    co = make_checkout(tmp / "h")
+    (co / ".lake").mkdir()
+    target = root / "w8" / "dot-lake"
+    target.mkdir(parents=True)
+    target.chmod(0o000)
+    cfg = SimpleNamespace(wid="w8", checkout=co)
+    try:
+        ok = agents.place_lake(cfg)
+        check("returns False, no exception", ok is False or os.geteuid() == 0)
+    except OSError as e:
+        check("returns False, no exception", False, repr(e))
+    finally:
+        target.chmod(0o700)
+    check(".lake untouched", (co / ".lake").is_dir() and not (co / ".lake").is_symlink())
+
+    print("5d) the exclude file gains no blank lines")
+    co = make_checkout(tmp / "i")
+    exclude = co / ".git" / "info" / "exclude"
+    exclude.write_text("# git ls-files --others --exclude-from=.git/info/exclude\n*.tmp\n")
+    agents.place_lake(SimpleNamespace(wid="w9", checkout=co))
+    check("pattern appended directly", exclude.read_text().endswith("*.tmp\n/.lake\n"), repr(exclude.read_text()))
+    co = make_checkout(tmp / "j")
+    exclude = co / ".git" / "info" / "exclude"
+    exclude.write_text("*.tmp")
+    agents.place_lake(SimpleNamespace(wid="w10", checkout=co))
+    check("an unterminated last line is completed", exclude.read_text() == "*.tmp\n/.lake\n", repr(exclude.read_text()))
 
     print("6) prepare_checkout links before the clean, and the clean keeps it")
     origin = tmp / "origin.git"

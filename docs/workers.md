@@ -399,7 +399,7 @@ symlink to `$EPSILONERIDANI_LAKE_ROOT/<id>/dot-lake`. That includes a worker's
 first round, before anything has been built. An existing real `.lake` is moved
 into an empty target once, so its builds are kept. If the target already has
 contents, the worker leaves both alone and fails the round with a message naming
-them. A `.lake` that is already a symlink is left as it is, wherever it points.
+them. A `.lake` that already links somewhere else is left as it is, and nothing is created under the root for it. If someone deleted the target behind the link, it is recreated empty and Lake repopulates it on the next build.
 The worker also adds `/.lake` to the checkout's `.git/info/exclude`, because
 EpsilonEridani's `.gitignore` entry `/.lake/` does not match a symlink.
 

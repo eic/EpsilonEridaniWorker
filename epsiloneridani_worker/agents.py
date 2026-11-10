@@ -686,11 +686,12 @@ def _git_exclude(checkout: Path, pattern: str) -> None:
     and could be swept into an agent's `git add -A`."""
     exclude = checkout / ".git" / "info" / "exclude"
     try:
-        lines = exclude.read_text().splitlines() if exclude.is_file() else []
-        if pattern not in lines:
+        text = exclude.read_text() if exclude.is_file() else ""
+        if pattern not in text.splitlines():
             exclude.parent.mkdir(parents=True, exist_ok=True)
             with exclude.open("a") as f:
-                f.write(("\n" if lines and lines[-1] else "") + pattern + "\n")
+                # Only complete an unterminated last line; never add a blank one.
+                f.write(("\n" if text and not text.endswith("\n") else "") + pattern + "\n")
     except OSError as e:
         log(f"{LAKE_ROOT_ENV}: could not add {pattern} to {exclude} ({e})")
 
@@ -706,7 +707,8 @@ def place_lake(cfg: Config) -> bool:
     `.lake`, since each rewrites the packages and build outputs the other is using.
 
     - No `.lake` yet (a new worker's first clone): create the link.
-    - Already a link: kept as is, even when it points elsewhere (an operator's choice).
+    - Already a link to the target: the target is re-created if it was deleted.
+    - A link elsewhere (an operator's choice): kept, and nothing is created under the root.
     - A real directory: moved into the empty target, so its builds are kept. When the target already
       has contents, nothing is touched and the round fails with a message naming both paths.
     Unset, nothing changes. Returns False only when the round must not build."""
@@ -716,21 +718,28 @@ def place_lake(cfg: Config) -> bool:
     co = cfg.checkout
     lake = co / ".lake"
     target = Path(root).expanduser() / cfg.wid / "dot-lake"
+    if lake.is_symlink() and os.path.realpath(lake) != os.path.realpath(target):
+        # An operator's link: nothing under the root is ours to create, and an unwritable root must
+        # not fail a checkout that already has a working .lake.
+        log(f"{LAKE_ROOT_ENV}: {lake} links to {os.readlink(lake)}, not {target}; leaving it")
+        _git_exclude(co, "/.lake")
+        return True
     try:
+        # Also re-creates the target behind an existing link to it, which someone emptied by
+        # deleting the directory itself: a dangling .lake link makes every lake command fail.
         target.mkdir(parents=True, exist_ok=True)
+        target_used = any(target.iterdir())
     except OSError as e:
-        log(f"{LAKE_ROOT_ENV}: cannot create {target} ({e})")
+        log(f"{LAKE_ROOT_ENV}: cannot create or read {target} ({e})")
         return False
     if lake.is_symlink():
-        if os.path.realpath(lake) != os.path.realpath(target):
-            log(f"{LAKE_ROOT_ENV}: {lake} links to {os.readlink(lake)}, not {target}; leaving it")
         _git_exclude(co, "/.lake")
         return True
     if lake.exists():
         if not lake.is_dir():
             log(f"{LAKE_ROOT_ENV}: {lake} is not a directory or symlink; remove it")
             return False
-        if any(target.iterdir()):
+        if target_used:
             log(
                 f"{LAKE_ROOT_ENV}: {lake} is a real directory and {target} is not empty; "
                 "delete or move one of them (both hold rebuildable Lake output)"
