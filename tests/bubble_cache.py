@@ -127,10 +127,19 @@ check(
 shutil.rmtree(shimdir, ignore_errors=True)
 
 
-# The cache is reached over the custom domain, not the bucket's `pub-<id>.r2.dev` development URL.
-# That URL was disabled and answered 401 for every path, so `lake cache get` failed on every round.
-check("cache uses the custom domain", tc.EPSILONERIDANI_CACHE_DOMAIN == "cache.epsiloneridaniproject.org")
+# The cache is the NRP bucket CI publishes to. Neither the bucket's `pub-<id>.r2.dev` development URL
+# (disabled, 401 for every path) nor the custom domain cache.epsiloneridaniproject.org (no DNS) serves it.
+nrp = "https://s3-central.nrp-nautilus.io/epsiloneridani-cache"
+check(
+    "Bubble and host rounds use the same NRP endpoints",
+    (tc.EPSILONERIDANI_CACHE_ARTIFACT_URL, tc.EPSILONERIDANI_CACHE_REVISION_URL)
+    == (tc.agents.EPSILONERIDANI_CACHE_ARTIFACT_ENDPOINT, tc.agents.EPSILONERIDANI_CACHE_REVISION_ENDPOINT)
+    == (f"{nrp}/artifacts", f"{nrp}/revisions"),
+)
 check("cache does not use the r2.dev development URL", "r2.dev" not in tc.EPSILONERIDANI_CACHE_ARTIFACT_URL)
+check(
+    "cache does not use the dead custom domain", "epsiloneridaniproject.org" not in tc.EPSILONERIDANI_CACHE_ARTIFACT_URL
+)
 
 
 # A bucket with public access switched off answers 401/403 for every path, root included, so no revision
