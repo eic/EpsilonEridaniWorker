@@ -9,7 +9,8 @@ now the transcript kept only the turn count and duration. Pinned:
   1. A run through run_agent_proc writes one JSON line to <credential source>/.epsiloneridani-quota/
      spend.jsonl: worker, label, rc, start and end, spend (cost, tokens, per model) and the last
      rate-limit headers per window, and logs the spend in the main log.
-  2. Under an isolated home the journal follows the .epsiloneridani-creds-source marker to the real
+  2. Separate logins for one account write one journal, in the account's directory. Under an
+     isolated home the journal follows the .epsiloneridani-creds-source marker to the real
      credential dir, which is where the shared usage reading lives too.
   3. A failed run is journaled as well, with its rc; one that reported no spend is journaled with spend
      null rather than skipped; one interrupted mid-run (the worker stopped) keeps what it had reported,
@@ -104,7 +105,14 @@ def journal(claude: Path) -> list[dict]:
 
 def main():
     saved = {
-        k: os.environ.get(k) for k in ("HOME", "CLAUDE_CONFIG_DIR", "EPSILONERIDANI_WORKER_ID", "EPSILONERIDANI_STREAM")
+        k: os.environ.get(k)
+        for k in (
+            "HOME",
+            "CLAUDE_CONFIG_DIR",
+            "EPSILONERIDANI_WORKER_ID",
+            "EPSILONERIDANI_STREAM",
+            "EPSILONERIDANI_CLAUDE_ACCOUNTS_DIR",
+        )
     }
     try:
         with tempfile.TemporaryDirectory() as d:
@@ -169,6 +177,23 @@ def main():
                     provider="claude",
                 )
             check("the agent's HOME, from its env, decides the journal", len(journal(other_home / ".claude")), 1)
+            os.environ["CLAUDE_CONFIG_DIR"] = str(iso)
+
+            accounts = tmp / "accounts"
+            os.environ["EPSILONERIDANI_CLAUDE_ACCOUNTS_DIR"] = str(accounts)
+            for wid in ("worker01", "worker03"):
+                d = tmp / "logins" / wid
+                d.mkdir(parents=True)
+                (d / ".claude.json").write_text(json.dumps({"oauthAccount": {"accountUuid": "acct-shared"}}))
+                os.environ["CLAUDE_CONFIG_DIR"] = str(d)
+                os.environ["EPSILONERIDANI_WORKER_ID"] = wid
+                run(tmp, EVENTS)
+            shared = quota.claude_quota_dir(home)
+            check("separate logins for one account share one journal", shared.parent == accounts, shared)
+            lines = [json.loads(x) for x in (shared / quota.CLAUDE_SPEND_JOURNAL_FILE).read_text().splitlines()]
+            check("...with a line from each worker", [x["worker"] for x in lines] == ["worker01", "worker03"], lines)
+            os.environ.pop("EPSILONERIDANI_CLAUDE_ACCOUNTS_DIR", None)
+            os.environ["EPSILONERIDANI_WORKER_ID"] = "worker27"
             os.environ["CLAUDE_CONFIG_DIR"] = str(iso)
 
             print("3) failures and other providers")

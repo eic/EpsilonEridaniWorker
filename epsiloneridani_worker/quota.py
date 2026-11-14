@@ -107,7 +107,7 @@ def claude_accounts_root() -> Path:
     return Path(override).expanduser() if override else HERE / "state" / CLAUDE_ACCOUNTS_DIRNAME
 
 
-# One JSON line per Claude agent run on this credential source: what it spent (Claude Code's cost
+# One JSON line per Claude agent run on this account (see claude_quota_dir): what it spent (Claude Code's cost
 # estimate and tokens per model) and the last rate-limit headers it saw. Recorded, not yet read: it is
 # the input for estimating usage between usage-endpoint readings, which answer 429 more often than not.
 CLAUDE_SPEND_JOURNAL_FILE = "spend.jsonl"

@@ -209,8 +209,10 @@ install on the same account do not share with this one.
 ## The spend journal
 
 Each Claude agent run (a fix, progress, roadmap or rebase round) appends one JSON
-line to `.epsiloneridani-quota/spend.jsonl` beside its credential source. It is
-written whatever the outcome, including a round cut off by a limit. The line holds:
+line to `spend.jsonl` in the same directory as the shared usage reading: the
+account's directory when the login names its account, otherwise
+`.epsiloneridani-quota/` beside the credential source. It is written whatever the
+outcome, including a round cut off by a limit. The line holds:
 
 - `worker`, `label`, `rc`, and `started` and `ts`, the run's start and end in epoch seconds;
 - `spend`: Claude Code's cost estimate (`cost_usd`), tokens by kind (`input`,
@@ -230,8 +232,8 @@ readings of the usage endpoint, which answers 429 more often than not: the chang
 in usage between two readings, set against the spend between them, gives a rate
 for each account. Review rounds are not journaled here: the review engine runs
 Claude itself and records its spend in its own ledger. Like the shared reading,
-the journal belongs to the credential source, so workers on their own logins keep
-separate journals even when the logins are for one account.
+the journal belongs to the account, so workers on separate logins for one account
+write to one journal.
 
 ## Usage credits
 
