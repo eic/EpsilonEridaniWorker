@@ -75,9 +75,28 @@ check(
 # fixer rounds found nothing to fix (no findings exist), and the per-head budget burnt to 3/3.
 check(
     "all rubrics errored at head -> waiting (awaiting re-review), not actionable",
-    disp(meta({"head_sha": HEAD, "states": {r: "error" for r in (
-        "correctness", "reuse", "api-design", "generality", "placement", "naming",
-        "documentation", "proof-quality")}}), blocking=True, per_head=0),
+    disp(
+        meta(
+            {
+                "head_sha": HEAD,
+                "states": {
+                    r: "error"
+                    for r in (
+                        "correctness",
+                        "reuse",
+                        "api-design",
+                        "generality",
+                        "placement",
+                        "naming",
+                        "documentation",
+                        "proof-quality",
+                    )
+                },
+            }
+        ),
+        blocking=True,
+        per_head=0,
+    ),
     "waiting",
     "awaiting re-review",
 )
@@ -90,8 +109,11 @@ check(
 # The exact #169 scoreboard: a mix of errored rubrics and stale (carried-forward) approvals.
 check(
     "errored + stale mix at head -> waiting (awaiting re-review)",
-    disp(meta({"head_sha": HEAD, "states": {"reuse": "error", "scope": "stale", "attribution": "stale"}}),
-         blocking=True, per_head=2),
+    disp(
+        meta({"head_sha": HEAD, "states": {"reuse": "error", "scope": "stale", "attribution": "stale"}}),
+        blocking=True,
+        per_head=2,
+    ),
     "waiting",
     "awaiting re-review",
 )
@@ -104,14 +126,16 @@ check(
 # A genuine adverse verdict alongside errored rubrics IS a finding: the fixer must still run.
 check(
     "one blocking_request among errored rubrics -> actionable",
-    disp(meta({"head_sha": HEAD, "states": {"reuse": "blocking_request", "naming": "error"}}),
-         blocking=True, per_head=0),
+    disp(
+        meta({"head_sha": HEAD, "states": {"reuse": "blocking_request", "naming": "error"}}), blocking=True, per_head=0
+    ),
     "actionable",
 )
 check(
     "blocking_block among absent rubrics -> actionable",
-    disp(meta({"head_sha": HEAD, "states": {"reuse": "blocking_block", "naming": "absent"}}),
-         blocking=True, per_head=0),
+    disp(
+        meta({"head_sha": HEAD, "states": {"reuse": "blocking_block", "naming": "absent"}}), blocking=True, per_head=0
+    ),
     "actionable",
 )
 
