@@ -107,7 +107,7 @@ CLAUDE_STALE_GATE_S = int(os.environ.get("EPSILONERIDANI_CLAUDE_STALE_GATE_S", "
 # while the usage endpoint reports credits enabled, a window at or above this percentage blocks new
 # rounds until it resets. EPSILONERIDANI_CLAUDE_ALLOW_CREDITS=1 opts in to spending credits and turns
 # the guard off.
-CLAUDE_CREDIT_HEADROOM_PCT = float(os.environ.get("EPSILONERIDANI_CLAUDE_CREDIT_GUARD_PCT", "75"))
+CLAUDE_CREDIT_GUARD_PCT = float(os.environ.get("EPSILONERIDANI_CLAUDE_CREDIT_GUARD_PCT", "75"))
 
 
 def _credits_allowed() -> bool:
@@ -2167,11 +2167,13 @@ class Quota:
     @staticmethod
     def _credit_guard(prov: Provider, payload: dict) -> Provider:
         """Withhold a launch near a plan limit while the account spends credits past it (see
-        CLAUDE_CREDIT_HEADROOM_PCT). Only ever narrows: a provider that was not available is returned
-        as is, and so is every provider when credits are off or the operator allowed them."""
-        if not prov.available or _credits_allowed() or not _extra_usage_enabled(payload):
+        CLAUDE_CREDIT_GUARD_PCT), and the window bootstrap that would open the way to one. Only ever
+        narrows: a provider that authorizes neither is returned as is, and so is every provider when
+        credits are off or the operator allowed them. The guarded provider authorizes neither: a
+        bootstrap would only open a window whose next launch this same guard refuses."""
+        if not (prov.available or prov.bootstrap_eligible) or _credits_allowed() or not _extra_usage_enabled(payload):
             return prov
-        near = [w for w in prov.windows if w.used is not None and w.used >= CLAUDE_CREDIT_HEADROOM_PCT]
+        near = [w for w in prov.windows if w.used is not None and w.used >= CLAUDE_CREDIT_GUARD_PCT]
         if not near:
             return prov
         resets = [w.resets_at for w in near if w.resets_at]
@@ -2182,7 +2184,7 @@ class Quota:
             None,
             prov.windows,
             f"usage credits are enabled on this account and {names} is at or above "
-            f"{CLAUDE_CREDIT_HEADROOM_PCT:.0f}%; not launching, so a round cannot run on into credits "
+            f"{CLAUDE_CREDIT_GUARD_PCT:.0f}%; not launching, so a round cannot run on into credits "
             f"(EPSILONERIDANI_CLAUDE_ALLOW_CREDITS=1 allows it)",
             max(resets) if resets else None,
         )

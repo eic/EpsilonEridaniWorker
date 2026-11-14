@@ -203,8 +203,9 @@ cannot stop a round that is already running from going past the limit.
 
 What the worker does is avoid launching close to one. While the usage endpoint
 reports `extra_usage.is_enabled`, any window at or above
-`$EPSILONERIDANI_CLAUDE_CREDIT_GUARD_PCT` percent (default 75) blocks new rounds
-until that window resets, and the wait line says so. Set
+`$EPSILONERIDANI_CLAUDE_CREDIT_GUARD_PCT` percent (default 75) blocks new rounds,
+and the window bootstrap that would lead to one, until that window resets, and the
+wait line says so. Set
 `EPSILONERIDANI_CLAUDE_ALLOW_CREDITS=1` to let workers spend credits; the guard is
 then off. With credits disabled or used up, nothing changes. This narrows the
 exposure but does not remove it: several rounds launched together under the
