@@ -161,12 +161,37 @@ fleet's requests for the same answer, and then every worker found out about the
 - **A sibling's 429 holds every worker back** until its `Retry-After` has passed.
   Meanwhile each worker answers from its own valid cache, as it would after a 429
   of its own.
+- **A cached reading stops authorizing launches after
+  `$EPSILONERIDANI_CLAUDE_STALE_GATE_S` seconds** (default 600). It can still
+  block for as long as the cache keeps it, but once it is that old a permissive
+  reading counts as unknown, and the worker waits as if the window were unreadable.
+  Usage only rises inside a window, and other workers on the account keep spending
+  while the endpoint refuses to answer. On 2026-11-11 two workers launched reviews
+  for an hour on a 0% reading from 07:01, though the window was used up by 07:21.
 
 A different access token (an account switch) is never served another token's
 reading. A bootstrap request clears the shared reading along with the worker's
 own. If the shared directory cannot be used, each worker reads on its own, as
 before. Workers on their own logins (`claude_config_dir`) each have their own
 source, so they share nothing with each other.
+
+## Usage credits
+
+When an account has usage credits (extra usage) enabled, a session that reaches a
+plan limit does not stop. It keeps working, billed to the credits. Claude Code has
+no per-client switch to refuse that: the only one is the account's Settings >
+Usage page on claude.ai, or `/usage-credits` in Claude Code. A worker therefore
+cannot stop a round that is already running from going past the limit.
+
+What the worker does is avoid launching close to one. While the usage endpoint
+reports `extra_usage.is_enabled`, any window at or above
+`$EPSILONERIDANI_CLAUDE_CREDIT_GUARD_PCT` percent (default 75) blocks new rounds
+until that window resets, and the wait line says so. Set
+`EPSILONERIDANI_CLAUDE_ALLOW_CREDITS=1` to let workers spend credits; the guard is
+then off. With credits disabled or used up, nothing changes. This narrows the
+exposure but does not remove it: several rounds launched together under the
+threshold can still go past the limit between them. To rule credit spending out,
+disable credits on the account.
 
 ## Accounts with no weekly cap: `--claude-no-weekly-cap`
 
