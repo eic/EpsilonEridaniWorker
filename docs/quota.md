@@ -116,6 +116,24 @@ session reset timestamp invalid
 rather than a generic "usage unknown". An unreadable constraint is not the same
 as no constraint.
 
+## Waking after a reset
+
+A worker held by quota sleeps until the moment its blocking window frees, and
+every worker on the same account works out the same moment. On 2026-11-11 five
+workers on one Claude account woke within two minutes of a 07:00 reset. They
+launched two reviews and three fix rounds together, all on a fresh reading of 0%
+used, and the 5-hour window was gone by 07:21.
+
+Each worker now adds its own fixed offset to that wake-up, somewhere in
+`[0, $EPSILONERIDANI_RESET_STAGGER_S)` (default 900 seconds; `0` turns it off).
+That way the first workers to wake have visibly spent before the later ones read
+usage. For an id that ends in a number (`worker05`), the offset is
+`frac(n × 0.618…) × spread`, which keeps any handful of consecutive numbers well
+apart. Other ids use a hash. To place workers by hand, set
+`EPSILONERIDANI_RESET_OFFSET_S` in a worker's `[workers.env]`. The offset only
+applies when a worker sleeps toward a named moment: a `Retry-After` is honoured as
+the server asked, and a short wait still sleeps at least the normal poll interval.
+
 ## The window bootstrap
 
 There is one gap where the endpoint reports a window with no usage and no reset

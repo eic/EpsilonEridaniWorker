@@ -26,6 +26,7 @@ unset EPSILONERIDANI_AUTO_REFRESH EPSILONERIDANI_QUOTA_IGNORE EPSILONERIDANI_CLA
   EPSILONERIDANI_GEMINI_NO_RENEW EPSILONERIDANI_PACE EPSILONERIDANI_LOCAL_CONTEXT \
   EPSILONERIDANI_LOCAL_MAX_TOKENS EPSILONERIDANI_CLAUDE_STALE_GATE_S \
   EPSILONERIDANI_CLAUDE_CREDIT_GUARD_PCT EPSILONERIDANI_CLAUDE_ALLOW_CREDITS \
+  EPSILONERIDANI_RESET_STAGGER_S EPSILONERIDANI_RESET_OFFSET_S \
   CLAUDE_REFRESH_SKEW_S VIRTUAL_ENV
 # Never ask PyPI from a test: `workers status` and the dashboard would otherwise check for an update.
 # tests/update_check.py turns it back on with a stub fetch.
@@ -94,6 +95,7 @@ RUN_STDLIB=(
   quota_reason.py
   quota_shared_usage.py
   quota_stale_and_credits.py
+  reset_stagger.py
   review_all_error_round.py
   review_codex_model.py
   review_daily_cap.py

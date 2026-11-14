@@ -3,6 +3,7 @@ timeout, then settle (short pause if productive, escalating back-off otherwise).
 
 from __future__ import annotations
 
+import hashlib
 import os
 import signal
 import subprocess
@@ -24,6 +25,59 @@ class _LoopTerminated(KeyboardInterrupt):
 
 # How often a managed worker's waits look for a drain request.
 DRAIN_POLL_S = 2.0
+
+# Spread wake-ups after a quota reset. A worker held by quota sleeps toward the moment its blocking
+# window frees, and every worker on the same account computes the same moment. On 2026-11-11 five
+# workers on one Claude account woke within two minutes of a 07:00 reset and launched two reviews and
+# three fix rounds at once, all against a fresh reading of 0% used; the window was gone by 07:21. Each
+# worker now adds its own fixed offset in [0, RESET_STAGGER_S) to that wake-up, so the earlier ones
+# have spent visibly before the later ones read usage. 0 turns it off.
+RESET_STAGGER_S = int(os.environ.get("EPSILONERIDANI_RESET_STAGGER_S", "900"))
+
+
+_GOLDEN = (5**0.5 - 1) / 2  # 0.618…: the fractional parts of n·φ spread consecutive n almost evenly
+
+
+def reset_stagger_s(wid: str, spread: int | None = None) -> int:
+    """This worker's wake-up offset after a reset, in [0, spread). The same every time for a given id,
+    so an operator can predict it and two loops of one worker agree.
+
+    $EPSILONERIDANI_RESET_OFFSET_S (in a worker's own env table) sets it outright. Otherwise an id
+    ending in a number (worker01, worker27) is placed by the golden-ratio sequence frac(n·φ), which
+    keeps any handful of consecutive numbers well apart (the three-gap theorem): a hash of the id
+    put worker01, worker03 and worker04 within 40 s of each other. Other ids fall back to a hash."""
+    spread = RESET_STAGGER_S if spread is None else spread
+    if spread <= 0:
+        return 0
+    explicit = os.environ.get("EPSILONERIDANI_RESET_OFFSET_S", "").strip()
+    if explicit:
+        try:
+            return max(0, int(explicit))
+        except ValueError:
+            log(f"EPSILONERIDANI_RESET_OFFSET_S={explicit!r} is not a number of seconds; ignoring it")
+    digits = len(wid) - len(wid.rstrip("0123456789"))
+    if digits:
+        return int(((int(wid[-digits:]) * _GOLDEN) % 1.0) * spread)
+    return int(hashlib.sha256(wid.encode()).hexdigest()[:8], 16) % spread
+
+
+def quota_nap(snap: dict[str, Provider], wid: str, now: float | None = None) -> float:
+    """How long a quota-held loop sleeps before asking again.
+
+    A provider's Retry-After (an HTTP 429 asking for 580 s, say) is honoured over the fixed poll, so we
+    do not re-trip a rate limit by polling sooner than the server asked. Otherwise, when a blocking
+    window names the moment it frees, sleep to that line plus this worker's stagger, rechecking at
+    least hourly so sibling workers or operator activity are still observed reasonably promptly. A
+    forced refresh is valuable before a launch, not every five minutes throughout a known multi-hour
+    wait. A pace-blocked window reports when the budget overtakes its usage, which is usually well
+    before its reset, so this sleeps to the line, not past it."""
+    now = time.time() if now is None else now
+    nap = max(POLL, max((p.retry_after or 0 for p in snap.values()), default=0))
+    if not any(p.retry_after for p in snap.values()):
+        eligible = [p.next_eligible for p in snap.values() if p.next_eligible]
+        if eligible:
+            nap = max(nap, min(int(min(eligible) - now) + 5 + reset_stagger_s(wid), 3600))
+    return nap
 
 
 def _sleep(seconds: float) -> None:
@@ -186,18 +240,7 @@ def cmd_loop(
                 if model is None and claude_pending_init(snap):
                     model, pending_init = "claude", True
                 if model is None:
-                    # Honor a provider's Retry-After (e.g. a 429 asking for 580s) over the fixed poll, so
-                    # we don't re-trip a rate limit by polling sooner than the server asked.
-                    nap = max(POLL, max((p.retry_after or 0 for p in snap.values()), default=0))
-                    if not any(p.retry_after for p in snap.values()):
-                        eligible = [p.next_eligible for p in snap.values() if p.next_eligible]
-                        if eligible:
-                            # A forced refresh is valuable before a launch, not every five minutes
-                            # throughout a known multi-hour wait. Recheck at least hourly so sibling
-                            # workers or operator activity are still observed reasonably promptly. A
-                            # pace-blocked window reports when the budget overtakes its usage, which is
-                            # usually well before its reset, so this sleeps to the line, not past it.
-                            nap = max(nap, min(int(min(eligible) - time.time()) + 5, 3600))
+                    nap = quota_nap(snap, cfg.wid)
                     # Neither destination renders Rich markup: log() writes to stderr and a file, and a
                     # runtime-status detail is read back as data.
                     waiting = _wait_quota_line(snap, markup=False)
