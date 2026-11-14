@@ -47,6 +47,7 @@ from .quota import (
     claude_dir,
     codex_dir,
     mirror_creds,
+    record_claude_spend,
 )
 from .review_diagnostics import failure_summary
 from .runtime_status import report_failure
@@ -1043,6 +1044,34 @@ def take_last_agent_infra_failure() -> str | None:
     return reason
 
 
+def journal_claude_run(renderer: AgentTranscriptRenderer, *, label: str, rc: int | None, started: float) -> None:
+    """Log what a Claude agent run spent and append it to its credential source's spend journal.
+
+    One line per run, written whatever the run's outcome (a round cut off by the 5-hour limit still
+    spent): Claude Code's cost estimate, tokens per model, and the last rate-limit headers it saw. A run
+    that reported neither (it died before its first `result`) is still recorded, with spend null, so a
+    gap in the journal is never mistaken for a run that cost nothing. rc is None for a run interrupted
+    before it exited (the worker was stopped mid-round): what it had reported by then is kept."""
+    spend = renderer.round_spend()
+    if spend is not None:
+        tokens = spend["tokens"]
+        cost = "" if spend["cost_usd"] is None else f"${spend['cost_usd']:.2f}, "
+        read = tokens["input"] + tokens["cache_read"] + tokens["cache_write"]
+        log(
+            f"{label}: spent {cost}{tokens['output']:,} output / {read:,} input tokens ({tokens['cache_read']:,} cache read)"
+        )
+    entry = {
+        "ts": round(time.time(), 3),
+        "started": round(started, 3),
+        "worker": os.environ.get("EPSILONERIDANI_WORKER_ID") or None,
+        "label": label,
+        "rc": rc,
+        "spend": spend,
+        "rate_limits": renderer.rate_limits or None,
+    }
+    record_claude_spend(Path(os.environ.get("HOME", os.path.expanduser("~"))), entry)
+
+
 def run_agent_proc(
     argv: list[str],
     *,
@@ -1117,8 +1146,19 @@ def run_agent_proc(
             classification_text = renderer.terminal_failure_text
         return classify_agent_failure(classification_text)
 
+    started = time.time()
+
+    def run_journaled(destination) -> int:
+        rc = None
+        try:
+            rc = run_rendered(destination)
+            return rc
+        finally:
+            if provider == "claude":
+                journal_claude_run(renderer, label=label, rc=rc, started=started)
+
     if os.environ.get("EPSILONERIDANI_STREAM"):
-        rc = run_rendered(sys.stdout)
+        rc = run_journaled(sys.stdout)
         if rc != 0:
             _LAST_AGENT_FAILURE = classify_rendered_failure()
             report_failure(f"{label.removeprefix('agent-')} agent exited with status {rc}", code=rc)
@@ -1127,7 +1167,7 @@ def run_agent_proc(
     logf = logdir / f"{label}-{time.strftime('%Y%m%d-%H%M%S')}.log"
     log(f"{label}: output → {logf}  (run with --stream to watch live)")
     with open(logf, "a", encoding="utf-8", errors="replace") as f:
-        rc = run_rendered(f)
+        rc = run_journaled(f)
     if rc != 0:
         log(f"{label}: exited {rc}; last lines of {logf.name}:")
         for line in tail:

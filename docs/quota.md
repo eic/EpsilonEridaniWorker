@@ -206,6 +206,33 @@ login holds its own token. A login that names no account keeps its state beside
 its credential source and matches by token, as before. Workers of a different
 install on the same account do not share with this one.
 
+## The spend journal
+
+Each Claude agent run (a fix, progress, roadmap or rebase round) appends one JSON
+line to `.epsiloneridani-quota/spend.jsonl` beside its credential source. It is
+written whatever the outcome, including a round cut off by a limit. The line holds:
+
+- `worker`, `label`, `rc`, and `started` and `ts`, the run's start and end in epoch seconds;
+- `spend`: Claude Code's cost estimate (`cost_usd`), tokens by kind (`input`,
+  `output`, `cache_read`, `cache_write`), and the same per model (`models`). It is
+  `null` when the run reported nothing, for example one that died before its first
+  `result`;
+- `rate_limits`: the last rate-limit headers the run saw for each window
+  (`five_hour`, `seven_day`, ...), with `status`, `resetsAt`, `utilization` (0–1, when
+  sent) and `seen`.
+
+The worker's log shows the same spend at the end of the run (`agent-claude: spent
+$2.50, 12,000 output / 520,030 input tokens ...`), and the transcript's `[result]`
+and `[rate limit]` lines show the cost, tokens and utilization.
+
+Nothing reads the journal yet. It is the input for estimating usage between
+readings of the usage endpoint, which answers 429 more often than not: the change
+in usage between two readings, set against the spend between them, gives a rate
+for each account. Review rounds are not journaled here: the review engine runs
+Claude itself and records its spend in its own ledger. Like the shared reading,
+the journal belongs to the credential source, so workers on their own logins keep
+separate journals even when the logins are for one account.
+
 ## Usage credits
 
 When an account has usage credits (extra usage) enabled, a session that reaches a
