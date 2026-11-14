@@ -854,6 +854,39 @@ def dispatch(stage: str, w: Worker, sv: Survey, c: Candidate, opts: RoundOpts) -
 # --- the work units (each runs on the host by default, or in bubble with --bubble) ---
 
 
+def _round_reviewed_nothing(store_dir: Path, pr: int, head: str, since: float) -> bool:
+    """True when the engine's newest ledger round for `pr`, written by this run at `head`, ran rubrics
+    and none of them used a single token: every rubric failed before the model answered.
+
+    The engine has its own abort for an unusable provider (REVIEW_PROVIDER_DOWN_EXIT), but it only
+    knows the failures it can classify. On 2026-11-11 Claude Code reworded an exhausted plan as
+    "You've hit your 5-hour limit", the engine called every rubric `unknown_error`, and each round
+    posted an all-`error` scoreboard and exited 0. Two workers took that as a posted review about 55
+    times in 40 minutes. A round that spent no tokens cannot have reviewed anything, whatever its
+    failures are called. Best effort: an unreadable or unfamiliar ledger answers False, so this can
+    only ever stop a loop, never turn a real review into a failure."""
+    import datetime
+
+    try:
+        ledger = json.loads((store_dir / "ledger.json").read_text())
+        rounds = ledger["prs"][str(pr)]["rounds"]
+        last = rounds[-1]
+        ts = datetime.datetime.fromisoformat(str(last["ts"]).replace("Z", "+00:00")).timestamp()
+    except (OSError, ValueError, KeyError, IndexError, TypeError):
+        return False
+    if not isinstance(last, dict) or ts < since - 5:
+        return False  # an older round: this run wrote nothing to the ledger
+    if head and last.get("head_sha") and last["head_sha"] != head:
+        return False
+    if not last.get("ran"):
+        return False  # nothing ran (everything carried): no tokens is expected
+    tokens = last.get("tokens")
+    if not isinstance(tokens, dict) or not tokens:
+        return False
+    counts = [v for v in tokens.values() if isinstance(v, (int, float))]
+    return bool(counts) and sum(counts) == 0
+
+
 def do_review(w: Worker, sv: Survey, c: Candidate, opts: RoundOpts, bubble: bool) -> int:
     pr, head = c.pr, c.head
     reviewers = opts.work_model
@@ -871,6 +904,7 @@ def do_review(w: Worker, sv: Survey, c: Candidate, opts: RoundOpts, bubble: bool
     else:
         nrnd = w.rs.review_rounds(pr, w.counters)
         log(f"  review round {nrnd + 1} @ {head[:12]}, reviewers={reviewers} (CI retires at the cap)")
+    started = time.time()
     try:
         if bubble:
             rc = review_in_bubble(w, pr, head, reviewers, opts)
@@ -904,6 +938,19 @@ def do_review(w: Worker, sv: Survey, c: Candidate, opts: RoundOpts, bubble: bool
                 f"review #{pr}",
             )
         log(f"  review #{pr}: engine rc={rc}")
+        if rc == 0 and _round_reviewed_nothing(w.cfg.store_dir, pr, head, started):
+            # Exit 0, but no rubric got an answer from the model: a provider outage the engine did not
+            # recognise as one. Whatever it posted is a scoreboard of errors, not a review. Treat it like
+            # REVIEW_PROVIDER_DOWN_EXIT below: machine-wide, so back off and charge no PR, rather than
+            # clear this PR's error streak and claim the next PR into the same outage.
+            w.rs.bust(pr)
+            warn_red(
+                f"review #{pr}: the engine exited 0 but every rubric it ran failed without using a token, "
+                f"so nothing was reviewed (most often an exhausted or rate-limited provider the engine "
+                f"did not classify). This is machine-wide, so it is NOT charged to the PR; the loop backs "
+                f"off. The PR may now show an error-only scoreboard until its next real review."
+            )
+            raise NoProgress(f"review #{pr}: every rubric failed without a model answer — not charged to the PR")
         if rc == 0:
             # The engine posted a verdict this round (scoreboard + threads are on the PR now), so clear
             # the "errored without posting a verdict" streak up front — BEFORE the publish step, which is
