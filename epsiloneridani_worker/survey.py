@@ -427,8 +427,9 @@ def fix_disposition(
       'actionable' — a blocking rubric stands at the current head, under the per-head attempt budget
       'exhausted'  — blocking at head, but the per-head fixer budget is spent (reason names the count)
       'waiting'    — not actionable now; reason explains why (awaiting first review, head moved,
-                     reviews all green, or a transient fetch failure) so a fix-focused worker can say
-                     whether to wait for reviews, re-push, or stop
+                     reviews all green, blocking rubrics errored/never run with no findings, a pending
+                     contest, or a transient fetch failure) so a fix-focused worker can say whether
+                     to wait for reviews, re-push, or stop
       'skip'       — nothing worth a status line (a red PR awaiting CI, not review)
 
     `blocking` is rs.ledger_blocking(pr, head) — the same authority CI's close reads — passed in so this
@@ -459,6 +460,22 @@ def fix_disposition(
         if (meta.data.get("states") or {}) or (meta.data.get("runs") or []):
             return ("waiting", "reviews all green — nothing to fix")
         return ("waiting", "review recorded at this head but no rubric verdicts yet — awaiting review")
+    states = meta.data.get("states") or {}
+    if states and not any(v in ("blocking_request", "blocking_block") for v in states.values()):
+        # Blocking, but no rubric carries a FINDING: every blocking state is `error` (the reviewer
+        # backend failed inside the round and posted no verdict) or `absent` (never run). A fixer
+        # cannot change either — only a re-review can — so scheduling one burns the per-head budget
+        # on a commit it will never move: eic/EpsilonEridani#169 was retired "3/3 — needs a human"
+        # by exactly this, one provider outage erroring every rubric and three fixer rounds finding
+        # nothing to fix. The blocking rule itself is deliberately coarse (an un-run rubric must
+        # block the merge), so the fix stage refines it here. Mirrors the engine's own
+        # posts_review_thread split, which already refuses threads on `error` for the same reason.
+        # (An empty `states` map means ledger_blocking fell back to `runs`, whose error verdicts do
+        # not block — so reaching here with `states` empty implies a genuine adverse verdict.)
+        return (
+            "waiting",
+            "blocking rubrics errored or never ran, no findings to address — awaiting re-review",
+        )
     if pending_contest:
         # A fix round may legitimately answer a wrong finding by contesting it without pushing. Until
         # review adjudicates that reply, the durable scoreboard remains blocking at the same head;
