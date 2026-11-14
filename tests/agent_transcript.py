@@ -334,6 +334,138 @@ rate_limit = event(
     },
 )
 check("Claude rate limit metadata is compact", rate_limit == "[rate limit] status=allowed type=five_hour resets=123\n")
+usage_headers = event(
+    claude,
+    {
+        "type": "rate_limit_event",
+        "session_id": "claude-session",
+        "rate_limit_info": {
+            "status": "allowed_warning",
+            "rateLimitType": "seven_day",
+            "resetsAt": 456,
+            "utilization": 0.81,
+            "unifiedWindows": {
+                "five_hour": {"utilization": 0.342, "resetsAt": 789, "status": "allowed"},
+                "seven_day": {"utilization": 0.81, "resetsAt": 456},
+                "bogus": {"utilization": "lots"},
+            },
+        },
+    },
+)
+check(
+    "Claude rate limit utilization is shown per window",
+    usage_headers
+    == "[rate limit] status=allowed_warning type=seven_day resets=456 used=81% five_hour=34% seven_day=81%\n",
+)
+check(
+    "...and kept, latest per window, for the spend journal",
+    claude.rate_limits["five_hour"]["utilization"] == 0.342
+    and claude.rate_limits["five_hour"]["resetsAt"] == 789
+    and claude.rate_limits["seven_day"]["status"] == "allowed_warning"
+    and claude.rate_limits["five_hour"]["seen"] > 0
+    and "bogus" not in claude.rate_limits,
+)
+odd = tc.AgentTranscriptRenderer("claude")
+event(
+    odd,
+    {
+        "type": "rate_limit_event",
+        "session_id": "s",
+        "rate_limit_info": {
+            "status": "allowed",
+            "rateLimitType": "five_hour",
+            "utilization": "high",
+            "unifiedWindows": {"seven_day": {"status": "allowed", "resetsAt": 99}},
+        },
+    },
+)
+check(
+    "a malformed headline utilization is not kept; a window without utilization still is",
+    "utilization" not in odd.rate_limits["five_hour"]
+    and odd.rate_limits["seven_day"].get("status") == "allowed"
+    and odd.rate_limits["seven_day"].get("resetsAt") == 99,
+)
+
+# Spend: Claude's `result` carries the session's running totals, so a second result for the same
+# session replaces the first, and results from different sessions add up.
+spender = tc.AgentTranscriptRenderer("claude")
+check("no result yet: no spend", spender.round_spend() is None)
+opus = {
+    "inputTokens": 120,
+    "outputTokens": 15300,
+    "cacheReadInputTokens": 900000,
+    "cacheCreationInputTokens": 40000,
+    "costUSD": 3.5,
+}
+first = event(
+    spender,
+    {
+        "type": "result",
+        "subtype": "success",
+        "session_id": "s1",
+        "num_turns": 14,
+        "duration_ms": 740932,
+        "total_cost_usd": 3.5,
+        "modelUsage": {"claude-opus-5-5": opus},
+    },
+)
+check(
+    "Claude result shows cost and tokens",
+    "[result] success; turns=14; duration=740932ms; cost=$3.5000; tokens in=120 out=15.3k cache_read=900.0k cache_write=40.0k"
+    in first,
+)
+event(
+    spender,
+    {
+        "type": "result",
+        "subtype": "success",
+        "session_id": "s1",
+        "num_turns": 1,
+        "total_cost_usd": 3.75,
+        "modelUsage": {
+            "claude-opus-5-5": {**opus, "outputTokens": 15500, "costUSD": 3.7},
+            "claude-haiku-5-5": {"inputTokens": 10, "outputTokens": 20, "costUSD": 0.05},
+        },
+    },
+)
+event(
+    spender,
+    {
+        "type": "result",
+        "subtype": "success",
+        "session_id": "s2",
+        "total_cost_usd": 1.25,
+        "usage": {
+            "input_tokens": 5,
+            "output_tokens": 600,
+            "cache_read_input_tokens": 70,
+            "cache_creation_input_tokens": 8,
+        },
+    },
+)
+total = spender.round_spend()
+check(
+    "a later result of the same session replaces it; sessions add", total["cost_usd"] == 5.0 and total["sessions"] == 2
+)
+check(
+    "tokens sum across models and sessions",
+    total["tokens"] == {"input": 135, "output": 16120, "cache_read": 900070, "cache_write": 40008},
+)
+check(
+    "per-model totals keep each model's own cost",
+    total["models"]["claude-opus-5-5"]["output"] == 15500
+    and total["models"]["claude-opus-5-5"]["cost_usd"] == 3.7
+    and total["models"]["claude-haiku-5-5"]["cost_usd"] == 0.05,
+)
+bare = tc.AgentTranscriptRenderer("claude")
+bare_out = event(
+    bare, {"type": "result", "subtype": "success", "session_id": "s", "num_turns": 1, "total_cost_usd": True}
+)
+check(
+    "a result without spend fields renders as before",
+    bare_out == "[result] success; turns=1\n" and bare.round_spend() is None,
+)
+
 partial = event(
     claude,
     {

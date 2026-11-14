@@ -107,6 +107,11 @@ def claude_accounts_root() -> Path:
     return Path(override).expanduser() if override else HERE / "state" / CLAUDE_ACCOUNTS_DIRNAME
 
 
+# One JSON line per Claude agent run on this account (see claude_quota_dir): what it spent (Claude Code's cost
+# estimate and tokens per model) and the last rate-limit headers it saw. Recorded, not yet read: it is
+# the input for estimating usage between usage-endpoint readings, which answer 429 more often than not.
+CLAUDE_SPEND_JOURNAL_FILE = "spend.jsonl"
+
 CLAUDE_USAGE_SHARE_S = int(os.environ.get("EPSILONERIDANI_CLAUDE_USAGE_SHARE_S", "300"))
 
 # How old a cached usage reading may be and still AUTHORIZE a launch. A cached reading keeps blocking
@@ -1013,6 +1018,61 @@ def claude_dir(home: Path) -> Path:
     the conventional <home>/.claude. Isolation repoints $CLAUDE_CONFIG_DIR at the per-worker copy."""
     d = os.environ.get("CLAUDE_CONFIG_DIR")
     return Path(d) if d else home / ".claude"
+
+
+def claude_creds_source(home: Path) -> Path:
+    """The canonical Claude credential location for this home: the operator's real claude dir even
+    under an isolated $HOME (isolate_home leaves a .epsiloneridani-creds-source marker)."""
+    d = claude_dir(home)
+    src = _read_marker(d / ".epsiloneridani-creds-source")
+    return Path(src) if src else d
+
+
+def claude_login_account(home: Path) -> str | None:
+    """The account UUID the Claude login for this home belongs to, from Claude Code's .claude.json
+    (`oauthAccount.accountUuid`), or None. With $CLAUDE_CONFIG_DIR the file sits inside that dir;
+    for the default ~/.claude it sits beside it, as ~/.claude.json."""
+    src = claude_creds_source(home)
+    candidates = [src / ".claude.json"]
+    if src.name == ".claude":
+        candidates.append(src.parent / ".claude.json")
+    for path in candidates:
+        data = _read_json_file(path)
+        account = (data or {}).get("oauthAccount")
+        uuid = account.get("accountUuid") if isinstance(account, dict) else None
+        if isinstance(uuid, str) and uuid.strip():
+            return uuid.strip()
+    return None
+
+
+def claude_quota_dir(home: Path) -> Path:
+    """Where the workers on one Claude account share their quota state (the usage reading and its lock,
+    the bootstrap reservation, the spend journal): the account's directory when the login names its
+    account, so separate logins for one account share it; otherwise beside the credential source,
+    which only workers mirroring that one login share."""
+    account = claude_login_account(home)
+    if account:
+        return claude_accounts_root() / hashlib.sha256(account.encode()).hexdigest()[:16]
+    return claude_creds_source(home) / CLAUDE_QUOTA_DIRNAME
+
+
+def record_claude_spend(home: Path, entry: dict) -> Path | None:
+    """Append one run's spend to its credential source's journal; the path written, or None if it
+    could not be. Never raises: the journal is telemetry and must not fail a round."""
+    path = claude_quota_dir(home) / CLAUDE_SPEND_JOURNAL_FILE
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        line = (json.dumps(entry, sort_keys=True, separators=(",", ":")) + "\n").encode()
+        # One write(2) of a short line to an O_APPEND descriptor, so concurrent workers' lines don't
+        # interleave (a text-mode file object may split it into several writes).
+        fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+        try:
+            os.write(fd, line)
+        finally:
+            os.close(fd)
+    except (OSError, TypeError, ValueError):
+        return None
+    return path
 
 
 def gemini_dir(home: Path) -> Path:
@@ -2378,35 +2438,17 @@ class Quota:
     def _claude_creds_source(self) -> Path:
         """The canonical credential location this worker is measuring — the operator's real claude dir
         even when running under an isolated $HOME (isolate_home leaves a .epsiloneridani-creds-source marker)."""
-        d = claude_dir(self.cfg.home)
-        src = _read_marker(d / ".epsiloneridani-creds-source")
-        return Path(src) if src else d
+        return claude_creds_source(self.cfg.home)
 
     def _claude_login_account(self) -> str | None:
-        """The account UUID this worker's Claude login belongs to, from Claude Code's .claude.json
-        (`oauthAccount.accountUuid`), or None. With $CLAUDE_CONFIG_DIR the file sits inside that dir;
-        for the default ~/.claude it sits beside it, as ~/.claude.json."""
-        src = self._claude_creds_source()
-        candidates = [src / ".claude.json"]
-        if src.name == ".claude":
-            candidates.append(src.parent / ".claude.json")
-        for path in candidates:
-            data = _read_json_file(path)
-            account = (data or {}).get("oauthAccount")
-            uuid = account.get("accountUuid") if isinstance(account, dict) else None
-            if isinstance(uuid, str) and uuid.strip():
-                return uuid.strip()
-        return None
+        """The account UUID this worker's Claude login belongs to (see claude_login_account)."""
+        return claude_login_account(self.cfg.home)
 
     def _claude_shared_dir(self) -> Path:
         """The directory whose quota state (shared reading, bootstrap reservation) this worker shares:
         its account's, when the login names the account, so separate logins for one account share it;
         otherwise beside the credential source, which only workers mirroring that one login share."""
-        account = self._claude_login_account()
-        if account:
-            digest = hashlib.sha256(account.encode()).hexdigest()[:16]
-            return claude_accounts_root() / digest
-        return self._claude_creds_source() / CLAUDE_QUOTA_DIRNAME
+        return claude_quota_dir(self.cfg.home)
 
     def _claude_account_key(self) -> str:
         """A stable identity for the Claude ACCOUNT, used to scope the shared bootstrap reservation.

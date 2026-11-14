@@ -44,6 +44,7 @@ RUN_STDLIB=(
   build_status_rollup.py
   claude_config_dir.py
   claude_keychain.py
+  claude_spend_journal.py
   claude_worker_login.py
   claims_repo.py
   claim_write_failure.py

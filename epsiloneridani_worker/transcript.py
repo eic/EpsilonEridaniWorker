@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import Any
 
 TOOL_INPUT_LIMIT = 4 * 1024
@@ -167,6 +168,89 @@ def _content_text(value: Any) -> str:
     return _json(value)
 
 
+# Claude's token kinds, with the field names `modelUsage` (camelCase) and `usage` (snake_case) use.
+_TOKEN_KINDS = ("input", "output", "cache_read", "cache_write")
+_MODEL_USAGE_FIELDS = {
+    "input": "inputTokens",
+    "output": "outputTokens",
+    "cache_read": "cacheReadInputTokens",
+    "cache_write": "cacheCreationInputTokens",
+}
+_USAGE_FIELDS = {
+    "input": "input_tokens",
+    "output": "output_tokens",
+    "cache_read": "cache_read_input_tokens",
+    "cache_write": "cache_creation_input_tokens",
+}
+
+
+def _number(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, int | float) or value != value or value < 0:
+        return None
+    return float(value)
+
+
+def _fraction_pct(value: Any) -> str | None:
+    """A 0-1 utilization as a percentage ("34%"); None for anything that isn't a number."""
+    n = _number(value)
+    return None if n is None else f"{n * 100:.0f}%"
+
+
+def _rate_limit_fields(info: dict[str, Any]) -> dict[str, Any]:
+    """The well-formed status, resetsAt and utilization of one rate-limit window; malformed ones are
+    dropped, so the journal never records a value later code would misread."""
+    fields: dict[str, Any] = {}
+    if isinstance(info.get("status"), str) and info["status"]:
+        fields["status"] = info["status"]
+    resets = _number(info.get("resetsAt"))
+    if resets is not None:
+        fields["resetsAt"] = info["resetsAt"]
+    used = _number(info.get("utilization"))
+    if used is not None:
+        fields["utilization"] = used
+    return fields
+
+
+def _claude_result_spend(event: dict[str, Any]) -> dict[str, Any] | None:
+    """The session's running spend from a Claude `result`: its cost estimate, and tokens per model from
+    `modelUsage` (or, without it, the unattributed `usage`). None when the event reports neither."""
+    cost = _number(event.get("total_cost_usd"))
+    models: dict[str, dict[str, float]] = {}
+    model_usage = event.get("modelUsage")
+    for model, use in model_usage.items() if isinstance(model_usage, dict) else ():
+        if not isinstance(use, dict):
+            continue
+        entry = {kind: int(_number(use.get(field)) or 0) for kind, field in _MODEL_USAGE_FIELDS.items()}
+        model_cost = _number(use.get("costUSD"))
+        if model_cost is not None:
+            entry["cost_usd"] = model_cost
+        models[str(model)] = entry
+    if models:
+        tokens = {kind: sum(int(m[kind]) for m in models.values()) for kind in _TOKEN_KINDS}
+    elif isinstance(event.get("usage"), dict):
+        usage = event["usage"]
+        tokens = {kind: int(_number(usage.get(field)) or 0) for kind, field in _USAGE_FIELDS.items()}
+    else:
+        tokens = None
+    if cost is None and tokens is None:
+        return None
+    return {"cost_usd": cost, "tokens": tokens or dict.fromkeys(_TOKEN_KINDS, 0), "models": models}
+
+
+def _kilo(n: float) -> str:
+    return f"{n / 1000:.1f}k" if n >= 1000 else f"{int(n)}"
+
+
+def _spend_text(spend: dict[str, Any]) -> str:
+    parts = [] if spend["cost_usd"] is None else [f"cost=${spend['cost_usd']:.4f}"]
+    t = spend["tokens"]
+    parts.append(
+        f"tokens in={_kilo(t['input'])} out={_kilo(t['output'])} "
+        f"cache_read={_kilo(t['cache_read'])} cache_write={_kilo(t['cache_write'])}"
+    )
+    return "; ".join(parts)
+
+
 class AgentTranscriptRenderer:
     """Turn Codex/Claude JSONL into one stable, human-readable transcript.
 
@@ -184,6 +268,12 @@ class AgentTranscriptRenderer:
         self.saw_work = False
         self.terminal_failure_text: str | None = None
         self.terminal_failure_final = False
+        # What the round spent and what the provider said about its limits, for the spend journal.
+        # Claude's `result` carries running totals for its session (total_cost_usd, modelUsage), and a
+        # run that resumes after background work emits more than one, so the latest per session wins.
+        self._spend: dict[str, dict[str, Any]] = {}
+        # The latest rate_limit_event per window ("five_hour", "seven_day", ...), from response headers.
+        self.rate_limits: dict[str, dict[str, Any]] = {}
 
     def render_line(self, raw: str) -> str:
         if self.provider not in {"codex", "claude"}:
@@ -402,11 +492,20 @@ class AgentTranscriptRenderer:
         if kind == "rate_limit_event":
             self.active = True
             info = event.get("rate_limit_info") if isinstance(event.get("rate_limit_info"), dict) else {}
+            self._note_rate_limit(info)
             details = [
                 f"{label}={info[key]}"
                 for key, label in (("status", "status"), ("rateLimitType", "type"), ("resetsAt", "resets"))
                 if info.get(key) is not None
             ]
+            used = _fraction_pct(info.get("utilization"))
+            if used is not None:
+                details.append(f"used={used}")
+            windows = info.get("unifiedWindows")
+            for name, window in windows.items() if isinstance(windows, dict) else ():
+                pct = _fraction_pct(window.get("utilization")) if isinstance(window, dict) else None
+                if pct is not None:
+                    details.append(f"{name}={pct}")
             return _line("rate limit", " ".join(details)) if details else ""
         if kind == "stream_event":
             # Partial token events are not requested and can include raw thinking deltas. A complete
@@ -426,6 +525,42 @@ class AgentTranscriptRenderer:
             self.active = True
             return _line("plugin install", f"{event.get('status', '?')} {event.get('name', '')}".rstrip())
         return None
+
+    def _note_rate_limit(self, info: dict[str, Any]) -> None:
+        updates: dict[str, dict[str, Any]] = {}
+        kind = info.get("rateLimitType")
+        if isinstance(kind, str) and kind:
+            updates[kind] = _rate_limit_fields(info)
+        windows = info.get("unifiedWindows")
+        for name, window in windows.items() if isinstance(windows, dict) else ():
+            fields = _rate_limit_fields(window) if isinstance(window, dict) else {}
+            if fields:
+                # The headline window may appear here too, with fields the headline lacks, or vice versa.
+                updates[str(name)] = {**updates.get(str(name), {}), **fields}
+        seen = time.time()
+        for name, entry in updates.items():
+            if entry:
+                self.rate_limits[name] = {**entry, "seen": seen}
+
+    def round_spend(self) -> dict[str, Any] | None:
+        """What this run spent across its Claude sessions, or None when no `result` reported it.
+
+        {"cost_usd": float | None, "tokens": {kind: n}, "models": {model: {"cost_usd", kind: n}}, "sessions": n}.
+        Token kinds are input, output, cache_read and cache_write; cost is Claude Code's own estimate."""
+        if not self._spend:
+            return None
+        total: dict[str, Any] = {"cost_usd": None, "tokens": dict.fromkeys(_TOKEN_KINDS, 0), "models": {}}
+        for spend in self._spend.values():
+            if spend["cost_usd"] is not None:
+                total["cost_usd"] = (total["cost_usd"] or 0.0) + spend["cost_usd"]
+            for kind in _TOKEN_KINDS:
+                total["tokens"][kind] += spend["tokens"][kind]
+            for model, use in spend["models"].items():
+                acc = total["models"].setdefault(model, {"cost_usd": 0.0, **dict.fromkeys(_TOKEN_KINDS, 0)})
+                for key, value in use.items():
+                    acc[key] = acc.get(key, 0) + value
+        total["sessions"] = len(self._spend)
+        return total
 
     @staticmethod
     def _scope(label: str, parent: Any) -> str:
@@ -498,6 +633,10 @@ class AgentTranscriptRenderer:
             detail += f"; turns={turns}"
         if isinstance(duration, int):
             detail += f"; duration={duration}ms"
+        spend = _claude_result_spend(event)
+        if spend is not None:
+            self._spend[str(event.get("session_id") or "")] = spend
+            detail += "; " + _spend_text(spend)
         rendered = [_line("result", detail)]
 
         result = event.get("result")
