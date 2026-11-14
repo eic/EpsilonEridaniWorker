@@ -245,6 +245,8 @@ Flags win over these. Most are tuning knobs with sane defaults.
 | `EPSILONERIDANI_CLAUDE_WEEKLY_SCOPE` | _(unset)_ | Model-scoped weekly cap (e.g. `Fable`) to pace the weekly window on instead of the overall weekly. See [quota and pacing](quota.md#a-model-with-its-own-weekly-budget-epsiloneridani_claude_weekly_scope). |
 | `EPSILONERIDANI_GEMINI_NO_RENEW` | _(unset)_ | `1` stops the pacer from running `agy models` to renew an expired Gemini (Antigravity) access token. See [quota and pacing](quota.md#keeping-the-gemini-token-alive). |
 | `EPSILONERIDANI_PACE` | _(unset)_ | Pacing curve for `--pace` (`time%:budget%` points); unset = `60:40`. |
+| `EPSILONERIDANI_RESET_STAGGER_S` | `900` | Spread of the per-worker offset added to a quota-held worker's wake-up, so workers on one account do not all launch the moment a window resets; `0` turns it off (see [waking after a reset](quota.md#waking-after-a-reset)). |
+| `EPSILONERIDANI_RESET_OFFSET_S` | _(computed)_ | This worker's own offset in seconds, overriding the computed one; set it per worker in `[workers.env]`. |
 | `EPSILONERIDANI_STREAM` | — | `1` is the same as `--stream`. |
 | `CLAUDE_CONFIG_DIR` | `~/.claude` | Claude config/credential source (account switching; Bubble uses a private transient handoff on macOS). |
 | `ELAN_HOME` | login user's `~/.elan` | Lean toolchains, shared by every worker: an install takes a lock and lands by rename. |
