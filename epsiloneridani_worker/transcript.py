@@ -196,6 +196,21 @@ def _fraction_pct(value: Any) -> str | None:
     return None if n is None else f"{n * 100:.0f}%"
 
 
+def _rate_limit_fields(info: dict[str, Any]) -> dict[str, Any]:
+    """The well-formed status, resetsAt and utilization of one rate-limit window; malformed ones are
+    dropped, so the journal never records a value later code would misread."""
+    fields: dict[str, Any] = {}
+    if isinstance(info.get("status"), str) and info["status"]:
+        fields["status"] = info["status"]
+    resets = _number(info.get("resetsAt"))
+    if resets is not None:
+        fields["resetsAt"] = info["resetsAt"]
+    used = _number(info.get("utilization"))
+    if used is not None:
+        fields["utilization"] = used
+    return fields
+
+
 def _claude_result_spend(event: dict[str, Any]) -> dict[str, Any] | None:
     """The session's running spend from a Claude `result`: its cost estimate, and tokens per model from
     `modelUsage` (or, without it, the unattributed `usage`). None when the event reports neither."""
@@ -512,19 +527,20 @@ class AgentTranscriptRenderer:
         return None
 
     def _note_rate_limit(self, info: dict[str, Any]) -> None:
-        fields = ("status", "resetsAt", "utilization")
         updates: dict[str, dict[str, Any]] = {}
         kind = info.get("rateLimitType")
         if isinstance(kind, str) and kind:
-            updates[kind] = {k: info[k] for k in fields if info.get(k) is not None}
+            updates[kind] = _rate_limit_fields(info)
         windows = info.get("unifiedWindows")
         for name, window in windows.items() if isinstance(windows, dict) else ():
-            if isinstance(window, dict) and _number(window.get("utilization")) is not None:
+            fields = _rate_limit_fields(window) if isinstance(window, dict) else {}
+            if fields:
                 # The headline window may appear here too, with fields the headline lacks, or vice versa.
-                updates[name] = {**updates.get(name, {}), **{k: window[k] for k in fields if window.get(k) is not None}}
+                updates[str(name)] = {**updates.get(str(name), {}), **fields}
         seen = time.time()
         for name, entry in updates.items():
-            self.rate_limits[name] = {**entry, "seen": seen}
+            if entry:
+                self.rate_limits[name] = {**entry, "seen": seen}
 
     def round_spend(self) -> dict[str, Any] | None:
         """What this run spent across its Claude sessions, or None when no `result` reported it.

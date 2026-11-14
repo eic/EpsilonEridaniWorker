@@ -365,6 +365,26 @@ check(
     and claude.rate_limits["five_hour"]["seen"] > 0
     and "bogus" not in claude.rate_limits,
 )
+odd = tc.AgentTranscriptRenderer("claude")
+event(
+    odd,
+    {
+        "type": "rate_limit_event",
+        "session_id": "s",
+        "rate_limit_info": {
+            "status": "allowed",
+            "rateLimitType": "five_hour",
+            "utilization": "high",
+            "unifiedWindows": {"seven_day": {"status": "allowed", "resetsAt": 99}},
+        },
+    },
+)
+check(
+    "a malformed headline utilization is not kept; a window without utilization still is",
+    "utilization" not in odd.rate_limits["five_hour"]
+    and odd.rate_limits["seven_day"].get("status") == "allowed"
+    and odd.rate_limits["seven_day"].get("resetsAt") == 99,
+)
 
 # Spend: Claude's `result` carries the session's running totals, so a second result for the same
 # session replaces the first, and results from different sessions add up.

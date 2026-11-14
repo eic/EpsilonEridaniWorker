@@ -1044,7 +1044,9 @@ def take_last_agent_infra_failure() -> str | None:
     return reason
 
 
-def journal_claude_run(renderer: AgentTranscriptRenderer, *, label: str, rc: int | None, started: float) -> None:
+def journal_claude_run(
+    renderer: AgentTranscriptRenderer, *, label: str, rc: int | None, started: float, home: Path | None = None
+) -> None:
     """Log what a Claude agent run spent and append it to its credential source's spend journal.
 
     One line per run, written whatever the run's outcome (a round cut off by the 5-hour limit still
@@ -1069,7 +1071,7 @@ def journal_claude_run(renderer: AgentTranscriptRenderer, *, label: str, rc: int
         "spend": spend,
         "rate_limits": renderer.rate_limits or None,
     }
-    record_claude_spend(Path(os.environ.get("HOME", os.path.expanduser("~"))), entry)
+    record_claude_spend(home or Path(os.environ.get("HOME", os.path.expanduser("~"))), entry)
 
 
 def run_agent_proc(
@@ -1155,7 +1157,10 @@ def run_agent_proc(
             return rc
         finally:
             if provider == "claude":
-                journal_claude_run(renderer, label=label, rc=rc, started=started)
+                # The agent's HOME (as Quota's cfg.home is), but the worker's own $CLAUDE_CONFIG_DIR:
+                # a Bubble run points the agent's at a temporary seed that is deleted afterwards.
+                home = Path(env.get("HOME") or os.environ.get("HOME") or os.path.expanduser("~"))
+                journal_claude_run(renderer, label=label, rc=rc, started=started, home=home)
 
     if os.environ.get("EPSILONERIDANI_STREAM"):
         rc = run_journaled(sys.stdout)

@@ -1062,10 +1062,14 @@ def record_claude_spend(home: Path, entry: dict) -> Path | None:
     path = claude_quota_dir(home) / CLAUDE_SPEND_JOURNAL_FILE
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        line = json.dumps(entry, sort_keys=True, separators=(",", ":")) + "\n"
-        # One write of a short line in append mode, so concurrent workers' lines don't interleave.
-        with open(path, "a", encoding="utf-8") as f:
-            f.write(line)
+        line = (json.dumps(entry, sort_keys=True, separators=(",", ":")) + "\n").encode()
+        # One write(2) of a short line to an O_APPEND descriptor, so concurrent workers' lines don't
+        # interleave (a text-mode file object may split it into several writes).
+        fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+        try:
+            os.write(fd, line)
+        finally:
+            os.close(fd)
     except (OSError, TypeError, ValueError):
         return None
     return path

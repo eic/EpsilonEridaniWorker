@@ -156,6 +156,21 @@ def main():
                 quota.claude_quota_dir(home) == real / quota.CLAUDE_QUOTA_DIRNAME,
             )
 
+            other_home = tmp / "agent-home"
+            (other_home / ".claude").mkdir(parents=True)
+            os.environ.pop("CLAUDE_CONFIG_DIR", None)
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
+                agents.run_agent_proc(
+                    fake_agent(tmp, EVENTS),
+                    env={**os.environ, "HOME": str(other_home)},
+                    logdir=tmp / "logs",
+                    label="agent-claude",
+                    provider="claude",
+                )
+            check("the agent's HOME, from its env, decides the journal", len(journal(other_home / ".claude")), 1)
+            os.environ["CLAUDE_CONFIG_DIR"] = str(iso)
+
             print("3) failures and other providers")
             rc, _ = run(
                 tmp,
