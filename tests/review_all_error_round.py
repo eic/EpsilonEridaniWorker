@@ -14,7 +14,8 @@ does not know. A round that ran rubrics and used zero tokens cannot have reviewe
      review error.
   2. A round that used tokens is a review as before: returns 0, clears the streak.
   3. Rounds the backstop must not judge stay successes: nothing ran (all carried), an older round
-     than this run (the engine wrote no ledger entry), another head, an unreadable ledger.
+     than this run (the engine wrote no ledger entry), another head or none named, an unreadable
+     ledger.
 
 Exit 0 = all assertions hold; 1 = a mismatch.
 """
@@ -129,6 +130,7 @@ def main():
             "nothing ran (all carried)": rnd(ran=[]),
             "an older round than this run": rnd(ts=iso(time.time() - 3600)),
             "another head": rnd(head_sha="b" * 40),
+            "a round that names no head": rnd(head_sha=None),
             "no token counts recorded": rnd(tokens={}),
             "no ledger entry at all": None,
             "an unreadable ledger": "garbage",

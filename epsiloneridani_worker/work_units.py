@@ -854,6 +854,13 @@ def dispatch(stage: str, w: Worker, sv: Survey, c: Candidate, opts: RoundOpts) -
 # --- the work units (each runs on the host by default, or in bubble with --bubble) ---
 
 
+# How much earlier than this run's launch a ledger round's timestamp may be and still count as written
+# by this run. The engine stamps the round when it finishes, so a genuine round is always later than
+# the launch; the margin only absorbs clock rounding between the two processes. It must stay well
+# under one review round (minutes), or a previous round of the same PR could be mistaken for this one.
+LEDGER_CLOCK_SLACK_S = 5
+
+
 def _round_reviewed_nothing(store_dir: Path, pr: int, head: str, since: float) -> bool:
     """True when the engine's newest ledger round for `pr`, written by this run at `head`, ran rubrics
     and none of them used a single token: every rubric failed before the model answered.
@@ -874,10 +881,10 @@ def _round_reviewed_nothing(store_dir: Path, pr: int, head: str, since: float) -
         ts = datetime.datetime.fromisoformat(str(last["ts"]).replace("Z", "+00:00")).timestamp()
     except (OSError, ValueError, KeyError, IndexError, TypeError):
         return False
-    if not isinstance(last, dict) or ts < since - 5:
+    if not isinstance(last, dict) or ts < since - LEDGER_CLOCK_SLACK_S:
         return False  # an older round: this run wrote nothing to the ledger
-    if head and last.get("head_sha") and last["head_sha"] != head:
-        return False
+    if head and last.get("head_sha") != head:
+        return False  # another head, or a round that does not say which: not positively this run's
     if not last.get("ran"):
         return False  # nothing ran (everything carried): no tokens is expected
     tokens = last.get("tokens")

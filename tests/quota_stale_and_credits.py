@@ -11,7 +11,7 @@ after round on that 0% while the window was exhausted by 07:21, until the entry 
    A young reading is unchanged.
 2. Usage credits. With credits enabled, a session past a plan limit keeps running on them, and Claude
    Code has no per-client switch to refuse that. While the endpoint reports `extra_usage.is_enabled`,
-   a window at or above CLAUDE_CREDIT_HEADROOM_PCT blocks launches until it resets; under it, or with
+   a window at or above CLAUDE_CREDIT_GUARD_PCT blocks launches until it resets; under it, or with
    credits off, or with EPSILONERIDANI_CLAUDE_ALLOW_CREDITS=1, nothing changes. Both apply to a fresh
    fetch and to a cached reading.
 
@@ -110,7 +110,7 @@ def main():
     check("a 429 on refresh does not launch on an hour-old 0%", not served.available, served.error)
 
     print("2) usage credits")
-    pct = quota.CLAUDE_CREDIT_HEADROOM_PCT
+    pct = quota.CLAUDE_CREDIT_GUARD_PCT
     for label, make in (("fresh", fetched), ("cached", lambda p: cached(p, 60))):
         base = make(payload(pct + 5, late=True, credits=False))
         check(f"{label}: (premise) pacing alone allows {pct + 5:.0f}% late in the window", base.available, base.error)
@@ -142,6 +142,47 @@ def main():
         "a non-boolean is_enabled reads as credits off",
         not quota._extra_usage_enabled({"extra_usage": {"is_enabled": "yes"}}),
     )
+
+    print("3) usage credits and the window bootstrap")
+    # A fresh session window not yet opened (idle) while the weekly window is near its limit: the gate
+    # would authorize a bootstrap, not a launch. With credits on, that bootstrap only opens a window
+    # whose next launch the guard refuses, so the guard withholds it too.
+    weekly_reset = time.time() + 1800
+    bootstrapping = quota.Provider(
+        "claude",
+        False,
+        None,
+        [
+            quota.Window("session", None, None, None, quota.STATE_IDLE),
+            quota.Window("weekly", pct + 5, 99.0, weekly_reset, quota.STATUS_UNDER_PACE),
+        ],
+        None,
+        None,
+        None,
+        True,
+        ["session"],
+    )
+    on = {"extra_usage": {"is_enabled": True}}
+    guarded = tc.Quota._credit_guard(bootstrapping, on)
+    check("credits on: a bootstrap near a limit is withheld", not guarded.bootstrap_eligible and not guarded.available)
+    check("...naming the credits", "credits" in (guarded.error or ""), guarded.error)
+    check("...until the near window resets", guarded.next_eligible == weekly_reset, guarded.next_eligible)
+    check(
+        "credits off: the bootstrap is untouched",
+        tc.Quota._credit_guard(bootstrapping, {"extra_usage": {"is_enabled": False}}) is bootstrapping,
+    )
+    roomy = quota.Provider(
+        "claude",
+        False,
+        None,
+        [bootstrapping.windows[0], quota.Window("weekly", 10.0, 99.0, weekly_reset, quota.STATUS_UNDER_PACE)],
+        None,
+        None,
+        None,
+        True,
+        ["session"],
+    )
+    check("credits on with headroom: the bootstrap is untouched", tc.Quota._credit_guard(roomy, on) is roomy)
 
     print(f"\n{'PASS' if not fails else 'FAIL'}: {fails} failure(s)")
     return 1 if fails else 0
