@@ -134,6 +134,14 @@ try:
     op = quota.Quota(SimpleNamespace(home=default_home, quota_cache=default_home / "cache"))
     check("the default ~/.claude finds ~/.claude.json", op._claude_shared_dir() == w01._claude_shared_dir(), True)
 
+    os.environ["EPSILONERIDANI_CLAUDE_ACCOUNTS_DIR"] = " ~/quota-accounts "
+    check("a ~ in the override is expanded", quota.claude_accounts_root(), Path.home() / "quota-accounts")
+    os.environ["EPSILONERIDANI_CLAUDE_ACCOUNTS_DIR"] = "  "
+    check(
+        "a blank override falls back to the default", quota.claude_accounts_root().name, quota.CLAUDE_ACCOUNTS_DIRNAME
+    )
+    os.environ["EPSILONERIDANI_CLAUDE_ACCOUNTS_DIR"] = str(root / "accounts")
+
     print("5) an entry from before accounts were recorded")
     shared = w01._shared_usage_paths()[0]
     shared.write_text(json.dumps({"fp": "fp-01", "fetched_at": time.time(), "payload": payload}))

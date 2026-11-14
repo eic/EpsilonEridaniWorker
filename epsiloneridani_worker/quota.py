@@ -101,8 +101,10 @@ CLAUDE_ACCOUNTS_DIRNAME = "claude-accounts"
 
 def claude_accounts_root() -> Path:
     """Where per-account quota state lives: $EPSILONERIDANI_CLAUDE_ACCOUNTS_DIR, else the install's
-    state/ directory (shared by all its workers, unlike their isolated homes)."""
-    return Path(os.environ.get("EPSILONERIDANI_CLAUDE_ACCOUNTS_DIR") or HERE / "state" / CLAUDE_ACCOUNTS_DIRNAME)
+    state/ directory (shared by all its workers, unlike their isolated homes). A leading ~ in the
+    override is expanded: left literal, it would name a directory relative to each worker's cwd."""
+    override = os.environ.get("EPSILONERIDANI_CLAUDE_ACCOUNTS_DIR", "").strip()
+    return Path(override).expanduser() if override else HERE / "state" / CLAUDE_ACCOUNTS_DIRNAME
 
 
 CLAUDE_USAGE_SHARE_S = int(os.environ.get("EPSILONERIDANI_CLAUDE_USAGE_SHARE_S", "300"))
@@ -1408,8 +1410,9 @@ class Quota:
 
     # --- Claude usage shared across workers ----------------------------------
     def _shared_usage_paths(self) -> tuple[Path, Path] | None:
-        """(reading, lock) shared by the workers measuring this credential source, or None when this
-        pacer has no configuration and so no credential source to share through."""
+        """(reading, lock) shared by the workers on this account (see _claude_shared_dir: per account
+        when the login names it, else per credential source), or None when this pacer has no
+        configuration and so nothing to share through."""
         if getattr(self, "cfg", None) is None:
             return None
         d = self._claude_shared_dir()
