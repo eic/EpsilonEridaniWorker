@@ -91,6 +91,37 @@ CLAUDE_QUOTA_DIRNAME = ".epsiloneridani-quota"
 CLAUDE_USAGE_SHARED_FILE = "usage.json"
 CLAUDE_USAGE_SHARE_S = int(os.environ.get("EPSILONERIDANI_CLAUDE_USAGE_SHARE_S", "300"))
 
+# How old a cached usage reading may be and still AUTHORIZE a launch. A cached reading keeps blocking
+# for as long as the cache holds it (QUOTA_TTL, or the next reset it describes), but permission is
+# bounded more tightly: usage only rises inside a window, and siblings on the same account keep
+# spending while the endpoint will not answer. On 2026-11-11 five workers on one account opened a
+# fresh window at once; the endpoint then answered their polls with 429s, and two of them launched
+# review after review for an hour on a 07:01 reading of 0% while the window was already exhausted.
+# Past this age a permissive reading is treated as unknown, which waits like any unreadable window.
+CLAUDE_STALE_GATE_S = int(os.environ.get("EPSILONERIDANI_CLAUDE_STALE_GATE_S", "600"))
+
+# Extra-usage ("usage credits") guard. With credits enabled on the account, a session that reaches a
+# plan limit does not stop: it keeps working, billed to the credits. Claude Code has no per-client
+# switch to refuse that (only the account's Settings > Usage page does), so the worker cannot stop a
+# round that is already running from spilling over. What it can do is not launch close to a limit:
+# while the usage endpoint reports credits enabled, a window at or above this percentage blocks new
+# rounds until it resets. EPSILONERIDANI_CLAUDE_ALLOW_CREDITS=1 opts in to spending credits and turns
+# the guard off.
+CLAUDE_CREDIT_HEADROOM_PCT = float(os.environ.get("EPSILONERIDANI_CLAUDE_CREDIT_GUARD_PCT", "75"))
+
+
+def _credits_allowed() -> bool:
+    return os.environ.get("EPSILONERIDANI_CLAUDE_ALLOW_CREDITS", "").strip().lower() in ("1", "true", "yes")
+
+
+def _extra_usage_enabled(payload: dict) -> bool:
+    """Whether the usage endpoint says this account currently spends credits past its plan limits.
+    Anything but an explicit `is_enabled: true` reads as disabled: the field is optional, and the
+    guard it drives only ever withholds launches."""
+    extra = payload.get("extra_usage") if isinstance(payload, dict) else None
+    return isinstance(extra, dict) and extra.get("is_enabled") is True
+
+
 # Environment the bootstrap request must NOT inherit. Every one of these can route a `claude -p` turn
 # to different credentials or a different backend than the one whose quota we just measured — an API
 # key, a second OAuth token, a proxy, or Bedrock/Vertex/Foundry — which would make the request bill
@@ -2130,14 +2161,39 @@ class Quota:
             if share:
                 self._shared_usage_record(fp, fetched_at=observed_at, payload=payload, valid_until=valid_until)
         notes, bootstrap_recorded = self._idle_notes(readings)
-        return self._claude_provider(readings, notes, bootstrap_recorded=bootstrap_recorded, now=observed_at), readings
+        prov = self._claude_provider(readings, notes, bootstrap_recorded=bootstrap_recorded, now=observed_at)
+        return self._credit_guard(prov, payload), readings
+
+    @staticmethod
+    def _credit_guard(prov: Provider, payload: dict) -> Provider:
+        """Withhold a launch near a plan limit while the account spends credits past it (see
+        CLAUDE_CREDIT_HEADROOM_PCT). Only ever narrows: a provider that was not available is returned
+        as is, and so is every provider when credits are off or the operator allowed them."""
+        if not prov.available or _credits_allowed() or not _extra_usage_enabled(payload):
+            return prov
+        near = [w for w in prov.windows if w.used is not None and w.used >= CLAUDE_CREDIT_HEADROOM_PCT]
+        if not near:
+            return prov
+        resets = [w.resets_at for w in near if w.resets_at]
+        names = ", ".join(f"{w.name} {w.used:.0f}%" for w in near)
+        return Provider(
+            "claude",
+            False,
+            None,
+            prov.windows,
+            f"usage credits are enabled on this account and {names} is at or above "
+            f"{CLAUDE_CREDIT_HEADROOM_PCT:.0f}%; not launching, so a round cannot run on into credits "
+            f"(EPSILONERIDANI_CLAUDE_ALLOW_CREDITS=1 allows it)",
+            max(resets) if resets else None,
+        )
 
     def _from_cached_claude(self, cached: tuple[dict, float]) -> tuple[Provider, list[Reading]]:
         """A cached payload turned into a Provider AS OF ITS FETCH TIME. Both the readings and the pacing
         are taken at that instant, so serving this entry again later can only repeat the verdict it
         already supported — never improve on it because the budget line has moved on.
 
-        What this does NOT do is re-examine a verdict that was already permissive: an entry that was under
+        A permissive verdict older than CLAUDE_STALE_GATE_S is withdrawn: it waits as unknown. What this
+        does NOT do is re-examine a younger verdict that was already permissive: an entry that was under
         pace when fetched still reads that way, even though its usage figure is only a lower bound and a
         sibling worker may have spent since. That is the deliberate availability trade behind the cache —
         an endpoint blip should not stop a fleet — and it is bounded by the TTL and by the loop forcing a
@@ -2145,7 +2201,23 @@ class Quota:
         payload, at = cached
         readings = _claude_readings(payload, at)
         notes, bootstrap_recorded = self._idle_notes(readings)
-        return self._claude_provider(readings, notes, bootstrap_recorded=bootstrap_recorded, now=at), readings
+        prov = self._credit_guard(
+            self._claude_provider(readings, notes, bootstrap_recorded=bootstrap_recorded, now=at), payload
+        )
+        age = time.time() - at
+        if (prov.available or prov.bootstrap_eligible) and age > CLAUDE_STALE_GATE_S:
+            # Too old to authorize anything (see CLAUDE_STALE_GATE_S). Keep the windows for display, but
+            # wait like an unreadable window: no model, no bootstrap, and no next_eligible, so the loop
+            # polls again at its normal interval rather than sleeping toward a reset it cannot vouch for.
+            prov = Provider(
+                "claude",
+                False,
+                None,
+                prov.windows,
+                f"claude usage reading is {int(age // 60)} min old and could not be refreshed; "
+                f"not launching on it (limit {CLAUDE_STALE_GATE_S // 60} min)",
+            )
+        return prov, readings
 
     def _cached_claude(self, fp: str | None) -> tuple[dict, float] | None:
         """A cached usage payload WITH the instant it describes, or None when it must not be served.
