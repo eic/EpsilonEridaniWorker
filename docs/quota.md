@@ -190,8 +190,21 @@ fleet's requests for the same answer, and then every worker found out about the
 A different access token (an account switch) is never served another token's
 reading. A bootstrap request clears the shared reading along with the worker's
 own. If the shared directory cannot be used, each worker reads on its own, as
-before. Workers on their own logins (`claude_config_dir`) each have their own
-source, so they share nothing with each other.
+before.
+
+**Separate logins for one account share too.** A login records its account in
+Claude Code's `.claude.json` (`oauthAccount.accountUuid`): inside the login's
+directory with `claude_config_dir`, or as `~/.claude.json` beside the default
+`~/.claude`. When it does, the shared reading, its lock and the bootstrap
+reservation live in a per-account directory,
+`$EPSILONERIDANI_CLAUDE_ACCOUNTS_DIR/<hash of the account>/`. The default is the
+install's `state/claude-accounts/`, which every worker of the install can see. So
+five workers logged in separately to one account make one usage request between
+them, wait out one 429, and spend at most one bootstrap request, as if they shared
+one login. A reading is served by account rather than by token there, because each
+login holds its own token. A login that names no account keeps its state beside
+its credential source and matches by token, as before. Workers of a different
+install on the same account do not share with this one.
 
 ## Usage credits
 

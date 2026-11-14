@@ -26,6 +26,7 @@ from . import oauth as credential_refresh
 from .config import Config, log
 from .constants import AUTHORING_DEFAULTS, CLAUDE_CMD, GEMINI_USAGE_URL, ROUND_TIMEOUT
 from .github import GitHubError, _parse_retry_after
+from .paths import HERE
 
 CODEX_USAGE_URL = "https://chatgpt.com/backend-api/wham/usage"
 
@@ -89,6 +90,23 @@ CLAUDE_QUOTA_DIRNAME = ".epsiloneridani-quota"
 # seconds old is reused instead of fetched, and a sibling's 429 makes every worker wait out the same
 # Retry-After.
 CLAUDE_USAGE_SHARED_FILE = "usage.json"
+
+# Workers on separate logins (each its own claude_config_dir) for ONE account used to share nothing:
+# each polled the usage endpoint on its own, multiplying the 429s, and each could spend its own
+# bootstrap request. When a login names its account (Claude Code's .claude.json `oauthAccount`), the
+# shared reading, its lock and the bootstrap reservation live in a per-account directory under here
+# instead, so every worker of this install on that account shares them, whatever login it uses.
+CLAUDE_ACCOUNTS_DIRNAME = "claude-accounts"
+
+
+def claude_accounts_root() -> Path:
+    """Where per-account quota state lives: $EPSILONERIDANI_CLAUDE_ACCOUNTS_DIR, else the install's
+    state/ directory (shared by all its workers, unlike their isolated homes). A leading ~ in the
+    override is expanded: left literal, it would name a directory relative to each worker's cwd."""
+    override = os.environ.get("EPSILONERIDANI_CLAUDE_ACCOUNTS_DIR", "").strip()
+    return Path(override).expanduser() if override else HERE / "state" / CLAUDE_ACCOUNTS_DIRNAME
+
+
 CLAUDE_USAGE_SHARE_S = int(os.environ.get("EPSILONERIDANI_CLAUDE_USAGE_SHARE_S", "300"))
 
 # How old a cached usage reading may be and still AUTHORIZE a launch. A cached reading keeps blocking
@@ -1392,11 +1410,12 @@ class Quota:
 
     # --- Claude usage shared across workers ----------------------------------
     def _shared_usage_paths(self) -> tuple[Path, Path] | None:
-        """(reading, lock) shared by the workers measuring this credential source, or None when this
-        pacer has no configuration and so no credential source to share through."""
+        """(reading, lock) shared by the workers on this account (see _claude_shared_dir: per account
+        when the login names it, else per credential source), or None when this pacer has no
+        configuration and so nothing to share through."""
         if getattr(self, "cfg", None) is None:
             return None
-        d = self._claude_creds_source() / CLAUDE_QUOTA_DIRNAME
+        d = self._claude_shared_dir()
         return d / CLAUDE_USAGE_SHARED_FILE, d / "usage.lock"
 
     @contextmanager
@@ -1438,11 +1457,11 @@ class Quota:
         cache if valid, else the shared reading if it is still within the private cache's own bounds
         (QUOTA_TTL, and no reset it describes has passed).
 
-        The token fingerprint must match, as for the private cache: an account switch in the shared
-        file invalidates what the siblings learned."""
+        The entry must be for this worker's account (see _shared_entry_matches): an account switch in
+        the shared file invalidates what the siblings learned."""
         paths = self._shared_usage_paths()
         entry = _read_json_file(paths[0]) if paths is not None else None
-        if not entry or entry.get("fp") != fp:
+        if not entry or not self._shared_entry_matches(entry, fp):
             return None
         now = time.time()
         fresh = self._shared_reading(entry, now, CLAUDE_USAGE_SHARE_S)
@@ -1472,6 +1491,22 @@ class Quota:
             None,
         )
 
+    def _shared_owner(self) -> str | None:
+        """Whose usage the shared entry describes, when the login names its account: "account:<uuid>".
+        None when it does not, and the token fingerprint is the only identity there is."""
+        account = self._claude_login_account()
+        return f"account:{account}" if account else None
+
+    def _shared_entry_matches(self, entry: dict, fp: str | None) -> bool:
+        """Whether a shared entry describes this worker's account. Workers on separate logins for one
+        account hold different tokens, so when the login names its account, that account must match
+        (an entry from before accounts were recorded has none, and is not trusted). Otherwise the token
+        fingerprint must, as for the private cache."""
+        owner = self._shared_owner()
+        if owner is not None:
+            return entry.get("account") == owner
+        return entry.get("fp") == fp
+
     @staticmethod
     def _shared_reading(entry: dict, now: float, max_age: float) -> tuple[dict, float, float] | None:
         """(payload, fetched_at, valid_until) of the shared entry's reading if at most `max_age` old,
@@ -1489,15 +1524,17 @@ class Quota:
     def _shared_usage_record(self, fp: str | None, **fields) -> None:
         """Publish a usage outcome to the siblings: a reading, or a Retry-After deadline. Best effort.
 
-        Merged into what is there for the same token, so a 429 does not erase a reading the siblings can
-        still use, and a new reading does not erase a back-off that has not yet passed. Callers hold the
-        shared lock (see _claude_pass), so the read-modify-write is not raced by a sibling."""
+        Merged into what is there for the same account (or token), so a 429 does not erase a reading the
+        siblings can still use, and a new reading does not erase a back-off that has not yet passed.
+        Callers hold the shared lock (see _claude_pass), so the read-modify-write is not raced by a
+        sibling."""
         paths = self._shared_usage_paths()
         if paths is None:
             return
         path = paths[0]
         previous = _read_json_file(path) or {}
-        entry = {**(previous if previous.get("fp") == fp else {}), "fp": fp, **fields}
+        keep = previous if self._shared_entry_matches(previous, fp) else {}
+        entry = {**keep, "fp": fp, "account": self._shared_owner(), **fields}
         tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -2345,6 +2382,32 @@ class Quota:
         src = _read_marker(d / ".epsiloneridani-creds-source")
         return Path(src) if src else d
 
+    def _claude_login_account(self) -> str | None:
+        """The account UUID this worker's Claude login belongs to, from Claude Code's .claude.json
+        (`oauthAccount.accountUuid`), or None. With $CLAUDE_CONFIG_DIR the file sits inside that dir;
+        for the default ~/.claude it sits beside it, as ~/.claude.json."""
+        src = self._claude_creds_source()
+        candidates = [src / ".claude.json"]
+        if src.name == ".claude":
+            candidates.append(src.parent / ".claude.json")
+        for path in candidates:
+            data = _read_json_file(path)
+            account = (data or {}).get("oauthAccount")
+            uuid = account.get("accountUuid") if isinstance(account, dict) else None
+            if isinstance(uuid, str) and uuid.strip():
+                return uuid.strip()
+        return None
+
+    def _claude_shared_dir(self) -> Path:
+        """The directory whose quota state (shared reading, bootstrap reservation) this worker shares:
+        its account's, when the login names the account, so separate logins for one account share it;
+        otherwise beside the credential source, which only workers mirroring that one login share."""
+        account = self._claude_login_account()
+        if account:
+            digest = hashlib.sha256(account.encode()).hexdigest()[:16]
+            return claude_accounts_root() / digest
+        return self._claude_creds_source() / CLAUDE_QUOTA_DIRNAME
+
     def _claude_account_key(self) -> str:
         """A stable identity for the Claude ACCOUNT, used to scope the shared bootstrap reservation.
 
@@ -2366,6 +2429,9 @@ class Quota:
                 for sub in ("uuid", "id", "email_address"):
                     if isinstance(blk.get(sub), str) and blk[sub]:
                         return f"account:{blk[sub]}"
+        login_account = self._claude_login_account()
+        if login_account:
+            return f"account:{login_account}"
         return f"creds:{self._claude_creds_source()}"
 
     def _episode_key(self, window: str) -> str:
@@ -2383,7 +2449,7 @@ class Quota:
 
     def _bootstrap_paths(self) -> tuple[Path, Path]:
         """(ledger, lock) for the shared reservation."""
-        d = self._claude_creds_source() / CLAUDE_QUOTA_DIRNAME
+        d = self._claude_shared_dir()
         return d / CLAUDE_BOOTSTRAP_FILE, d / "bootstrap.lock"
 
     @contextmanager

@@ -285,6 +285,7 @@ Flags win over these. Most are tuning knobs with sane defaults.
 | `EPSILONERIDANI_CLAUDE_USAGE_SHARE_S` | `300` | How old a sibling worker's Claude usage reading may be and still be reused instead of fetched (see [sharing one usage reading](quota.md#sharing-one-usage-reading)). |
 | `EPSILONERIDANI_CLAUDE_STALE_GATE_S` | `600` | How old a cached Claude usage reading may be and still authorize a launch; older, a permissive reading waits as unknown (see [sharing one usage reading](quota.md#sharing-one-usage-reading)). |
 | `EPSILONERIDANI_CLAUDE_CREDIT_GUARD_PCT` | `75` | While the account has usage credits enabled, a window at or above this percentage blocks launches until it resets (see [usage credits](quota.md#usage-credits)). |
+| `EPSILONERIDANI_CLAUDE_ACCOUNTS_DIR` | `<install>/state/claude-accounts` | Where workers keep quota state shared per Claude account (usage reading, its lock, bootstrap reservation) when their login names the account. Workers on separate logins for one account share it. |
 | `EPSILONERIDANI_CLAUDE_ALLOW_CREDITS` | _(unset)_ | `1` lets workers launch near a plan limit even with usage credits enabled, i.e. spend credits; turns the credit guard off. |
 | `EPSILONERIDANI_ROUND_TIMEOUT` | `5400` | Hard cap per round (seconds). |
 | `EPSILONERIDANI_MAX_OPEN_PRS` | `8` | Open PRs in the selected roadmap scope at which authoring stops (see [roadmap backpressure](#roadmap-backpressure)). |
