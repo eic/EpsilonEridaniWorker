@@ -1185,7 +1185,8 @@ def preflight(cfg: Config, opts: RoundOpts) -> None:
             raise Die(
                 f"preflight: EpsilonEridani's public Lake artifact cache is not readable: {unreachable}. "
                 "Every work round would rebuild the library from source instead. Check the bucket's "
-                "public access and that EPSILONERIDANI_CACHE_DOMAIN still matches the LAKE_CACHE_*_PUBLIC "
+                "public access and that EPSILONERIDANI_CACHE_ARTIFACT_ENDPOINT and "
+                "EPSILONERIDANI_CACHE_REVISION_ENDPOINT still match the LAKE_CACHE_*_ENDPOINT_PUBLIC "
                 "repository variables on eic/EpsilonEridani, then re-run."
             )
     # The CLI may advertise --allow-push while an older live daemon keeps rejecting fork pushes (403).

@@ -1234,16 +1234,15 @@ KIRO_BUBBLE_MIN_VERSION = "0.7.31"
 # EpsilonEridani's public, anonymous Lake artifact cache. Mathlib's separate cache is fetched by
 # `lake exe cache get Mathlib Physlib TauCeti`; this one contains EpsilonEridani's own main-built outputs.
 #
-# The custom domain, NOT the bucket's `pub-<id>.r2.dev` development URL. That development URL is
-# disabled on this bucket and answers 401 for every path, root included, so every round's
-# `lake cache get` failed and fell through to a from-scratch `lake build` -- silently, because a
-# cache miss is non-fatal here. The custom domain is also what EpsilonEridani's own CI publishes and reads
-# through (the LAKE_CACHE_*_PUBLIC repo variables). Keep the two in step.
-EPSILONERIDANI_CACHE_DOMAIN = "cache.epsiloneridaniproject.org"
+# The NRP S3 bucket, read anonymously: the same endpoints EpsilonEridani's CI publishes to and reads from
+# (the LAKE_CACHE_*_ENDPOINT_PUBLIC repository variables). Keep the two in step. Two earlier choices
+# failed silently, because a cache miss is non-fatal and the round just rebuilds from source: the
+# bucket's `pub-<id>.r2.dev` development URL (disabled, 401 for every path) and the custom domain
+# cache.epsiloneridaniproject.org (no DNS since 2026-11; Bubble rounds pointed there got no cache).
 EPSILONERIDANI_CACHE_SERVICE = "epsiloneridani-public"
-# The public endpoints of that service, as EpsilonEridani's scripts/lake-cache-get.sh names them. A
-# host round writes its own Lake config from these rather than run that script from the checkout,
-# which on a fix round is the PR's branch, possibly a contributor's fork.
+# A host round writes its own Lake config from these rather than run scripts/lake-cache-get.sh from the
+# checkout, which on a fix round is the PR's branch, possibly a contributor's fork. Bubble rounds grant
+# the same two endpoints as their download-cache capability.
 EPSILONERIDANI_CACHE_ARTIFACT_ENDPOINT = "https://s3-central.nrp-nautilus.io/epsiloneridani-cache/artifacts"
 EPSILONERIDANI_CACHE_REVISION_ENDPOINT = "https://s3-central.nrp-nautilus.io/epsiloneridani-cache/revisions"
 OWN_CACHE_ENV = "EPSILONERIDANI_OWN_CACHE"
@@ -1253,8 +1252,9 @@ OWN_CACHE_TIMEOUT_S = 600
 # every prompt's verification starts with, run by the worker first as bubble_work_cmd does.
 DEPS_CACHE_CMD = ("lake", "exe", "cache", "get", "Mathlib", "Physlib", "TauCeti")
 DEPS_CACHE_TIMEOUT_S = 1200
-EPSILONERIDANI_CACHE_ARTIFACT_URL = f"https://{EPSILONERIDANI_CACHE_DOMAIN}/artifacts"
-EPSILONERIDANI_CACHE_REVISION_URL = f"https://{EPSILONERIDANI_CACHE_DOMAIN}/revisions"
+# One set of endpoints for host and Bubble rounds alike (these names predate the host prefetch).
+EPSILONERIDANI_CACHE_ARTIFACT_URL = EPSILONERIDANI_CACHE_ARTIFACT_ENDPOINT
+EPSILONERIDANI_CACHE_REVISION_URL = EPSILONERIDANI_CACHE_REVISION_ENDPOINT
 
 
 def bubble_cmd() -> list[str]:
