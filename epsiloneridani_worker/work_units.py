@@ -76,7 +76,7 @@ from .fix_context import fix_round_subs
 from .github import GitHub, GitHubError, claims_repo, ensure_fork, gh_run, me
 from .intentions import administrative_hold_avoid_list, claimed_avoid_list
 from .paths import CLAIM_SH, HERE
-from .quota import Quota, _unavail_reason, mirror_creds
+from .quota import CLAUDE_SPEND_JOURNAL_ENV, Quota, _unavail_reason, claude_spend_journal, mirror_creds
 from .review_diagnostics import (
     clear_review_failure,
     public_review_failure,
@@ -894,6 +894,21 @@ def _round_reviewed_nothing(store_dir: Path, pr: int, head: str, since: float) -
     return bool(counts) and sum(counts) == 0
 
 
+def _review_engine_env(w) -> dict[str, str] | None:
+    """The host review engine's environment: the worker's own, plus the path of its Claude account's
+    spend journal in CLAUDE_SPEND_JOURNAL_ENV, so the engine journals each Claude call's spend and
+    rate-limit readings for the pacer like an agent run does (see Quota._claude_journal_pass). None,
+    inheriting unchanged, when the worker has no home to find its account from."""
+    home = getattr(getattr(w, "cfg", None), "home", None)
+    if home is None:
+        return None
+    try:
+        path = claude_spend_journal(Path(home))
+    except (OSError, TypeError, ValueError):
+        return None
+    return {**os.environ, CLAUDE_SPEND_JOURNAL_ENV: str(path)}
+
+
 def do_review(w: Worker, sv: Survey, c: Candidate, opts: RoundOpts, bubble: bool) -> int:
     pr, head = c.pr, c.head
     reviewers = opts.work_model
@@ -943,6 +958,7 @@ def do_review(w: Worker, sv: Survey, c: Candidate, opts: RoundOpts, bubble: bool
                 ],
                 logf,
                 f"review #{pr}",
+                env=_review_engine_env(w),
             )
         log(f"  review #{pr}: engine rc={rc}")
         if rc == 0 and _round_reviewed_nothing(w.cfg.store_dir, pr, head, started):

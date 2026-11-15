@@ -1186,18 +1186,19 @@ def run_agent_proc(
     return rc
 
 
-def run_to_logfile(argv: list[str], logf: Path, label: str) -> int:
+def run_to_logfile(argv: list[str], logf: Path, label: str, *, env: dict[str, str] | None = None) -> int:
     """Run a subprocess with stdout+stderr redirected to logf, keeping the worker's MAIN log clean. Used
     for the review engine, which prints a lot (git clones, the full scoreboard dump, per-rubric lines) —
     detail that belongs in a subsidiary per-review log, not the orchestration stream. EPSILONERIDANI_STREAM=1
     streams to the terminal instead. Tails logf to the main log on a non-zero exit so failures aren't
-    silent. The caller logs a one-line pointer to logf so the detail is discoverable."""
+    silent. The caller logs a one-line pointer to logf so the detail is discoverable. `env` replaces the
+    child's environment when given (None inherits the worker's)."""
     if os.environ.get("EPSILONERIDANI_STREAM"):
-        return subprocess.run(argv).returncode
+        return subprocess.run(argv, env=env).returncode
     logf.parent.mkdir(parents=True, exist_ok=True)
     log(f"  {label}: engine output → {logf}  (run with --stream to watch live)")
     with open(logf, "ab") as f:
-        rc = subprocess.run(argv, stdout=f, stderr=subprocess.STDOUT).returncode
+        rc = subprocess.run(argv, stdout=f, stderr=subprocess.STDOUT, env=env).returncode
     if rc != 0:
         log(f"{label}: exited {rc}; last lines of {logf.name}:")
         tail: list[str] = []

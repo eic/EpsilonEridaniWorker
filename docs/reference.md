@@ -283,7 +283,8 @@ Flags win over these. Most are tuning knobs with sane defaults.
 | `EPSILONERIDANI_REVIEW_ENGINE_DIR` | — | Use a local `epsiloneridani-review` checkout instead of fetching the engine. |
 | `EPSILONERIDANI_POLL` | `300` | Seconds between quota checks while the loop waits. |
 | `EPSILONERIDANI_CLAUDE_USAGE_SHARE_S` | `300` | How old a sibling worker's Claude usage reading may be and still be reused instead of fetched (see [sharing one usage reading](quota.md#sharing-one-usage-reading)). |
-| `EPSILONERIDANI_CLAUDE_STALE_GATE_S` | `600` | How old a cached Claude usage reading may be and still authorize a launch; older, a permissive reading waits as unknown (see [sharing one usage reading](quota.md#sharing-one-usage-reading)). |
+| `EPSILONERIDANI_CLAUDE_STALE_GATE_S` | `600` | How old a cached Claude usage reading may be and still authorize a launch; older, a permissive reading waits as unknown (see [sharing one usage reading](quota.md#sharing-one-usage-reading)). Also bounds the age of a [spend-journal reading](quota.md#the-spend-journal) that stands in for the endpoint. |
+| `EPSILONERIDANI_CLAUDE_SPEND_JOURNAL` | set by the worker | The path of the account's `spend.jsonl`, given to the host review engine so it journals each Claude call. Not an operator setting. |
 | `EPSILONERIDANI_CLAUDE_CREDIT_GUARD_PCT` | `75` | While the account has usage credits enabled, a window at or above this percentage blocks launches until it resets (see [usage credits](quota.md#usage-credits)). |
 | `EPSILONERIDANI_CLAUDE_ACCOUNTS_DIR` | `<install>/state/claude-accounts` | Where workers keep quota state shared per Claude account (usage reading, its lock, bootstrap reservation) when their login names the account. Workers on separate logins for one account share it. |
 | `EPSILONERIDANI_CLAUDE_ALLOW_CREDITS` | _(unset)_ | `1` lets workers launch near a plan limit even with usage credits enabled, i.e. spend credits; turns the credit guard off. |

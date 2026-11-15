@@ -208,8 +208,8 @@ install on the same account do not share with this one.
 
 ## The spend journal
 
-Each Claude agent run (a fix, progress, roadmap or rebase round) appends one JSON
-line to `spend.jsonl` in the same directory as the shared usage reading: the
+Each Claude agent run (a fix, progress, roadmap or rebase round), and each Claude
+call of a host review round, appends one JSON line to `spend.jsonl` in the same directory as the shared usage reading: the
 account's directory when the login names its account, otherwise
 `.epsiloneridani-quota/` beside the credential source. It is written whatever the
 outcome, including a round cut off by a limit. The line holds:
@@ -227,13 +227,32 @@ The worker's log shows the same spend at the end of the run (`agent-claude: spen
 $2.50, 12,000 output / 520,030 input tokens ...`), and the transcript's `[result]`
 and `[rate limit]` lines show the cost, tokens and utilization.
 
-Nothing reads the journal yet. It is the input for estimating usage between
-readings of the usage endpoint, which answers 429 more often than not: the change
-in usage between two readings, set against the spend between them, gives a rate
-for each account. Review rounds are not journaled here: the review engine runs
-Claude itself and records its spend in its own ledger. Like the shared reading,
-the journal belongs to the account, so workers on separate logins for one account
-write to one journal.
+The review engine writes its lines itself (label `review-claude:<model>`), when
+the worker names the journal in `$EPSILONERIDANI_CLAUDE_SPEND_JOURNAL`. It dates
+their readings to the call's start, the cautious side. Bubble review rounds are
+not journaled. Like the shared reading, the journal belongs to the account, so
+workers on separate logins for one account write to one journal.
+
+**A fresh journal reading stands in for the usage endpoint.** The rate-limit
+headers carry the same utilization the endpoint reports, and the endpoint answers
+most polls with 429. So when the endpoint cannot vouch for anything (a 429, or a
+cached reading past the stale gate), the worker paces on the journal's newest
+reading instead, if:
+
+- every window the worker gates on (`five_hour`, and `seven_day` unless
+  `$EPSILONERIDANI_CLAUDE_NO_WEEKLY_CAP` is set) has one, the pair is no older than
+  `$EPSILONERIDANI_CLAUDE_STALE_GATE_S`, and neither reset has passed;
+- the account has a real usage payload on record, of any age. The journal's
+  figures replace its windows, and its other fields (whether credits are enabled)
+  still drive the credit guard. Without one the worker keeps waiting.
+
+The pair is dated to the older of its two `seen` stamps and paced as of that
+moment, like a cached reading. A model-scoped weekly
+(`$EPSILONERIDANI_CLAUDE_WEEKLY_SCOPE`) has no counterpart in the headers, so such
+a worker never reads the journal. A verdict the endpoint actually gave (a refused
+credential, an over-pace reading) is never overridden. The log says when it
+happens: `claude quota: usage endpoint unreadable; pacing on the spend journal's
+reading from 3 min ago (five_hour 41%, seven_day 22%)`.
 
 ## Usage credits
 

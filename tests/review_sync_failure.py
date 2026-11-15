@@ -85,7 +85,7 @@ def opts(work_model="codex"):
 # Stub the engine (posts fine, rc=0) and the module-level helpers do_review calls on the host path.
 warns = []
 _saved = {k: getattr(wu, k) for k in ("run_to_logfile", "_sync_review_outbox", "warn_red", "me", "gh_run", "log")}
-wu.run_to_logfile = lambda argv, logf, label: 0  # the review engine posts successfully
+wu.run_to_logfile = lambda argv, logf, label, **_k: 0  # the review engine posts successfully
 wu.warn_red = lambda msg: warns.append(msg)
 wu.me = lambda: "kim-em"
 
@@ -113,10 +113,10 @@ try:
     w = FakeWorker()
     w.counters.write("review-err-726", 2)
     wu.do_review(w, None, CAND, opts(), bubble=False)  # posts, publish fails -> streak reset to 0
-    wu.run_to_logfile = lambda argv, logf, label: 4  # now the engine genuinely errors (no verdict posted)
+    wu.run_to_logfile = lambda argv, logf, label, **_k: 4  # now the engine genuinely errors (no verdict posted)
     wu.do_review(w, None, CAND, opts(), bubble=False)
     check("reset-on-post -> later engine error starts a fresh streak (1, not 3)", w.counters.read("review-err-726"), 1)
-    wu.run_to_logfile = lambda argv, logf, label: 0  # restore for the cases below
+    wu.run_to_logfile = lambda argv, logf, label, **_k: 0  # restore for the cases below
 
     # 2) engine posts and the publish SUCCEEDS -> errkey reset to 0, ledger busted, no warning.
     wu._sync_review_outbox = lambda w, pr: 0
@@ -133,7 +133,7 @@ try:
     # behaviour). Any status EXCEPT REVIEW_PROVIDER_DOWN_EXIT, which the engine reserves for "the
     # provider is unusable and I posted nothing" and which do_review treats as machine-wide the same
     # way as the publish failure above (tests/review_provider_down.py).
-    wu.run_to_logfile = lambda argv, logf, label: 4
+    wu.run_to_logfile = lambda argv, logf, label, **_k: 4
     wu._sync_review_outbox = lambda w, pr: 0
     w = FakeWorker()
     w.counters.write("review-err-726", 2)
