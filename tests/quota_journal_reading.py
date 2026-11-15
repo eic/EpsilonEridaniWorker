@@ -154,6 +154,7 @@ try:
         ("over pace", [line(now - 60, 0.95, 0.3)]),
         ("from the future", [line(now + 600, 0.2, 0.3)]),
         ("malformed", [{"rate_limits": {"five_hour": {"utilization": "x", "resetsAt": five_reset, "seen": now}}}]),
+        ("an int too large for a float", [line(now - 60, 0.2, 0.3, five_resets=10**1000)]),
     ):
         reset_state()
         seed_template(at=now - 2 * 3600)

@@ -511,7 +511,12 @@ def _finite_num(x: object) -> bool:
     """A usable numeric percentage: a real int/float that isn't a bool and isn't NaN/inf. The usage
     endpoints are reverse-engineered JSON (whose decoder even accepts NaN/Infinity), so anything else is
     treated as missing telemetry — fail-closed — rather than clamped into a spurious value."""
-    return isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x)
+    if not isinstance(x, (int, float)) or isinstance(x, bool):
+        return False
+    try:
+        return math.isfinite(x)
+    except OverflowError:  # an int too large for a float (JSON integers are unbounded)
+        return False
 
 
 def _classify_window(
