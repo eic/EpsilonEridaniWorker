@@ -110,6 +110,21 @@ green head or contest reply. After that window, every worker may take it;
 eligible reviews are chosen by an age-weighted lottery, with waiting-time weight
 capped after 24 hours so older work is favored without imposing a rigid queue.
 
+### Interrupted rounds
+
+A PR round (rebase, bump, lint repair, fix CI, fix) commits and pushes from inside
+the agent. When the agent is cut off first (the 5-hour limit, the round timeout, a
+stopped service), the next round keeps what it left: its commits on top of the PR
+head, plus any uncommitted edits as one WIP commit, go into a git bundle under
+`$EPSILONERIDANI_SALVAGE_DIR` (default `<install>/state/salvage`). The PR's next
+host round, on any worker of the install, replays them onto the PR head if the PR
+has not moved since, with the edits back as edits, and tells the agent what it is
+resuming. If the PR moved, the work is set aside in `superseded/` rather than
+replayed. A round that exits 0 is never salvaged, and Bubble rounds are not
+covered. Before this, the next round's checkout reset discarded the work: 30
+commits that never reached GitHub were found in the fleet's reflogs for
+2026-11-08 to 11-16.
+
 Merging green PRs, closing stuck ones, and de-duplicating are the repo's CI, not
 the worker. A GitHub API failure aborts the round rather than reading as "nothing
 to do", so a transient outage never falls through to authoring.

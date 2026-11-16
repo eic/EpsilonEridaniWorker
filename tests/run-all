@@ -117,6 +117,7 @@ RUN_STDLIB=(
   fix_context.py
   rubric_bundle.py
   safe_exists.py
+  salvage_interrupted_round.py
   scoreboard_trust.py
   shared_build_caches.py
   source_argument.py

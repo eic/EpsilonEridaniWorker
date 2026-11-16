@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:  # annotations only; importing at runtime would invert the layer order
     from .work_units import RoundOpts, Worker
 
-from . import build_caches, local_endpoint
+from . import build_caches, local_endpoint, salvage
 from .config import Config, Die, NoProgress, log
 from .constants import (
     AUTHORING_DEFAULTS,
@@ -772,6 +772,9 @@ def prepare_checkout(cfg: Config) -> bool:
         log(f"cloning {EPSILONERIDANI} → {co} (first run)")
         if subprocess.run(["git", "clone", "-q", f"https://github.com/{EPSILONERIDANI}", str(co)]).returncode:
             return False
+    # Before anything is reset: keep what an interrupted previous PR round committed or edited but never
+    # pushed, so the PR's next round can resume it (see salvage).
+    salvage.capture(cfg)
     # Before anything can build into it: a fresh clone has no .lake yet, and the first build would put
     # one wherever the checkout lives.
     if not place_lake(cfg):

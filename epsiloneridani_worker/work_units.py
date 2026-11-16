@@ -16,6 +16,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import salvage
 from .agents import (
     AuthoringProfile,
     _codex_review_model_override,
@@ -1210,8 +1211,15 @@ def _do_fixlike(
         checked = rev.stdout.strip() or head
         os.environ["EPSILONERIDANI_PUSH_EXPECT"] = checked  # CAS against what we actually checked out
         log(f"  {label} #{pr}: checked out @ {checked[:12]}")
+        # Work an interrupted round on this PR left unpushed, replayed on top when the PR has not moved.
+        # The push CAS above stays the PR head: that is what the remote must still hold.
+        resumed = salvage.restore(w.cfg, co, owner=p.head_owner, repo=p.head_repo, pr=pr, head=checked)
+        if resumed:
+            prompt += resumed
+        salvage.note_start(w.cfg, stage=label, owner=p.head_owner, repo=p.head_repo, pr=pr, base=checked)
         prefetch_build_caches(co)
         rc = run_agent_host(co, prompt, _effective_authoring_profile(opts), w.cfg.logdir)
+        salvage.note_end(w.cfg, rc)
     if rc == 0:
         w.rs.bust(pr)
     else:
