@@ -90,6 +90,11 @@ CLAUDE_QUOTA_DIRNAME = ".epsiloneridani-quota"
 # seconds old is reused instead of fetched, and a sibling's 429 makes every worker wait out the same
 # Retry-After.
 CLAUDE_USAGE_SHARED_FILE = "usage.json"
+# The account's last usage payload the endpoint actually returned, kept apart from the shared reading:
+# a bootstrap request deletes that reading (_forget_raw), and a 429 right after it leaves the shared
+# file holding nothing but a back-off. The spend journal needs a payload to fill in (see
+# Quota._claude_payload_template), and the hour after a window reset is when it is needed most.
+CLAUDE_USAGE_TEMPLATE_FILE = "usage-template.json"
 
 # Workers on separate logins (each its own claude_config_dir) for ONE account used to share nothing:
 # each polled the usage endpoint on its own, multiplying the 429s, and each could spend its own
@@ -2333,7 +2338,34 @@ class Quota:
             and _finite_num(shared.get("fetched_at"))
         ):
             candidates.append((shared["fetched_at"], shared["payload"]))
+        kept = _read_json_file(paths[0].with_name(CLAUDE_USAGE_TEMPLATE_FILE)) if paths is not None else None
+        if (
+            kept
+            and self._shared_entry_matches(kept, fp)
+            and isinstance(kept.get("payload"), dict)
+            and _finite_num(kept.get("fetched_at"))
+        ):
+            candidates.append((kept["fetched_at"], kept["payload"]))
         return max(candidates, key=lambda c: c[0])[1] if candidates else None
+
+    def _record_payload_template(self, fp: str | None, payload: dict, fetched_at: float) -> None:
+        """Keep this payload as the account's template (CLAUDE_USAGE_TEMPLATE_FILE). Best effort, and
+        replaced whole (write, then rename), so a reader never sees half of one."""
+        paths = self._shared_usage_paths()
+        if paths is None:
+            return
+        path = paths[0].with_name(CLAUDE_USAGE_TEMPLATE_FILE)
+        tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+        entry = {"fp": fp, "account": self._shared_owner(), "fetched_at": fetched_at, "payload": payload}
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp.write_text(json.dumps(entry))
+            os.replace(tmp, path)
+        except (OSError, TypeError, ValueError):
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
 
     def _claude_endpoint_pass(
         self, fp: str | None, tok: str | None, *, refresh: bool = False
@@ -2400,6 +2432,7 @@ class Quota:
         problem = _claude_payload_problem(payload)
         if problem:
             return Provider("claude", False, None, error=problem, retry_after=retry_after), None
+        self._record_payload_template(fp, payload, observed_at)
         readings = _claude_readings(payload, observed_at)
         # Cache ONLY a payload that is fully resolved, and only until the first reset it describes.
         # An idle/absent/malformed payload is never pinned: re-reading it is the only thing that can
