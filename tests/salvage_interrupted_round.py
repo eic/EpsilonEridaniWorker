@@ -163,6 +163,30 @@ try:
     check("...the checkout stays at the new head", git(w28.checkout, "rev-parse", "HEAD"), head)
     check("...and the salvage is set aside", any((root / "salvage" / "superseded").glob("*.bundle")), True)
 
+    print("5b) another branch that contains the base (main after the PR merged)")
+    base = take_pr(w27)
+    salvage.note_start(w27, stage="fix", base=base, **kw)
+    git(w27.checkout, "checkout", "-q", "-B", "main", base)  # main fast-forwarded onto the PR head
+    (w27.checkout / "A.lean").write_text("theorem a : True := trivial\n-- unrelated work on main\n")
+    git(w27.checkout, "commit", "-qam", "unrelated")
+    reset_like_next_round(w27)
+    check("nothing salvaged from the wrong branch", bundle.exists(), False)
+
+    print("5c) .lake is never bundled, ignored or not")
+    base = take_pr(w27)
+    salvage.note_start(w27, stage="fix", base=base, **kw)
+    (w27.checkout / ".gitignore").write_text("")  # .lake no longer ignored
+    (w27.checkout / ".lake").mkdir(exist_ok=True)
+    (w27.checkout / ".lake" / "big.olean").write_text("build output")
+    (w27.checkout / "C.lean").write_text("theorem d : True := trivial\n")
+    reset_like_next_round(w27)
+    meta = salvage._read_json(root / "salvage" / "eic__EpsilonEridani__7.json")
+    files = git(w27.checkout, "ls-tree", "-r", "--name-only", meta["tip"]) if meta else ""
+    check("the edit is kept", "C.lean" in files.split(), True)
+    check("...without .lake", any(f.startswith(".lake/") for f in files.split()), False)
+    for f in (root / "salvage").glob("eic__EpsilonEridani__7.*"):
+        f.unlink()
+
     print("5) a checkout no longer on the PR branch")
     base = take_pr(w27)
     salvage.note_start(w27, stage="fix", base=base, **kw)

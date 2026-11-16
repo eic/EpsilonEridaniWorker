@@ -60,6 +60,15 @@ def _intent_path(cfg: Config) -> Path | None:
     return None if state is None else Path(state) / INTENT_FILE
 
 
+def _current_branch(co: Path) -> str | None:
+    """The checked-out branch's name, or None (detached HEAD, or no repository)."""
+    try:
+        name = _git(co, "symbolic-ref", "--short", "-q", "HEAD").stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return name or None
+
+
 def _write_json(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
@@ -89,6 +98,9 @@ def note_start(cfg: Config, *, stage: str, owner: str, repo: str, pr: int, base:
                 "repo": repo,
                 "pr": pr,
                 "base": base,
+                # The branch too: `capture` must not mistake another branch that merely contains `base`
+                # (main, after the PR merged) for this round's work.
+                "branch": _current_branch(Path(cfg.checkout)),
                 "worker": cfg.wid,
                 "started": time.time(),
                 "rc": None,
@@ -140,15 +152,22 @@ def _capture(cfg: Config, co: Path, intent: dict) -> None:
     head = _git(co, "rev-parse", "HEAD").stdout.strip()
     if not head or _git(co, "merge-base", "--is-ancestor", base, head).returncode:
         return  # the checkout is not on the round's PR branch any more: nothing of it to keep
+    branch = intent.get("branch")
+    if branch and _current_branch(co) != branch:
+        return  # another branch that happens to contain the base (main, after a merge) is not this work
     tip, wip = head, False
     if _git(co, "status", "--porcelain").stdout.strip():
         # The edits as one commit, without touching the checkout's own index or files: a scratch
-        # index takes the whole tree (.lake is ignored), and commit-tree hangs it on HEAD.
+        # index takes the whole tree but .lake, and commit-tree hangs it on HEAD.
         index = Path(cfg.state) / ".salvage-index"
         env = {**os.environ, "GIT_INDEX_FILE": str(index)}
         try:
             _git(co, "read-tree", "HEAD", env=env)
-            if _git(co, "add", "-A", env=env).returncode == 0:
+            # .lake explicitly, not only through the repository's .gitignore: a build tree in the
+            # bundle would make it huge, and the next round rebuilds it anyway.
+            # (An exclude pathspec would not do: `git add` fails outright when it names an ignored path.)
+            added = _git(co, "add", "-A", env=env).returncode == 0
+            if added and _git(co, "rm", "-r", "-q", "--cached", "--ignore-unmatch", ".lake", env=env).returncode == 0:
                 tree = _git(co, "write-tree", env=env).stdout.strip()
                 made = _git(
                     co,
