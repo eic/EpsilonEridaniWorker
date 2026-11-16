@@ -92,6 +92,7 @@ RUN_STDLIB=(
   quota_codex_windows.py
   quota_gemini_renew.py
   quota_gemini_windows.py
+  quota_journal_reading.py
   quota_launch_stage.py
   quota_reason.py
   quota_shared_by_account.py

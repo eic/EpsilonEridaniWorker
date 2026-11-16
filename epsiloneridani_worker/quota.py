@@ -107,10 +107,19 @@ def claude_accounts_root() -> Path:
     return Path(override).expanduser() if override else HERE / "state" / CLAUDE_ACCOUNTS_DIRNAME
 
 
-# One JSON line per Claude agent run on this account (see claude_quota_dir): what it spent (Claude Code's cost
-# estimate and tokens per model) and the last rate-limit headers it saw. Recorded, not yet read: it is
-# the input for estimating usage between usage-endpoint readings, which answer 429 more often than not.
+# One JSON line per Claude run on this account (see claude_quota_dir): agent runs (journal_claude_run) and,
+# through CLAUDE_SPEND_JOURNAL_ENV, each Claude call of a host review round. A line holds what the run
+# spent (Claude Code's cost estimate and tokens per model) and the last rate-limit headers it saw. Those
+# headers carry the same utilization the usage endpoint reports, so a fresh one stands in for the
+# endpoint when it will not answer (see Quota._claude_journal_pass).
 CLAUDE_SPEND_JOURNAL_FILE = "spend.jsonl"
+# Names the journal to the review engine (EpsilonEridaniReview runner/reviewers.py, SPEND_JOURNAL_ENV).
+CLAUDE_SPEND_JOURNAL_ENV = "EPSILONERIDANI_CLAUDE_SPEND_JOURNAL"
+# How much of the journal's tail a read looks at. Lines are ~500 bytes, so this holds the last few
+# hundred runs, far more than the stale gate's window can contain.
+CLAUDE_JOURNAL_TAIL_BYTES = 256 * 1024
+# The journal's rate-limit window names, per usage-payload window (_FLAT_KEY's keys).
+_JOURNAL_WINDOW = {"session": "five_hour", "weekly": "seven_day"}
 
 CLAUDE_USAGE_SHARE_S = int(os.environ.get("EPSILONERIDANI_CLAUDE_USAGE_SHARE_S", "300"))
 
@@ -502,7 +511,12 @@ def _finite_num(x: object) -> bool:
     """A usable numeric percentage: a real int/float that isn't a bool and isn't NaN/inf. The usage
     endpoints are reverse-engineered JSON (whose decoder even accepts NaN/Infinity), so anything else is
     treated as missing telemetry — fail-closed — rather than clamped into a spurious value."""
-    return isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x)
+    if not isinstance(x, (int, float)) or isinstance(x, bool):
+        return False
+    try:
+        return math.isfinite(x)
+    except OverflowError:  # an int too large for a float (JSON integers are unbounded)
+        return False
 
 
 def _classify_window(
@@ -766,6 +780,17 @@ def _claude_unauthorized(prov: Provider) -> bool:
     """Whether this verdict is the usage endpoint refusing our credential, as opposed to any of the
     other ways a read fails. Only this one is worth answering with a credential rotation."""
     return bool(prov.error and prov.error.startswith("claude usage HTTP 401"))
+
+
+def _endpoint_unreadable(prov: Provider) -> bool:
+    """Whether this verdict says only that the usage endpoint could not vouch for anything right now:
+    rate-limited (429), or a cached reading too old to authorize a launch (CLAUDE_STALE_GATE_S). These
+    are the cases a fresh spend-journal reading may answer instead. Anything else (a credential the
+    endpoint refused, a malformed or over-pace reading) stands."""
+    err = prov.error or ""
+    return err.startswith("claude usage HTTP 429") or (
+        err.startswith("claude usage reading is ") and "could not be refreshed" in err
+    )
 
 
 def _claude_readings(payload: dict, now: float | None = None) -> list[Reading]:
@@ -1059,7 +1084,7 @@ def claude_quota_dir(home: Path) -> Path:
 def record_claude_spend(home: Path, entry: dict) -> Path | None:
     """Append one run's spend to its credential source's journal; the path written, or None if it
     could not be. Never raises: the journal is telemetry and must not fail a round."""
-    path = claude_quota_dir(home) / CLAUDE_SPEND_JOURNAL_FILE
+    path = claude_spend_journal(home)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         line = (json.dumps(entry, sort_keys=True, separators=(",", ":")) + "\n").encode()
@@ -1073,6 +1098,73 @@ def record_claude_spend(home: Path, entry: dict) -> Path | None:
     except (OSError, TypeError, ValueError):
         return None
     return path
+
+
+def claude_spend_journal(home: Path) -> Path:
+    """The spend journal of the Claude account this home's login belongs to."""
+    return claude_quota_dir(home) / CLAUDE_SPEND_JOURNAL_FILE
+
+
+def _journal_windows(path: Path, now: float, max_age: float) -> tuple[dict[str, tuple[float, float]], float] | None:
+    """The journal's newest reading for each window the pacer gates on, as {payload key: (used %,
+    resets_at)}, with the instant they describe: the OLDEST of their `seen` stamps, so the pair is never
+    dated later than either half. None unless every gated window has a well-formed reading no older
+    than `max_age` whose reset is still ahead.
+
+    Lines may arrive out of order (concurrent workers append when their runs END), so the newest reading
+    per window is chosen by its own `seen`, not by its position. A model-scoped weekly cap
+    (EPSILONERIDANI_CLAUDE_WEEKLY_SCOPE) has no counterpart in the headers, so it never reads from here."""
+    if _claude_weekly_scope() is not None:
+        return None
+    wanted = ("session",) if _claude_no_weekly_cap() else ("session", "weekly")
+    try:
+        with path.open("rb") as f:
+            f.seek(0, os.SEEK_END)
+            size = f.tell()
+            f.seek(max(0, size - CLAUDE_JOURNAL_TAIL_BYTES))
+            tail = f.read().decode("utf-8", "replace").splitlines()
+    except OSError:
+        return None
+    best: dict[str, tuple[float, float, float]] = {}  # window -> (seen, used %, resets_at)
+    for line in tail:
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue  # includes the partial first line of the tail
+        limits = entry.get("rate_limits") if isinstance(entry, dict) else None
+        if not isinstance(limits, dict):
+            continue
+        for window in wanted:
+            rec = limits.get(_JOURNAL_WINDOW[window])
+            if not isinstance(rec, dict):
+                continue
+            seen, used, resets = rec.get("seen"), rec.get("utilization"), rec.get("resetsAt")
+            if not (_finite_num(seen) and _finite_num(used) and _finite_num(resets)):
+                continue
+            if not 0 <= used <= 1.5 or seen > now:
+                continue  # utilization is a fraction; a reading from the future describes nothing
+            if window not in best or seen > best[window][0]:
+                best[window] = (float(seen), float(used) * 100, float(resets))
+    if set(best) != set(wanted):
+        return None
+    at = min(seen for seen, _u, _r in best.values())
+    if now - at > max_age or any(resets <= now for _s, _u, resets in best.values()):
+        return None
+    return {_FLAT_KEY[w]: (used, resets) for w, (_s, used, resets) in best.items()}, at
+
+
+def _journal_payload(template: dict, windows: dict[str, tuple[float, float]]) -> dict:
+    """A usage payload that says what the journal says: `template` (the account's last real payload,
+    which carries everything the headers do not, such as whether credits are enabled) with each gated
+    window replaced. The structured `limits` array is dropped: it would outrank the replaced windows
+    (see _claude_window_reading) with figures from the template's older moment."""
+    payload = {k: v for k, v in template.items() if k != "limits"}
+    for key, (used, resets) in windows.items():
+        payload[key] = {
+            "utilization": used,
+            "resets_at": time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(resets)),
+        }
+    return payload
 
 
 def gemini_dir(home: Path) -> Path:
@@ -2184,6 +2276,66 @@ class Quota:
         return self.claude(renew=True)  # the fresh telemetry decides, including whether there is headroom to spend
 
     def _claude_pass(
+        self, fp: str | None, tok: str | None, *, refresh: bool = False
+    ) -> tuple[Provider, list[Reading] | None]:
+        """One read of the account's usage: the usage endpoint (see _claude_endpoint_pass), or, when that
+        cannot vouch for anything right now, a fresh reading from the spend journal."""
+        prov, readings = self._claude_endpoint_pass(fp, tok, refresh=refresh)
+        if prov.available or prov.bootstrap_eligible or not _endpoint_unreadable(prov):
+            return prov, readings
+        journal = self._claude_journal_pass(fp)
+        return (prov, readings) if journal is None else journal
+
+    def _claude_journal_pass(self, fp: str | None) -> tuple[Provider, list[Reading]] | None:
+        """The verdict on the spend journal's newest reading (see _journal_windows), or None when there
+        is none fresh enough to stand in for the endpoint.
+
+        Claude Code reports the account's utilization per window in the rate-limit headers of every
+        response, and each run journals the last it saw, so a run that just ended knows the usage as
+        well as the endpoint would, while the endpoint answers most polls with 429. The reading is held
+        to the endpoint's own rules: paced as of the moment it was seen, never the present, and only
+        while younger than CLAUDE_STALE_GATE_S (see _from_cached_claude). It also needs the account's
+        last real payload as a template, for what the headers do not carry (credits), and fails closed
+        without one."""
+        cfg = getattr(self, "cfg", None)
+        if cfg is None:
+            return None  # no configuration, so no account and no journal (as for _shared_usage_paths)
+        found = _journal_windows(claude_spend_journal(cfg.home), time.time(), CLAUDE_STALE_GATE_S)
+        if found is None:
+            return None
+        template = self._claude_payload_template(fp)
+        if template is None:
+            return None
+        windows, at = found
+        prov, readings = self._from_cached_claude((_journal_payload(template, windows), at))
+        log(
+            f"claude quota: usage endpoint unreadable; pacing on the spend journal's reading from "
+            f"{int((time.time() - at) // 60)} min ago ("
+            + ", ".join(f"{key} {used:.0f}%" for key, (used, _r) in windows.items())
+            + ")"
+        )
+        return prov, readings
+
+    def _claude_payload_template(self, fp: str | None) -> dict | None:
+        """The account's most recent real usage payload, of any age: this worker's own cache entry or
+        the account's shared one, whichever was fetched later. Only its shape and the fields the
+        rate-limit headers lack are used (see _journal_payload)."""
+        candidates: list[tuple[float, dict]] = []
+        own = _read_json_file(self.cache_dir / "quota-claude.json")
+        if own and own.get("fp") == fp and isinstance(own.get("payload"), dict) and _finite_num(own.get("fetched_at")):
+            candidates.append((own["fetched_at"], own["payload"]))
+        paths = self._shared_usage_paths()
+        shared = _read_json_file(paths[0]) if paths is not None else None
+        if (
+            shared
+            and self._shared_entry_matches(shared, fp)
+            and isinstance(shared.get("payload"), dict)
+            and _finite_num(shared.get("fetched_at"))
+        ):
+            candidates.append((shared["fetched_at"], shared["payload"]))
+        return max(candidates, key=lambda c: c[0])[1] if candidates else None
+
+    def _claude_endpoint_pass(
         self, fp: str | None, tok: str | None, *, refresh: bool = False
     ) -> tuple[Provider, list[Reading] | None]:
         """One read of the usage endpoint (cache-aware) turned into a Provider. Returns readings=None
