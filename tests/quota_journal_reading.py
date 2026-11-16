@@ -103,7 +103,8 @@ try:
 
     def reset_state():
         q._forget_raw("claude")
-        for p in (journal, q._shared_usage_paths()[0]):
+        shared = q._shared_usage_paths()[0]
+        for p in (journal, shared, shared.with_name(quota.CLAUDE_USAGE_TEMPLATE_FILE)):
             p.unlink(missing_ok=True)
 
     answer = {"value": (429, None, 3600)}
@@ -201,6 +202,24 @@ try:
     found = quota._journal_windows(journal, time.time(), 1800)
     check("without a weekly cap, the session alone suffices", found is not None and list(found[0]), ["five_hour"])
     os.environ.pop("EPSILONERIDANI_CLAUDE_NO_WEEKLY_CAP")
+
+    print("5b) the template survives a bootstrap's cache wipe")
+    reset_state()
+    seed_template(at=now - 2 * 3600)
+    q._forget_raw("claude")  # what a bootstrap request does to the own and shared readings
+    q._shared_usage_record("fp", blocked_until=time.time() + 3600)  # then the next fetch meets a 429
+    write_journal(line(now - 60, 0.2, 0.3))
+    prov, _ = q._claude_pass("fp", "tok", refresh=True)
+    check("the kept template still lets the journal decide", prov.available, True)
+    template_file = q._shared_usage_paths()[0].with_name(quota.CLAUDE_USAGE_TEMPLATE_FILE)
+    data = json.loads(template_file.read_text())
+    data["account"] = "account:someone-else"
+    template_file.write_text(json.dumps(data))
+    q._forget_raw("claude")
+    q._shared_usage_record("fp", blocked_until=time.time() + 3600)
+    prov, _ = q._claude_pass("fp", "tok", refresh=True)
+    check("...but never another account's", prov.available, False)
+    template_file.unlink()
 
     print("6) a verdict the endpoint gave stands")
     reset_state()

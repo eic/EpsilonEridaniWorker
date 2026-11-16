@@ -244,7 +244,10 @@ reading instead, if:
   `$EPSILONERIDANI_CLAUDE_STALE_GATE_S`, and neither reset has passed;
 - the account has a real usage payload on record, of any age. The journal's
   figures replace its windows, and its other fields (whether credits are enabled)
-  still drive the credit guard. Without one the worker keeps waiting.
+  still drive the credit guard. Without one the worker keeps waiting. The last
+  payload the endpoint returned is kept in `usage-template.json` in the account's
+  directory, which a bootstrap request does not clear, so the journal still
+  works right after a window reset.
 
 The pair is dated to the older of its two `seen` stamps and paced as of that
 moment, like a cached reading. A model-scoped weekly
