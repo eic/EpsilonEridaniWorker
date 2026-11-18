@@ -49,6 +49,13 @@ to change it. That is useful when several workers author into the same scope,
 or when PRs wait long for review or merge. It is per worker, so one can be
 given its own value through its `workers.toml` `env` table.
 
+A worker whose `only` includes `roadmap` but not `review` idles at the limit,
+although the PRs holding it back are waiting for review. Set
+`$EPSILONERIDANI_BACKPRESSURE_REVIEW=1` in its `env` table to let it review one
+PR instead whenever backpressure stops it authoring. Review still never outranks
+the stages it was given: it authors again as soon as the limit allows. This is off
+by default, because a worker may have been kept from reviewing on purpose.
+
 ## The claim namespace
 
 Two workers must not spend two subscriptions writing the same report or fixing
@@ -291,6 +298,7 @@ Flags win over these. Most are tuning knobs with sane defaults.
 | `EPSILONERIDANI_CLAUDE_ALLOW_CREDITS` | _(unset)_ | `1` lets workers launch near a plan limit even with usage credits enabled, i.e. spend credits; turns the credit guard off. |
 | `EPSILONERIDANI_ROUND_TIMEOUT` | `5400` | Hard cap per round (seconds). |
 | `EPSILONERIDANI_MAX_OPEN_PRS` | `8` | Open PRs in the selected roadmap scope at which authoring stops (see [roadmap backpressure](#roadmap-backpressure)). |
+| `EPSILONERIDANI_BACKPRESSURE_REVIEW` | unset | `1`: a worker whose `only` leaves out `review` reviews one PR when roadmap backpressure stops it authoring (see [roadmap backpressure](#roadmap-backpressure)). |
 | `EPSILONERIDANI_GRACEFUL_RESTART_TIMEOUT` | `ROUND_TIMEOUT` + 600 | Seconds a graceful restart (a changed definition, `workers restart --after-round`) waits for the worker to stop between rounds before stopping it outright. |
 | `EPSILONERIDANI_INTERROUND` | `20` | Minimum gap after a productive round (seconds). |
 | `EPSILONERIDANI_BACKOFF_BASE` / `EPSILONERIDANI_BACKOFF_MAX` | `30` / `900` | The escalating no-progress back-off (seconds). |

@@ -322,6 +322,64 @@ def focus_prs(sv: Survey, opts) -> None:
             log(f"  --pr #{pr}: {pr_focus_reason(sv, opts, pr)}")
 
 
+def backpressure_review_enabled() -> bool:
+    """$EPSILONERIDANI_BACKPRESSURE_REVIEW=1: a worker whose `only` leaves out review reviews anyway
+    while roadmap backpressure stops it authoring. Read live, like the other dials; off by default,
+    because an operator may have kept a worker from reviewing on purpose."""
+    return os.environ.get("EPSILONERIDANI_BACKPRESSURE_REVIEW", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _review_under_backpressure(w: Worker, sv: Survey, opts) -> int | None:
+    """Review one PR in place of the roadmap round backpressure just refused, when the operator allowed
+    it (backpressure_review_enabled). None when that does not apply or nothing was taken.
+
+    A roadmap worker that is not also a reviewer otherwise sits idle at the limit, and the limit is
+    reached precisely because PRs are waiting: its own new PRs, unreviewed, are what hold it. Reviewing
+    them is the one thing that can let it author again. Only the cascade's FALLBACK changes: review
+    still never outranks the stages the worker was given, so it authors whenever the limit allows."""
+    if want(opts.only, "review") or not backpressure_review_enabled():
+        return None  # a reviewer already took its review turn in the cascade; or not allowed
+    if not sv.reviewable.actionable:
+        return None
+    log(
+        f"roadmap: {sv.n_mine_open} open PRs in selected scope (>= {MAX_OPEN_PRS}) — backpressure; "
+        f"reviewing instead (EPSILONERIDANI_BACKPRESSURE_REVIEW)"
+    )
+    order_review_candidates(sv, opts)
+    for c in sv.reviewable.actionable:
+        rc = dispatch("review", w, sv, c, opts)
+        if rc is not None:
+            return rc
+    return None
+
+
+def order_review_candidates(sv: Survey, opts) -> None:
+    """Apply the review throttles and the affinity + age-weighted order to this round's review queue,
+    in place. Only for a round that may review: the throttles log what they hold back, and a round
+    that is not going to review should not say so."""
+    throttle_review(sv, opts)
+    stamp = time.time()
+    affinity_present = any(
+        c.preferred_reviewer and c.ready_at is not None and max(0.0, stamp - c.ready_at) < REVIEW_AFFINITY_GRACE_S
+        for c in sv.reviewable.actionable
+    )
+    reviewer = ""
+    if affinity_present:
+        try:
+            reviewer = me()
+        except Die as exc:
+            log(f"  review: {exc}; reviewer affinity disabled for this round")
+    ordered, deferred = prioritize_review_candidates(sv.reviewable.actionable, reviewer, now=stamp)
+    sv.reviewable.actionable = ordered
+    if deferred:
+        waits = [REVIEW_AFFINITY_GRACE_S - max(0.0, stamp - c.ready_at) for c in deferred if c.ready_at is not None]
+        next_wait = max(0, int(min(waits))) if waits else REVIEW_AFFINITY_GRACE_S
+        log(
+            f"  review: deferring {len(deferred)} PR(s) for their previous reviewers; "
+            f"next first-refusal window expires in {next_wait // 60}m {next_wait % 60:02d}s"
+        )
+
+
 def run_round(w: Worker, opts: RoundOpts) -> int:
     # Re-mirror the operator's (externally-refreshed) credentials into this worker's isolated home
     # before any work runs. The quota pacer does this too, and every paced path now reaches it — but the
@@ -416,27 +474,7 @@ def run_round(w: Worker, opts: RoundOpts) -> int:
     # and every other stage) keeps reporting the queue as it really is. Skipped outright when this
     # worker isn't reviewing anyway, so a `--only fix` round never logs a review it was not going to do.
     if want(opts.only, "review"):
-        throttle_review(sv, opts)
-        stamp = time.time()
-        affinity_present = any(
-            c.preferred_reviewer and c.ready_at is not None and max(0.0, stamp - c.ready_at) < REVIEW_AFFINITY_GRACE_S
-            for c in sv.reviewable.actionable
-        )
-        reviewer = ""
-        if affinity_present:
-            try:
-                reviewer = me()
-            except Die as exc:
-                log(f"  review: {exc}; reviewer affinity disabled for this round")
-        ordered, deferred = prioritize_review_candidates(sv.reviewable.actionable, reviewer, now=stamp)
-        sv.reviewable.actionable = ordered
-        if deferred:
-            waits = [REVIEW_AFFINITY_GRACE_S - max(0.0, stamp - c.ready_at) for c in deferred if c.ready_at is not None]
-            next_wait = max(0, int(min(waits))) if waits else REVIEW_AFFINITY_GRACE_S
-            log(
-                f"  review: deferring {len(deferred)} PR(s) for their previous reviewers; "
-                f"next first-refusal window expires in {next_wait // 60}m {next_wait % 60:02d}s"
-            )
+        order_review_candidates(sv, opts)
 
     # --pr: the operator named specific pull requests, so narrow every stage to those. Last of the
     # three narrowings (task selection, throttles, targeting) because each earlier one answers a
@@ -461,6 +499,9 @@ def run_round(w: Worker, opts: RoundOpts) -> int:
     # authoring: the operator asked for those PRs, and unrelated work is not a substitute for them.
     if want(opts.only, "roadmap") and not getattr(opts, "prs", ()):
         if sv.roadmap_backpressure:
+            rc = _review_under_backpressure(w, sv, opts)
+            if rc is not None:
+                return rc
             raise NoProgress(
                 f"roadmap: {sv.n_mine_open} open PRs in selected scope "
                 f"(>= {MAX_OPEN_PRS}) — backpressure, not authoring"
