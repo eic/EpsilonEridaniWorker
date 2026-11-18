@@ -49,6 +49,11 @@ to change it. That is useful when several workers author into the same scope,
 or when PRs wait long for review or merge. It is per worker, so one can be
 given its own value through its `workers.toml` `env` table.
 
+A worker whose `only` includes `roadmap` but not `review` idles at the limit,
+although the PRs holding it back are waiting for review. Give it
+`fallback = ["review"]` in `workers.toml` (see [workers.md](workers.md)) and it
+reviews one PR instead whenever backpressure stops it authoring.
+
 ## The claim namespace
 
 Two workers must not spend two subscriptions writing the same report or fixing

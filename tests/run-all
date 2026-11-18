@@ -53,6 +53,7 @@ RUN_STDLIB=(
   codex_fallback.py
   contest_claim.py
   dispatch_revalidation.py
+  fallback_tier.py
   fix_diagnostic.py
   fork_authoring.py
   github_failure_reason.py

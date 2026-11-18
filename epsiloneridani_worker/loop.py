@@ -274,6 +274,9 @@ def cmd_loop(
             tail = ["--worker-id", cfg.wid]
             if only:
                 tail += ["--only", ",".join(only)]
+            fallback = [t for v in getattr(args, "fallback", None) or [] for t in v.split(",") if t]
+            if fallback:
+                tail += ["--fallback", ",".join(fallback)]
             # --pr must travel to the child for the same reason --account does: the child is what
             # surveys and picks, this argv is built explicitly rather than inherited, and a targeting
             # flag omitted here would turn every round of a `--loop --pr` into a free-running one.

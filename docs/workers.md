@@ -101,6 +101,7 @@ other top-level key is an error, as is any unrecognized field inside a
 | `enabled` | bool | `true` | Desired running state. `false` stops the worker without forgetting it |
 | `agent` | string | `"auto"` | `auto`, `codex`, `claude`, `kiro`, `deepseek`, or `minimax` |
 | `only` | string list | `[]` | Work phases: `rebase`, `bump`, `progress`, `fix-ci`, `fix`, `review`, `roadmap`, `lint-repair`. Empty means the whole cascade |
+| `fallback` | string list | `[]` | Work phases done only when nothing under `only` is, including a roadmap round refused by [backpressure](reference.md#roadmap-backpressure). Needs `only`. `only` is a filter over one fixed order (review always comes before roadmap), so listing both never makes either a fallback; this does. For example, `only = ["roadmap", "fix-ci", "fix"]` with `fallback = ["review"]` authors first and reviews when it cannot |
 | `sandbox` | string | `"host"` | `host` or `bubble`. Progress-report rounds always run on the host |
 | `ignore_quota` | bool | `false` | Skip soft pacing. Provider hard limits still apply; an `auto` worker cannot launch with this enabled |
 | `auto_refresh` | bool | `false` | Renew this worker's Claude access token when it expires, instead of parking until a human runs `claude`. Only safe when nothing else uses the same credential file — the refresh token is single-use, so pair it with `claude_config_dir`. See [quota and pacing](quota.md) |

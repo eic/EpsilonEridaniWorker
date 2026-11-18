@@ -49,6 +49,7 @@ _WORKER_KEYS = {
     "enabled",
     "agent",
     "only",
+    "fallback",
     "sandbox",
     "ignore_quota",
     "auto_refresh",
@@ -257,6 +258,8 @@ class WorkerSpec:
     enabled: bool = True
     agent: str = "auto"
     only: tuple[str, ...] = ()
+    # Work kinds done only when nothing under `only` is: see work_units.run_round's fallback tier.
+    fallback: tuple[str, ...] = ()
     sandbox: str = "host"
     ignore_quota: bool = False
     auto_refresh: bool = False
@@ -296,6 +299,12 @@ class WorkerSpec:
         bad_tasks = [task for task in only if task not in ALLOWED_TASKS]
         if bad_tasks:
             raise WorkersError(f"workers[{index}].only has unknown task(s): {', '.join(bad_tasks)}")
+        fallback = _strings(raw.get("fallback", []), f"workers[{index}].fallback")
+        bad_fallback = [task for task in fallback if task not in ALLOWED_TASKS]
+        if bad_fallback:
+            raise WorkersError(f"workers[{index}].fallback has unknown task(s): {', '.join(bad_fallback)}")
+        if fallback and not only:
+            raise WorkersError(f"workers[{index}].fallback needs only: without it every task is already in the cascade")
         sandbox = _string(raw.get("sandbox", "host"), f"workers[{index}].sandbox")
         if sandbox not in ("host", "bubble"):
             raise WorkersError(f"workers[{index}].sandbox must be 'host' or 'bubble'")
@@ -315,6 +324,7 @@ class WorkerSpec:
             enabled=enabled,
             agent=agent,
             only=only,
+            fallback=fallback,
             sandbox=sandbox,
             ignore_quota=_boolean(raw.get("ignore_quota", False), f"workers[{index}].ignore_quota"),
             auto_refresh=_boolean(raw.get("auto_refresh", False), f"workers[{index}].auto_refresh"),
@@ -346,6 +356,8 @@ class WorkerSpec:
             value["agent"] = self.agent
         if self.only:
             value["only"] = list(self.only)
+        if self.fallback:
+            value["fallback"] = list(self.fallback)
         if self.sandbox != "host":
             value["sandbox"] = self.sandbox
         if self.ignore_quota:
@@ -386,6 +398,8 @@ class WorkerSpec:
         argv = self_argv("work", "--loop", "--worker-id", self.id)
         if self.only:
             argv += ["--only", ",".join(self.only)]
+        if self.fallback:
+            argv += ["--fallback", ",".join(self.fallback)]
         if self.agent != "auto":
             argv += ["--agent", self.agent]
         if self.sandbox == "bubble":
@@ -1540,6 +1554,9 @@ def _worker_configuration_lines(item: dict, width: int) -> list[str]:
     selected = spec.get("only") if isinstance(spec.get("only"), list) else item.get("only")
     phases = [str(phase) for phase in selected] if selected else list(ALLOWED_TASKS)
     lines = _status_field("phases", [", ".join(phases)], width)
+    fallback = spec.get("fallback") if isinstance(spec.get("fallback"), list) else []
+    if fallback:
+        lines += _status_field("fallback", [", ".join(str(t) for t in fallback)], width)
 
     agent = str(spec.get("agent") or item.get("agent") or "auto")
     sandbox = str(spec.get("sandbox") or item.get("sandbox") or "host")
