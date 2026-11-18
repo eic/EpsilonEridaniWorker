@@ -177,6 +177,14 @@ def add_work_flags(p: argparse.ArgumentParser) -> None:
         + " (default: walk the whole cascade)",
     )
     p.add_argument(
+        "--fallback",
+        action="append",
+        default=[],
+        metavar="TASKS",
+        help="work units to do only when nothing under --only is, including a roadmap round refused by "
+        "backpressure: a comma list of the same tasks (default: none)",
+    )
+    p.add_argument(
         "--skip",
         action="append",
         default=[],
@@ -666,6 +674,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_usage(args)
     if cmd in ("work", "_round"):
         only = resolve_tasks(getattr(args, "only", []), getattr(args, "skip", []))
+        if parse_only(getattr(args, "fallback", []) or [], "--fallback") and not only:
+            raise SystemExit("--fallback needs --only: without it every task is already in the cascade")
         prs = resolve_pr_targets(getattr(args, "pr", []))
         raise_on_untargetable_tasks(prs, only)
         if getattr(args, "until_done", False) and not (cmd == "work" and args.loop and prs):
@@ -978,6 +988,7 @@ def cmd_work(args, *, only: list[str], agent: str, one_round: bool, prs: tuple[i
         w = Worker(cfg, gh, ReviewState(cfg, gh), Counters(cfg), ctx, Claims(cfg, ctx))
         opts = RoundOpts(
             only=only,
+            fallback=tuple(parse_only(getattr(args, "fallback", []) or [], "--fallback")),
             agent=agent,
             work_model=work_model,
             sandbox_host=not getattr(args, "bubble", False),

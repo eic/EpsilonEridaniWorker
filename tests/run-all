@@ -38,7 +38,6 @@ RUN_STDLIB=(
   agent_transcript.py
   auto_stage_priority.py
   authoring_profiles.py
-  backpressure_review.py
   bubble_cache.py
   bubble_version.py
   branch_claim_repo.py
@@ -54,6 +53,7 @@ RUN_STDLIB=(
   codex_fallback.py
   contest_claim.py
   dispatch_revalidation.py
+  fallback_tier.py
   fix_diagnostic.py
   fork_authoring.py
   github_failure_reason.py

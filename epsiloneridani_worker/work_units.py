@@ -132,6 +132,8 @@ class RoundOpts:
     review_min_age: int = 0  # minutes a PR must have been awaiting review before this worker takes it
     # --pr: the pull requests this round is restricted to. Empty (the normal case) = no targeting.
     prs: tuple[int, ...] = ()
+    # --fallback: work kinds done only when nothing under `only` is (see run_round). Empty = none.
+    fallback: tuple[str, ...] = ()
 
     @property
     def agent_name(self) -> str:
@@ -322,34 +324,24 @@ def focus_prs(sv: Survey, opts) -> None:
             log(f"  --pr #{pr}: {pr_focus_reason(sv, opts, pr)}")
 
 
-def backpressure_review_enabled() -> bool:
-    """$EPSILONERIDANI_BACKPRESSURE_REVIEW=1: a worker whose `only` leaves out review reviews anyway
-    while roadmap backpressure stops it authoring. Read live, like the other dials; off by default,
-    because an operator may have kept a worker from reviewing on purpose."""
-    return os.environ.get("EPSILONERIDANI_BACKPRESSURE_REVIEW", "").strip().lower() in ("1", "true", "yes", "on")
+def _run_tier(w: Worker, sv: Survey, opts, allowed, declined: list[tuple[str, int]]) -> int | None:
+    """One pass of the cascade over the stages `allowed` admits: the PR stages in AUTO_STAGES order, then
+    roadmap. Returns the first performed unit's rc, or None when every candidate was declined (a peer
+    holds its claim) or there was none. Declined candidates are appended to `declined`.
 
-
-def _review_under_backpressure(w: Worker, sv: Survey, opts) -> int | None:
-    """Review one PR in place of the roadmap round backpressure just refused, when the operator allowed
-    it (backpressure_review_enabled). None when that does not apply or nothing was taken.
-
-    A roadmap worker that is not also a reviewer otherwise sits idle at the limit, and the limit is
-    reached precisely because PRs are waiting: its own new PRs, unreviewed, are what hold it. Reviewing
-    them is the one thing that can let it author again. Only the cascade's FALLBACK changes: review
-    still never outranks the stages the worker was given, so it authors whenever the limit allows."""
-    if want(opts.only, "review") or not backpressure_review_enabled():
-        return None  # a reviewer already took its review turn in the cascade; or not allowed
-    if not sv.reviewable.actionable:
-        return None
-    log(
-        f"roadmap: {sv.n_mine_open} open PRs in selected scope (>= {MAX_OPEN_PRS}) — backpressure; "
-        f"reviewing instead (EPSILONERIDANI_BACKPRESSURE_REVIEW)"
-    )
-    order_review_candidates(sv, opts)
-    for c in sv.reviewable.actionable:
-        rc = dispatch("review", w, sv, c, opts)
-        if rc is not None:
-            return rc
+    `roadmap` authors a PR that does not exist yet, so it can never be one of the PRs `--pr` named: a
+    targeted round never authors (the operator asked for those PRs, and unrelated work is not a
+    substitute for them), and backpressure refuses it; the caller reports that."""
+    for stage in AUTO_STAGES:
+        if not allowed(stage):
+            continue
+        for c in sv.kind(stage).actionable:
+            rc = dispatch(stage, w, sv, c, opts)
+            if rc is not None:
+                return rc  # performed (or dry-run); else (None) claimed-elsewhere → try next candidate
+            declined.append((stage, c.pr))
+    if allowed("roadmap") and not getattr(opts, "prs", ()) and not sv.roadmap_backpressure:
+        return dispatch("roadmap", w, sv, Candidate(0, "", sv.roadmap_only), opts)
     return None
 
 
@@ -486,29 +478,31 @@ def run_round(w: Worker, opts: RoundOpts) -> int:
     # claimed elsewhere is skipped to the next one (COOP dedup); progress also returns None when its
     # fresh plan re-check finds the cached due verdict stale, so useful lower-priority work still runs.
     declined: list[tuple[str, int]] = []
-    for stage in AUTO_STAGES:
-        if not want(opts.only, stage):
-            continue
-        for c in sv.kind(stage).actionable:
-            rc = dispatch(stage, w, sv, c, opts)
-            if rc is not None:
-                return rc  # performed (or dry-run); else (None) claimed-elsewhere → try next candidate
-            declined.append((stage, c.pr))
-    # `roadmap` authors a PR that does not exist yet, so it can never be one of the PRs `--pr` named.
-    # A targeted round that finds nothing to do on its targets stops rather than falling through to
-    # authoring: the operator asked for those PRs, and unrelated work is not a substitute for them.
-    if want(opts.only, "roadmap") and not getattr(opts, "prs", ()):
-        if sv.roadmap_backpressure:
-            rc = _review_under_backpressure(w, sv, opts)
+    rc = _run_tier(w, sv, opts, lambda stage: want(opts.only, stage), declined)
+    if rc is not None:
+        return rc
+    blocked = sv.roadmap_backpressure and want(opts.only, "roadmap") and not targets
+    # The fallback tier (`fallback` in workers.toml, --fallback): work kinds this worker does only when
+    # nothing under `only` was there, including a roadmap round refused by backpressure. Never for a
+    # --pr round, whose operator asked for those PRs and nothing else.
+    fallback = [t for t in getattr(opts, "fallback", ()) or () if not want(opts.only, t)]
+    if fallback and not targets:
+        if "review" in fallback:
+            order_review_candidates(sv, opts)  # first: its throttles may leave nothing to review
+        # Announce the fallback only when it has something to try, so the log never claims work the
+        # round then does not attempt.
+        if any(sv.kind(t).actionable for t in fallback if t in AUTO_STAGES) or (
+            "roadmap" in fallback and not sv.roadmap_backpressure
+        ):
+            why = "roadmap backpressure" if blocked else "nothing to do"
+            log(f"{why} under --only={','.join(opts.only)}; falling back to {','.join(fallback)}")
+            rc = _run_tier(w, sv, opts, lambda stage: stage in fallback, declined)
             if rc is not None:
                 return rc
-            raise NoProgress(
-                f"roadmap: {sv.n_mine_open} open PRs in selected scope "
-                f"(>= {MAX_OPEN_PRS}) — backpressure, not authoring"
-            )
-        rc = dispatch("roadmap", w, sv, Candidate(0, "", sv.roadmap_only), opts)
-        if rc is not None:
-            return rc
+    if blocked:
+        raise NoProgress(
+            f"roadmap: {sv.n_mine_open} open PRs in selected scope (>= {MAX_OPEN_PRS}) — backpressure, not authoring"
+        )
 
     scope = f"--only={','.join(opts.only) or '(all)'}"
     if targets:
