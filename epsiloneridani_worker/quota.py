@@ -2286,10 +2286,39 @@ class Quota:
         """One read of the account's usage: the usage endpoint (see _claude_endpoint_pass), or, when that
         cannot vouch for anything right now, a fresh reading from the spend journal."""
         prov, readings = self._claude_endpoint_pass(fp, tok, refresh=refresh)
-        if prov.available or prov.bootstrap_eligible or not _endpoint_unreadable(prov):
+        if prov.available or prov.bootstrap_eligible:
+            # A permissive verdict can rest on a reading minutes old: a sibling's shared one, or this
+            # worker's cache while the endpoint answers 429. Runs that ended since may have journaled
+            # the window running out. Usage never falls inside a window, so a fresh journal reading
+            # that shows one exhausted outranks it (see _claude_journal_exhausted).
+            exhausted = self._claude_journal_exhausted(fp)
+            return (prov, readings) if exhausted is None else exhausted
+        if not _endpoint_unreadable(prov):
             return prov, readings
         journal = self._claude_journal_pass(fp)
         return (prov, readings) if journal is None else journal
+
+    def _claude_journal_exhausted(self, fp: str | None) -> tuple[Provider, list[Reading]] | None:
+        """The spend journal's verdict when its fresh reading shows a gated window exhausted, else None.
+
+        On 2026-11-22 three workers on one account started reviews together from a 64% session reading
+        while the endpoint answered 429. The window ran out within five minutes; each review aborted
+        (engine exit 3), and the loop launched 12 more over 20 minutes on the same cached reading, every
+        one aborting at its first rubric, while the journal already said 101%. An exhausted window is a
+        hard block whatever the pace curve says, and a reading that shows one cannot be contradicted by
+        an older lower one, so this only ever withholds a launch, never grants one."""
+        found = self._claude_journal_reading(fp)
+        if found is None:
+            return None
+        prov, readings, windows, at = found
+        if not any(w.status == STATUS_EXHAUSTED for w in prov.windows):
+            return None
+        log(
+            f"claude quota: the spend journal's reading from {int((time.time() - at) // 60)} min ago shows "
+            + ", ".join(f"{key} {used:.0f}%" for key, (used, _r) in windows.items())
+            + " — newer than the usage reading the pacer had; holding until the window resets"
+        )
+        return prov, readings
 
     def _claude_journal_pass(self, fp: str | None) -> tuple[Provider, list[Reading]] | None:
         """The verdict on the spend journal's newest reading (see _journal_windows), or None when there
@@ -2302,6 +2331,23 @@ class Quota:
         while younger than CLAUDE_STALE_GATE_S (see _from_cached_claude). It also needs the account's
         last real payload as a template, for what the headers do not carry (credits), and fails closed
         without one."""
+        found = self._claude_journal_reading(fp)
+        if found is None:
+            return None
+        prov, readings, windows, at = found
+        log(
+            f"claude quota: usage endpoint unreadable; pacing on the spend journal's reading from "
+            f"{int((time.time() - at) // 60)} min ago ("
+            + ", ".join(f"{key} {used:.0f}%" for key, (used, _r) in windows.items())
+            + ")"
+        )
+        return prov, readings
+
+    def _claude_journal_reading(
+        self, fp: str | None
+    ) -> tuple[Provider, list[Reading], dict[str, tuple[float, float]], float] | None:
+        """The spend journal's newest fresh reading as a verdict, with its windows and instant, or None
+        (no configuration, no fresh reading, or no payload template). Silent: callers say why they use it."""
         cfg = getattr(self, "cfg", None)
         if cfg is None:
             return None  # no configuration, so no account and no journal (as for _shared_usage_paths)
@@ -2313,13 +2359,7 @@ class Quota:
             return None
         windows, at = found
         prov, readings = self._from_cached_claude((_journal_payload(template, windows), at))
-        log(
-            f"claude quota: usage endpoint unreadable; pacing on the spend journal's reading from "
-            f"{int((time.time() - at) // 60)} min ago ("
-            + ", ".join(f"{key} {used:.0f}%" for key, (used, _r) in windows.items())
-            + ")"
-        )
-        return prov, readings
+        return prov, readings, windows, at
 
     def _claude_payload_template(self, fp: str | None) -> dict | None:
         """The account's most recent real usage payload, of any age: this worker's own cache entry or

@@ -910,6 +910,24 @@ def _review_engine_env(w) -> dict[str, str] | None:
     return {**os.environ, CLAUDE_SPEND_JOURNAL_ENV: str(path)}
 
 
+def _review_workdir(w) -> Path:
+    """This worker's one reviewer workspace, handed to the host engine as --workdir.
+
+    Left to itself the engine makes a fresh `epsiloneridani-review-<pr>-*` temp dir per run and removes
+    it only when the run reaches its end. A run that stops early (a provider-down abort, a head that
+    moved, a crash) leaves it behind, 0.4-0.8 GB each (PR source, roadmap, upstream sources), and on
+    2026-11-22 255 of them filled bison's /tmp (47 GB). A worker runs one review at a time, so a fixed
+    per-worker path, emptied before and after every run, bounds the litter to one workspace per worker
+    whatever the engine does, and a run killed outright is cleared by the next one."""
+    wid = getattr(getattr(w, "cfg", None), "wid", None) or "worker"
+    return Path(tempfile.gettempdir()) / f"epsiloneridani-review-{wid}"
+
+
+def _clear_review_workdir(path: Path) -> None:
+    """Remove the workspace; best effort (a failure here must not fail the review round)."""
+    shutil.rmtree(path, ignore_errors=True)
+
+
 def do_review(w: Worker, sv: Survey, c: Candidate, opts: RoundOpts, bubble: bool) -> int:
     pr, head = c.pr, c.head
     reviewers = opts.work_model
@@ -928,6 +946,7 @@ def do_review(w: Worker, sv: Survey, c: Candidate, opts: RoundOpts, bubble: bool
         nrnd = w.rs.review_rounds(pr, w.counters)
         log(f"  review round {nrnd + 1} @ {head[:12]}, reviewers={reviewers} (CI retires at the cap)")
     started = time.time()
+    workdir = None if bubble else _review_workdir(w)
     try:
         if bubble:
             rc = review_in_bubble(w, pr, head, reviewers, opts)
@@ -935,6 +954,7 @@ def do_review(w: Worker, sv: Survey, c: Candidate, opts: RoundOpts, bubble: bool
             logf = w.cfg.logdir / f"review-{pr}-{time.strftime('%Y%m%d-%H%M%S')}.log"
             cm = _codex_review_model_override(reviewers)  # operator override; else the engine default
             km = _kiro_review_model(reviewers)
+            _clear_review_workdir(workdir)  # whatever a killed earlier run left
             rc = run_to_logfile(
                 [
                     "uvx",
@@ -954,6 +974,8 @@ def do_review(w: Worker, sv: Survey, c: Candidate, opts: RoundOpts, bubble: bool
                     str(REVIEW_DAILY_CAP),
                     "--submitted-by",
                     me(),
+                    "--workdir",
+                    str(workdir),
                     *(["--codex-model", cm] if cm else []),
                     *(["--kiro-model", km] if km else []),
                 ],
@@ -1040,6 +1062,8 @@ def do_review(w: Worker, sv: Survey, c: Candidate, opts: RoundOpts, bubble: bool
             )
         return rc
     finally:
+        if workdir is not None:
+            _clear_review_workdir(workdir)
         # Drop the claim: on success the watermark now prevents a re-fire; on failure releasing it lets
         # the contest be retried. A crash before here leaves the 👀 to TTL out (CONTEST_CLAIM_TTL).
         if c.contest and c.contest_reply_id and not w.gh.remove_reaction(c.contest_reply_id):
